@@ -10,7 +10,12 @@ import SwiftData
 import os
 
 enum AppConfig {
-    static let appGroupId = "group.com.MCCANN.Learn"
+    static let appGroupId: String = {
+        guard let groupId = Bundle.main.object(forInfoDictionaryKey: "AppGroupId") as? String else {
+            fatalError("AppGroupId not found in Info.plist")
+        }
+        return groupId
+    }()
 }
 
 enum BorderLogSchemaV1: VersionedSchema {

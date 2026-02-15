@@ -383,6 +383,8 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.business";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				APP_GROUP_ID = "group.com.MCCANN.Learn";
+				INFOPLIST_KEY_AppGroupId = "$(APP_GROUP_ID)";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
@@ -416,6 +418,8 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.business";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				APP_GROUP_ID = "group.com.MCCANN.Learn";
+				INFOPLIST_KEY_AppGroupId = "$(APP_GROUP_ID)";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",

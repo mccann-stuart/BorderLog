@@ -30,18 +30,11 @@ struct DayOverrideEditorView: View {
                 DatePicker("Day", selection: $draft.date, displayedComponents: .date)
             }
 
-            Section("Location") {
-                TextField("Country", text: $draft.countryName)
-
-                TextField("Country Code", text: $draft.countryCode)
-                    .textInputAutocapitalization(.characters)
-
-                Picker("Region", selection: $draft.region) {
-                    ForEach(Region.allCases) { region in
-                        Text(region.rawValue).tag(region)
-                    }
-                }
-            }
+            LocationFormSection(
+                countryName: $draft.countryName,
+                countryCode: $draft.countryCode,
+                region: $draft.region
+            )
 
             Section("Notes") {
                 TextField("Notes", text: $draft.notes, axis: .vertical)

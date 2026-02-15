@@ -19,9 +19,9 @@ enum StayValidation {
             let start = calendar.startOfDay(for: stay.enteredOn)
             let end = calendar.startOfDay(for: stay.exitedOn ?? Date.distantFuture)
 
-            if let currentEnd, start <= currentEnd {
+            if let existingEnd = currentEnd, start <= existingEnd {
                 overlapCount += 1
-                currentEnd = max(currentEnd, end)
+                currentEnd = max(existingEnd, end)
             } else {
                 currentEnd = end
             }
