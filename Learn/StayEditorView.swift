@@ -26,18 +26,11 @@ struct StayEditorView: View {
 
     var body: some View {
         Form {
-            Section("Location") {
-                TextField("Country", text: $draft.countryName)
-
-                TextField("Country Code", text: $draft.countryCode)
-                    .textInputAutocapitalization(.characters)
-
-                Picker("Region", selection: $draft.region) {
-                    ForEach(Region.allCases) { region in
-                        Text(region.rawValue).tag(region)
-                    }
-                }
-            }
+            LocationFormSection(
+                countryName: $draft.countryName,
+                countryCode: $draft.countryCode,
+                region: $draft.region
+            )
 
             Section("Dates") {
                 DatePicker("Entry", selection: $draft.enteredOn, displayedComponents: .date)
