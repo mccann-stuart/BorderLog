@@ -1,5 +1,5 @@
 //
-//  LearnApp.swift
+//  BorderLogApp.swift
 //  Learn
 //
 //  Created by Mccann Stuart on 13/02/2026.
@@ -9,10 +9,10 @@ import SwiftUI
 import SwiftData
 
 @main
-struct LearnApp: App {
+struct BorderLogApp: App {
     var sharedModelContainer: ModelContainer = {
         let schema = Schema([
-            Item.self,
+            Stay.self,
         ])
         let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
 

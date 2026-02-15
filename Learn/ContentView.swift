@@ -10,50 +10,161 @@ import SwiftData
 
 struct ContentView: View {
     @Environment(\.modelContext) private var modelContext
-    @Query private var items: [Item]
+    @Query(sort: [SortDescriptor(\Stay.enteredOn, order: .reverse)]) private var stays: [Stay]
+    @State private var isPresentingAdd = false
+
+    private var schengenSummary: SchengenSummary {
+        SchengenCalculator.summary(for: stays, asOf: Date())
+    }
 
     var body: some View {
-        NavigationSplitView {
+        NavigationStack {
             List {
-                ForEach(items) { item in
-                    NavigationLink {
-                        Text("Item at \(item.timestamp, format: Date.FormatStyle(date: .numeric, time: .standard))")
-                    } label: {
-                        Text(item.timestamp, format: Date.FormatStyle(date: .numeric, time: .standard))
+                Section {
+                    SchengenSummaryRow(summary: schengenSummary)
+                        .listRowSeparator(.hidden)
+                }
+
+                Section("Stays") {
+                    if stays.isEmpty {
+                        ContentUnavailableView(
+                            "No stays yet",
+                            systemImage: "globe",
+                            description: Text("Add your first stay to start tracking days.")
+                        )
+                    } else {
+                        ForEach(stays) { stay in
+                            NavigationLink {
+                                StayDetailView(stay: stay)
+                            } label: {
+                                StayRow(stay: stay)
+                            }
+                        }
+                        .onDelete(perform: deleteStays)
                     }
                 }
-                .onDelete(perform: deleteItems)
             }
-            .navigationSplitViewColumnWidth(min: 180, ideal: 200)
+            .navigationTitle("BorderLog")
             .toolbar {
-                ToolbarItem {
-                    Button(action: addItem) {
-                        Label("Add Item", systemImage: "plus")
+                ToolbarItem(placement: .primaryAction) {
+                    Button {
+                        isPresentingAdd = true
+                    } label: {
+                        Label("Add Stay", systemImage: "plus")
                     }
                 }
             }
-        } detail: {
-            Text("Select an item")
-        }
-    }
-
-    private func addItem() {
-        withAnimation {
-            let newItem = Item(timestamp: Date())
-            modelContext.insert(newItem)
-        }
-    }
-
-    private func deleteItems(offsets: IndexSet) {
-        withAnimation {
-            for index in offsets {
-                modelContext.delete(items[index])
+            .sheet(isPresented: $isPresentingAdd) {
+                StayEditorView()
             }
         }
+    }
+
+    private func deleteStays(offsets: IndexSet) {
+        for index in offsets {
+            modelContext.delete(stays[index])
+        }
+    }
+}
+
+private struct StayRow: View {
+    let stay: Stay
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 8) {
+                Text(stay.displayTitle)
+                    .font(.headline)
+
+                if stay.isOngoing {
+                    Text("Ongoing")
+                        .font(.caption)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(Color.accentColor.opacity(0.15))
+                        .clipShape(Capsule())
+                }
+            }
+
+            HStack {
+                Text(dateRangeText)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+
+                Spacer()
+
+                Text(stay.region.rawValue)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .padding(.vertical, 4)
+    }
+
+    private var dateRangeText: String {
+        let formatter = Date.FormatStyle(date: .abbreviated, time: .omitted)
+        let start = stay.enteredOn.formatted(formatter)
+        if let exit = stay.exitedOn {
+            return "\(start) – \(exit.formatted(formatter))"
+        }
+        return "\(start) – Present"
+    }
+}
+
+private struct SchengenSummaryRow: View {
+    let summary: SchengenSummary
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Schengen 90/180")
+                .font(.headline)
+
+            HStack(spacing: 12) {
+                StatPill(title: "Used", value: "\(summary.usedDays)d")
+
+                if summary.overstayDays > 0 {
+                    StatPill(title: "Over", value: "\(summary.overstayDays)d", tint: .red)
+                } else {
+                    StatPill(title: "Remaining", value: "\(summary.remainingDays)d", tint: .green)
+                }
+            }
+
+            Text(windowText)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+        .padding(.vertical, 6)
+    }
+
+    private var windowText: String {
+        let formatter = Date.FormatStyle(date: .abbreviated, time: .omitted)
+        let start = summary.windowStart.formatted(formatter)
+        let end = summary.windowEnd.formatted(formatter)
+        return "Window: \(start) – \(end)"
+    }
+}
+
+private struct StatPill: View {
+    let title: String
+    let value: String
+    var tint: Color = .accentColor
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(title)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            Text(value)
+                .font(.headline)
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+        .background(tint.opacity(0.12))
+        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
     }
 }
 
 #Preview {
     ContentView()
-        .modelContainer(for: Item.self, inMemory: true)
+        .modelContainer(for: Stay.self, inMemory: true)
 }
