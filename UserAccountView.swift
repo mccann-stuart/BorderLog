@@ -16,31 +16,44 @@ struct UserAccountView: View {
     var body: some View {
         NavigationStack {
             Form {
-                Section("Account") {
-                    HStack {
-                        Image(systemName: "person.circle.fill")
-                            .font(.system(size: 50))
-                            .foregroundStyle(.blue)
-                        
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("Signed in with Apple")
-                                .font(.headline)
+                if AuthenticationManager.isAppleSignInEnabled {
+                    Section("Account") {
+                        HStack {
+                            Image(systemName: "person.circle.fill")
+                                .font(.system(size: 50))
+                                .foregroundStyle(.blue)
                             
-                            Text(maskedUserId)
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("Signed in with Apple")
+                                    .font(.headline)
+                                
+                                Text(maskedUserId)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                        .padding(.vertical, 8)
+                    }
+                    
+                    Section("Authentication") {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("Sign in with Apple")
+                                .font(.headline)
+                            Text("Your Apple ID is used for authentication. BorderLog does not have access to your email or personal information.")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                         }
                     }
-                    .padding(.vertical, 8)
-                }
-                
-                Section("Authentication") {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Sign in with Apple")
-                            .font(.headline)
-                        Text("Your Apple ID is used for authentication. BorderLog does not have access to your email or personal information.")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+                } else {
+                    Section("Account") {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("Local-only mode")
+                                .font(.headline)
+                            Text("Sign in is disabled. Your travel data stays on this device.")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                        .padding(.vertical, 8)
                     }
                 }
                 
@@ -60,9 +73,11 @@ struct UserAccountView: View {
                     }
                 }
                 
-                Section {
-                    Button("Sign Out", role: .destructive) {
-                        isConfirmingSignOut = true
+                if AuthenticationManager.isAppleSignInEnabled {
+                    Section {
+                        Button("Sign Out", role: .destructive) {
+                            isConfirmingSignOut = true
+                        }
                     }
                 }
             }

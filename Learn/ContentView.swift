@@ -121,10 +121,12 @@ struct ContentView: View {
                             isConfirmingReset = true
                         }
 
-                        Divider()
+                        if AuthenticationManager.isAppleSignInEnabled {
+                            Divider()
 
-                        Button("Sign Out") {
-                            authManager.signOut()
+                            Button("Sign Out") {
+                                authManager.signOut()
+                            }
                         }
                     } label: {
                         Image(systemName: "ellipsis.circle")

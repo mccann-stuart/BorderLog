@@ -180,15 +180,17 @@ private struct SideMenuView: View {
                     
                     Divider()
                         .padding(.vertical, 8)
-                    
-                    MenuButton(
-                        icon: "person.circle",
-                        title: "Account",
-                        isSelected: false
-                    ) {
-                        isShowingAccount = true
-                        withAnimation {
-                            isShowing = false
+
+                    if AuthenticationManager.isAppleSignInEnabled {
+                        MenuButton(
+                            icon: "person.circle",
+                            title: "Account",
+                            isSelected: false
+                        ) {
+                            isShowingAccount = true
+                            withAnimation {
+                                isShowing = false
+                            }
                         }
                     }
                     
@@ -211,19 +213,21 @@ private struct SideMenuView: View {
             // Footer
             VStack(spacing: 8) {
                 Divider()
-                
-                Button {
-                    authManager.signOut()
-                } label: {
-                    HStack {
-                        Image(systemName: "rectangle.portrait.and.arrow.right")
-                        Text("Sign Out")
+
+                if AuthenticationManager.isAppleSignInEnabled {
+                    Button {
+                        authManager.signOut()
+                    } label: {
+                        HStack {
+                            Image(systemName: "rectangle.portrait.and.arrow.right")
+                            Text("Sign Out")
+                        }
+                        .foregroundStyle(.red)
+                        .font(.callout)
                     }
-                    .foregroundStyle(.red)
-                    .font(.callout)
+                    .padding(.horizontal, 20)
+                    .padding(.bottom, 20)
                 }
-                .padding(.horizontal, 20)
-                .padding(.bottom, 20)
             }
         }
     }

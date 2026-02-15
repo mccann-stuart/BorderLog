@@ -2,6 +2,9 @@ import SwiftUI
 import Combine
 
 class AuthenticationManager: ObservableObject {
+    // Temporary local-only mode. Flip to true to re-enable Apple Sign-In UI/flows.
+    static let isAppleSignInEnabled = false
+
     @Published var appleUserId: String = ""
     
     private let service = "com.MCCANN.Learn"

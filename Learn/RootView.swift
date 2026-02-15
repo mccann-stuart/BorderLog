@@ -14,23 +14,27 @@ struct RootView: View {
 
     var body: some View {
         Group {
-            if authManager.appleUserId.isEmpty {
-                if hasCompletedFirstLaunch {
-                    SignInScreen(
-                        title: "Sign in to Border Log",
-                        subtitle: "Sign up with Apple ID to access your travel history on this device",
-                        showHighlights: false,
-                        onSignedIn: {}
-                    )
+            if AuthenticationManager.isAppleSignInEnabled {
+                if authManager.appleUserId.isEmpty {
+                    if hasCompletedFirstLaunch {
+                        SignInScreen(
+                            title: "Sign in to Border Log",
+                            subtitle: "Sign up with Apple ID to access your travel history on this device",
+                            showHighlights: false,
+                            onSignedIn: {}
+                        )
+                    } else {
+                        SignInScreen(
+                            title: "Welcome to Border Log",
+                            subtitle: "Track country stays, stay compliant, and keep your data on-device",
+                            showHighlights: true,
+                            onSignedIn: {
+                                hasCompletedFirstLaunch = true
+                            }
+                        )
+                    }
                 } else {
-                    SignInScreen(
-                        title: "Welcome to Border Log",
-                        subtitle: "Track country stays, stay compliant, and keep your data on-device",
-                        showHighlights: true,
-                        onSignedIn: {
-                            hasCompletedFirstLaunch = true
-                        }
-                    )
+                    MainNavigationView()
                 }
             } else {
                 MainNavigationView()
@@ -38,6 +42,7 @@ struct RootView: View {
         }
         .environmentObject(authManager)
         .onAppear {
+            guard AuthenticationManager.isAppleSignInEnabled else { return }
             if !authManager.appleUserId.isEmpty && !hasCompletedFirstLaunch {
                 hasCompletedFirstLaunch = true
             }

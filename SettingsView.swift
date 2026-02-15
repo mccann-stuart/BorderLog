@@ -118,7 +118,7 @@ struct AboutSetupView: View {
 
             Section("Setup") {
                 Text("App Group: configure Info.plist key 'AppGroupId' and enable the App Groups capability.")
-                Text("Sign in with Apple: required. Enable capability and use the system button.")
+                Text("Sign in with Apple: temporarily disabled (local-only mode).")
                 Text("iCloud: optional for M1. Add later if you want device sync.")
             }
 
