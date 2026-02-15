@@ -17,15 +17,15 @@ struct RootView: View {
             if authManager.appleUserId.isEmpty {
                 if hasCompletedFirstLaunch {
                     SignInScreen(
-                        title: "Sign in to BorderLog",
-                        subtitle: "Use your Apple ID to access your travel history on this device.",
+                        title: "Sign in to Border Log",
+                        subtitle: "Sign up with Apple ID to access your travel history on this device",
                         showHighlights: false,
                         onSignedIn: {}
                     )
                 } else {
                     SignInScreen(
-                        title: "Welcome to BorderLog",
-                        subtitle: "Track country stays, stay Schengen-compliant, and keep your data on-device.",
+                        title: "Welcome to Border Log",
+                        subtitle: "Track country stays, stay compliant, and keep your data on-device",
                         showHighlights: true,
                         onSignedIn: {
                             hasCompletedFirstLaunch = true
@@ -64,6 +64,8 @@ private struct SignInScreen: View {
 
                 Text(title)
                     .font(.largeTitle.bold())
+                    .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
             }
 
             Text(subtitle)
@@ -75,8 +77,8 @@ private struct SignInScreen: View {
             if showHighlights {
                 VStack(alignment: .leading, spacing: 10) {
                     Label("Log stays with dates and notes", systemImage: "calendar")
-                    Label("See Schengen 90/180 usage", systemImage: "gauge.with.dots.needle.67percent")
-                    Label("Keep data local-first", systemImage: "lock.fill")
+                    Label("See visa usage", systemImage: "gauge.with.dots.needle.67percent")
+                    Label("Keep data local, always", systemImage: "lock.fill")
                 }
                 .font(.callout)
                 .frame(maxWidth: 320, alignment: .leading)

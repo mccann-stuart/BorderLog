@@ -9,6 +9,8 @@ import XCTest
 @testable import Learn
 import SwiftData
 import Foundation
+
+@MainActor
 final class DataManagerTests: XCTestCase {
 
     func testSeedSampleDataInsertsData() async throws {

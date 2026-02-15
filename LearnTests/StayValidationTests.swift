@@ -15,7 +15,7 @@ final class StayValidationTests: XCTestCase {
     }
 
     func testOverlapCount_EmptyStays_ReturnsZero() {
-        let count = StayValidation.overlapCount(stays: [], calendar: calendar)
+        let count = StayValidation.overlapCount(stays: [Stay](), calendar: calendar)
         XCTAssertTrue(count == 0)
     }
 
@@ -233,6 +233,6 @@ final class StayValidationTests: XCTestCase {
         XCTAssertTrue(StayValidation.gapDays(stays: [stay1], calendar: calendar) == 0)
 
         // 7. Empty list
-        XCTAssertTrue(StayValidation.gapDays(stays: [], calendar: calendar) == 0)
+        XCTAssertTrue(StayValidation.gapDays(stays: [Stay](), calendar: calendar) == 0)
     }
 }

@@ -26,7 +26,12 @@ final class SchengenCalculatorWindowTests: XCTestCase {
             Stay(countryName: "France", region: .schengen, enteredOn: date(2026, 2, 1), exitedOn: date(2026, 2, 5)),
         ]
 
-        let summary = SchengenCalculator.summary(for: stays, asOf: date(2026, 2, 15), calendar: calendar)
+        let summary = SchengenCalculator.summary(
+            for: stays,
+            overrides: [DayOverride](),
+            asOf: date(2026, 2, 15),
+            calendar: calendar
+        )
 
         XCTAssertTrue(summary.usedDays == 6)
         XCTAssertTrue(summary.remainingDays == 84)
@@ -76,7 +81,12 @@ final class SchengenCalculatorWindowTests: XCTestCase {
             Stay(countryName: "France", region: .schengen, enteredOn: date(2026, 1, 1), exitedOn: date(2026, 1, 2)),
         ]
 
-        let summary = SchengenCalculator.summary(for: stays, asOf: referenceDate, calendar: calendar)
+        let summary = SchengenCalculator.summary(
+            for: stays,
+            overrides: [DayOverride](),
+            asOf: referenceDate,
+            calendar: calendar
+        )
 
         XCTAssertTrue(summary.usedDays == 0)
     }
@@ -87,7 +97,12 @@ final class SchengenCalculatorWindowTests: XCTestCase {
             Stay(countryName: "France", region: .schengen, enteredOn: date(2026, 1, 1), exitedOn: date(2026, 1, 5)),
         ]
 
-        let summary = SchengenCalculator.summary(for: stays, asOf: referenceDate, calendar: calendar)
+        let summary = SchengenCalculator.summary(
+            for: stays,
+            overrides: [DayOverride](),
+            asOf: referenceDate,
+            calendar: calendar
+        )
 
         // Should count Jan 3, 4, 5
         XCTAssertTrue(summary.usedDays == 3)
@@ -99,7 +114,12 @@ final class SchengenCalculatorWindowTests: XCTestCase {
             Stay(countryName: "France", region: .schengen, enteredOn: date(2026, 7, 2), exitedOn: date(2026, 7, 10)),
         ]
 
-        let summary = SchengenCalculator.summary(for: stays, asOf: referenceDate, calendar: calendar)
+        let summary = SchengenCalculator.summary(
+            for: stays,
+            overrides: [DayOverride](),
+            asOf: referenceDate,
+            calendar: calendar
+        )
 
         XCTAssertTrue(summary.usedDays == 0)
     }
@@ -110,7 +130,12 @@ final class SchengenCalculatorWindowTests: XCTestCase {
             Stay(countryName: "France", region: .schengen, enteredOn: date(2026, 6, 30), exitedOn: date(2026, 7, 5)),
         ]
 
-        let summary = SchengenCalculator.summary(for: stays, asOf: referenceDate, calendar: calendar)
+        let summary = SchengenCalculator.summary(
+            for: stays,
+            overrides: [DayOverride](),
+            asOf: referenceDate,
+            calendar: calendar
+        )
 
         // Should count June 30, July 1
         XCTAssertTrue(summary.usedDays == 2)
