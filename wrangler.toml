@@ -1,4 +1,4 @@
-name = "borderlog-api"
+name = "borderlog"
 main = "backend/src/index.js"
 compatibility_date = "2024-04-05"
 
