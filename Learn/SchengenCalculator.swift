@@ -16,6 +16,9 @@ struct SchengenSummary {
 }
 
 enum SchengenCalculator {
+    private static let windowSize = 180
+    private static let maxAllowedDays = 90
+
     static func summary(
         for stays: [Stay],
         overrides: [DayOverride] = [],
@@ -23,7 +26,7 @@ enum SchengenCalculator {
         calendar: Calendar = .current
     ) -> SchengenSummary {
         let windowEnd = calendar.startOfDay(for: referenceDate)
-        let windowStart = calendar.date(byAdding: .day, value: -179, to: windowEnd) ?? windowEnd
+        let windowStart = calendar.date(byAdding: .day, value: -(windowSize - 1), to: windowEnd) ?? windowEnd
         var uniqueDays = Set<Date>()
 
         for stay in stays where stay.region == .schengen {
@@ -58,8 +61,8 @@ enum SchengenCalculator {
         }
 
         let usedDays = uniqueDays.count
-        let remainingDays = max(0, 90 - usedDays)
-        let overstayDays = max(0, usedDays - 90)
+        let remainingDays = max(0, maxAllowedDays - usedDays)
+        let overstayDays = max(0, usedDays - maxAllowedDays)
 
         return SchengenSummary(
             usedDays: usedDays,
