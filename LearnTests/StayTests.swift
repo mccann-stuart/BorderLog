@@ -1,43 +1,42 @@
-import Testing
+import XCTest
 import Foundation
 import SwiftData
 @testable import Learn
-
-struct StayTests {
-    @Test func displayTitleFormatting() {
+final class StayTests: XCTestCase {
+    func testDisplayTitleFormatting() {
         let entryWithCode = Stay(
             countryName: "France",
             countryCode: "fr",
             enteredOn: Date()
         )
-        #expect(entryWithCode.displayTitle == "France (FR)")
+        XCTAssertTrue(entryWithCode.displayTitle == "France (FR)")
 
         let entryWithEmptyCode = Stay(
             countryName: "France",
             countryCode: "",
             enteredOn: Date()
         )
-        #expect(entryWithEmptyCode.displayTitle == "France")
+        XCTAssertTrue(entryWithEmptyCode.displayTitle == "France")
 
         let entryWithWhitespaceCode = Stay(
             countryName: "France",
             countryCode: "  ",
             enteredOn: Date()
         )
-        #expect(entryWithWhitespaceCode.displayTitle == "France")
+        XCTAssertTrue(entryWithWhitespaceCode.displayTitle == "France")
 
         let entryWithNilCode = Stay(
             countryName: "France",
             countryCode: nil,
             enteredOn: Date()
         )
-        #expect(entryWithNilCode.displayTitle == "France")
+        XCTAssertTrue(entryWithNilCode.displayTitle == "France")
 
         let entryWithMixedCaseCode = Stay(
             countryName: "France",
             countryCode: "fR",
             enteredOn: Date()
         )
-        #expect(entryWithMixedCaseCode.displayTitle == "France (FR)")
+        XCTAssertTrue(entryWithMixedCaseCode.displayTitle == "France (FR)")
     }
 }

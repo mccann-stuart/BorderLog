@@ -1,10 +1,9 @@
 
-import Testing
+import XCTest
 import Foundation
 import SwiftData
 @testable import Learn
-
-struct DayOverrideValidationTests {
+final class DayOverrideValidationTests: XCTestCase {
     private var calendar: Calendar {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = TimeZone(secondsFromGMT: 0) ?? .current
@@ -15,26 +14,26 @@ struct DayOverrideValidationTests {
         calendar.date(from: DateComponents(year: year, month: month, day: day))!
     }
 
-    @Test func conflictingOverride_EmptyOverrides_ReturnsNil() {
+    func testConflictingOverride_EmptyOverrides_ReturnsNil() {
         let result = DayOverrideValidation.conflictingOverride(
             for: date(2026, 1, 1),
             in: [],
             calendar: calendar
         )
-        #expect(result == nil)
+        XCTAssertTrue(result == nil)
     }
 
-    @Test func conflictingOverride_NoConflict_ReturnsNil() {
+    func testConflictingOverride_NoConflict_ReturnsNil() {
         let override1 = DayOverride(date: date(2026, 1, 5), countryName: "A")
         let result = DayOverrideValidation.conflictingOverride(
             for: date(2026, 1, 1),
             in: [override1],
             calendar: calendar
         )
-        #expect(result == nil)
+        XCTAssertTrue(result == nil)
     }
 
-    @Test func conflictingOverride_ConflictFound_ReturnsOverride() {
+    func testConflictingOverride_ConflictFound_ReturnsOverride() {
         let conflictDate = date(2026, 1, 5)
         let override1 = DayOverride(date: conflictDate, countryName: "A")
         let result = DayOverrideValidation.conflictingOverride(
@@ -42,10 +41,10 @@ struct DayOverrideValidationTests {
             in: [override1],
             calendar: calendar
         )
-        #expect(result === override1)
+        XCTAssertTrue(result === override1)
     }
 
-    @Test func conflictingOverride_ExcludingSelf_ReturnsNil() {
+    func testConflictingOverride_ExcludingSelf_ReturnsNil() {
         let conflictDate = date(2026, 1, 5)
         let override1 = DayOverride(date: conflictDate, countryName: "A")
         let result = DayOverrideValidation.conflictingOverride(
@@ -54,10 +53,10 @@ struct DayOverrideValidationTests {
             excluding: override1,
             calendar: calendar
         )
-        #expect(result == nil)
+        XCTAssertTrue(result == nil)
     }
 
-    @Test func conflictingOverride_MultipleOverrides_FindsFirstConflict() {
+    func testConflictingOverride_MultipleOverrides_FindsFirstConflict() {
         let conflictDate = date(2026, 1, 5)
         let override1 = DayOverride(date: date(2026, 1, 1), countryName: "A")
         let override2 = DayOverride(date: conflictDate, countryName: "B")
@@ -68,6 +67,6 @@ struct DayOverrideValidationTests {
             in: [override1, override2, override3],
             calendar: calendar
         )
-        #expect(result === override2)
+        XCTAssertTrue(result === override2)
     }
 }

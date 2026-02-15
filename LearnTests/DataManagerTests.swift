@@ -5,14 +5,13 @@
 //  Created by Jules on 16/02/2026.
 //
 
-import Testing
+import XCTest
 @testable import Learn
 import SwiftData
 import Foundation
+final class DataManagerTests: XCTestCase {
 
-struct DataManagerTests {
-
-    @Test func seedSampleDataInsertsData() async throws {
+    func testSeedSampleDataInsertsData() async throws {
         let schema = Schema([Stay.self, DayOverride.self])
         let config = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
         let container = try ModelContainer(for: schema, configurations: [config])
@@ -23,7 +22,7 @@ struct DataManagerTests {
         // Seed
         let seeded = try dataManager.seedSampleData()
 
-        #expect(seeded)
+        XCTAssertTrue(seeded)
 
         // Verify counts
         let stayDescriptor = FetchDescriptor<Stay>()
@@ -32,15 +31,15 @@ struct DataManagerTests {
         let staysCount = try context.fetchCount(stayDescriptor)
         let overridesCount = try context.fetchCount(overrideDescriptor)
 
-        #expect(staysCount == 3)
-        #expect(overridesCount == 1)
+        XCTAssertTrue(staysCount == 3)
+        XCTAssertTrue(overridesCount == 1)
 
         // Seed again should fail
         let seededAgain = try dataManager.seedSampleData()
-        #expect(!seededAgain)
+        XCTAssertTrue(!seededAgain)
     }
 
-    @Test func resetAllDataRemovesData() async throws {
+    func testResetAllDataRemovesData() async throws {
         let schema = Schema([Stay.self, DayOverride.self])
         let config = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
         let container = try ModelContainer(for: schema, configurations: [config])
@@ -54,7 +53,7 @@ struct DataManagerTests {
         // Verify data exists
         let stayDescriptor = FetchDescriptor<Stay>()
         let staysCountBefore = try context.fetchCount(stayDescriptor)
-        #expect(staysCountBefore > 0)
+        XCTAssertTrue(staysCountBefore > 0)
 
         // Reset
         try dataManager.resetAllData()
@@ -63,11 +62,11 @@ struct DataManagerTests {
         let staysCountAfter = try context.fetchCount(stayDescriptor)
         let overridesCountAfter = try context.fetchCount(FetchDescriptor<DayOverride>())
 
-        #expect(staysCountAfter == 0)
-        #expect(overridesCountAfter == 0)
+        XCTAssertTrue(staysCountAfter == 0)
+        XCTAssertTrue(overridesCountAfter == 0)
     }
 
-    @Test func deleteRemovesSpecificModel() async throws {
+    func testDeleteRemovesSpecificModel() async throws {
         let schema = Schema([Stay.self, DayOverride.self])
         let config = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
         let container = try ModelContainer(for: schema, configurations: [config])
@@ -90,6 +89,6 @@ struct DataManagerTests {
         dataManager.delete(stay)
 
         let staysCount = try context.fetchCount(FetchDescriptor<Stay>())
-        #expect(staysCount == 0)
+        XCTAssertTrue(staysCount == 0)
     }
 }

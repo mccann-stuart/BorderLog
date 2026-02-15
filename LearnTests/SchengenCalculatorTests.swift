@@ -1,9 +1,7 @@
-import Testing
+import XCTest
 import Foundation
 @testable import Learn
-
-@Suite("Schengen 90/180 Engine")
-struct SchengenCalculatorTests {
+final class SchengenCalculatorTests: XCTestCase {
 
     private var calendar: Calendar {
         var cal = Calendar(identifier: .gregorian)
@@ -17,53 +15,48 @@ struct SchengenCalculatorTests {
         return calendar.date(from: comps)!
     }
 
-    @Test
-    func emptyData_hasZeroUsedAndFullRemaining() {
+    func testEmptyData_hasZeroUsedAndFullRemaining() {
         let stays: [Stay] = []
         let overrides: [DayOverride] = []
         let ref = day(2026, 2, 15)
         let summary = SchengenCalculator.summary(for: stays, overrides: overrides, asOf: ref, calendar: calendar)
-        #expect(summary.usedDays == 0)
-        #expect(summary.remainingDays == 90)
-        #expect(summary.overstayDays == 0)
+        XCTAssertTrue(summary.usedDays == 0)
+        XCTAssertTrue(summary.remainingDays == 90)
+        XCTAssertTrue(summary.overstayDays == 0)
     }
 
-    @Test
-    func exactly90DaysUsed_inWindow() {
+    func testExactly90DaysUsed_inWindow() {
         // One continuous Schengen stay of 90 days ending on ref
         let ref = day(2026, 2, 15)
         let start = calendar.date(byAdding: .day, value: -89, to: ref)!
         let stay = Stay(countryName: "Spain", countryCode: "ES", region: .schengen, enteredOn: start, exitedOn: ref)
         let summary = SchengenCalculator.summary(for: [stay], overrides: [], asOf: ref, calendar: calendar)
-        #expect(summary.usedDays == 90)
-        #expect(summary.remainingDays == 0)
-        #expect(summary.overstayDays == 0)
+        XCTAssertTrue(summary.usedDays == 90)
+        XCTAssertTrue(summary.remainingDays == 0)
+        XCTAssertTrue(summary.overstayDays == 0)
     }
 
-    @Test
-    func overstay_whenMoreThan90Days() {
+    func testOverstay_whenMoreThan90Days() {
         let ref = day(2026, 2, 15)
         let start = calendar.date(byAdding: .day, value: -100, to: ref)!
         let stay = Stay(countryName: "Italy", countryCode: "IT", region: .schengen, enteredOn: start, exitedOn: ref)
         let summary = SchengenCalculator.summary(for: [stay], overrides: [], asOf: ref, calendar: calendar)
-        #expect(summary.usedDays == 101) // inclusive of start and end
-        #expect(summary.overstayDays == 11)
-        #expect(summary.remainingDays == 0)
+        XCTAssertTrue(summary.usedDays == 101) // inclusive of start and end
+        XCTAssertTrue(summary.overstayDays == 11)
+        XCTAssertTrue(summary.remainingDays == 0)
     }
 
-    @Test
-    func nonSchengen_stay_doesNotCount() {
+    func testNonSchengen_stay_doesNotCount() {
         let ref = day(2026, 2, 15)
         let start = calendar.date(byAdding: .day, value: -30, to: ref)!
         let stay = Stay(countryName: "United Kingdom", countryCode: "UK", region: .nonSchengen, enteredOn: start, exitedOn: ref)
         let summary = SchengenCalculator.summary(for: [stay], overrides: [], asOf: ref, calendar: calendar)
-        #expect(summary.usedDays == 0)
-        #expect(summary.remainingDays == 90)
-        #expect(summary.overstayDays == 0)
+        XCTAssertTrue(summary.usedDays == 0)
+        XCTAssertTrue(summary.remainingDays == 90)
+        XCTAssertTrue(summary.overstayDays == 0)
     }
 
-    @Test
-    func overrides_addAndRemoveDays() {
+    func testOverrides_addAndRemoveDays() {
         let ref = day(2026, 2, 15)
         // 10 days Schengen stay
         let start = calendar.date(byAdding: .day, value: -9, to: ref)!
@@ -76,8 +69,8 @@ struct SchengenCalculatorTests {
 
         let summary = SchengenCalculator.summary(for: [stay], overrides: [removeDay, addDay], asOf: ref, calendar: calendar)
         // Base used = 10, minus 1 (removed), plus 1 (added) => 10
-        #expect(summary.usedDays == 10)
-        #expect(summary.remainingDays == 80)
-        #expect(summary.overstayDays == 0)
+        XCTAssertTrue(summary.usedDays == 10)
+        XCTAssertTrue(summary.remainingDays == 80)
+        XCTAssertTrue(summary.overstayDays == 0)
     }
 }

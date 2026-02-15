@@ -5,7 +5,7 @@
 //  Created by Mccann Stuart on 15/02/2026.
 //
 
-import Testing
+import XCTest
 @testable import Learn
 
 final class MockTravelEntry: TravelEntry {
@@ -26,43 +26,42 @@ final class MockTravelEntry: TravelEntry {
         self.notes = notes
     }
 }
-
-struct TravelEntryTests {
-    @Test func displayTitleFormattedCorrectly() {
+final class TravelEntryTests: XCTestCase {
+    func testDisplayTitleFormattedCorrectly() {
         let entryWithCode = MockTravelEntry(countryName: "France", countryCode: "fr")
-        #expect(entryWithCode.displayTitle == "France (FR)")
+        XCTAssertTrue(entryWithCode.displayTitle == "France (FR)")
 
         let entryWithEmptyCode = MockTravelEntry(countryName: "France", countryCode: "")
-        #expect(entryWithEmptyCode.displayTitle == "France")
+        XCTAssertTrue(entryWithEmptyCode.displayTitle == "France")
 
         let entryWithWhitespaceCode = MockTravelEntry(countryName: "France", countryCode: "  ")
-        #expect(entryWithWhitespaceCode.displayTitle == "France")
+        XCTAssertTrue(entryWithWhitespaceCode.displayTitle == "France")
 
         let entryWithNilCode = MockTravelEntry(countryName: "France", countryCode: nil)
-        #expect(entryWithNilCode.displayTitle == "France")
+        XCTAssertTrue(entryWithNilCode.displayTitle == "France")
 
         let entryWithMixedCaseCode = MockTravelEntry(countryName: "France", countryCode: "fR")
-        #expect(entryWithMixedCaseCode.displayTitle == "France (FR)")
+        XCTAssertTrue(entryWithMixedCaseCode.displayTitle == "France (FR)")
     }
 
-    @Test func regionGetterAndSetter() {
+    func testRegionGetterAndSetter() {
         let entry = MockTravelEntry(countryName: "France", region: .schengen)
 
-        #expect(entry.region == .schengen)
-        #expect(entry.regionRaw == "Schengen")
+        XCTAssertTrue(entry.region == .schengen)
+        XCTAssertTrue(entry.regionRaw == "Schengen")
 
         entry.region = .nonSchengen
-        #expect(entry.region == .nonSchengen)
-        #expect(entry.regionRaw == "Non-Schengen")
+        XCTAssertTrue(entry.region == .nonSchengen)
+        XCTAssertTrue(entry.regionRaw == "Non-Schengen")
 
         entry.region = .other
-        #expect(entry.region == .other)
-        #expect(entry.regionRaw == "Other")
+        XCTAssertTrue(entry.region == .other)
+        XCTAssertTrue(entry.regionRaw == "Other")
     }
 
-    @Test func regionHandlesInvalidRawValue() {
+    func testRegionHandlesInvalidRawValue() {
         let entry = MockTravelEntry(countryName: "France", region: .schengen)
         entry.regionRaw = "Invalid"
-        #expect(entry.region == .other)
+        XCTAssertTrue(entry.region == .other)
     }
 }

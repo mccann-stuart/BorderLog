@@ -1,13 +1,12 @@
 
-import Testing
+import XCTest
 import Foundation
 import SwiftData
 @testable import Learn
-
-struct PerformanceTests {
+final class PerformanceTests: XCTestCase {
 
     @MainActor
-    @Test func benchmarkFetchPerformance() async throws {
+    func testBenchmarkFetchPerformance() async throws {
         let schema = Schema([Stay.self])
         let config = ModelConfiguration(isStoredInMemoryOnly: true)
         let container = try ModelContainer(for: schema, configurations: config)
@@ -58,6 +57,6 @@ struct PerformanceTests {
         print("Fetch Overlapping (Predicate) took: \(durationPredicate) seconds. Count: \(overlappingStays.count)")
 
         // Assertion to ensure we are actually testing what we think
-        #expect(durationPredicate < durationAll, "Predicate fetch should be faster than fetching all")
+        XCTAssertTrue(durationPredicate < durationAll, "Predicate fetch should be faster than fetching all")
     }
 }

@@ -5,10 +5,9 @@
 //  Created by Mccann Stuart on 13/02/2026.
 //
 
-import Testing
+import XCTest
 @testable import Learn
-
-struct SchengenCalculatorTests {
+final class SchengenCalculatorWindowTests: XCTestCase {
     private var calendar: Calendar {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = TimeZone(secondsFromGMT: 0) ?? .current
@@ -19,7 +18,7 @@ struct SchengenCalculatorTests {
         calendar.date(from: DateComponents(year: year, month: month, day: day))!
     }
 
-    @Test func countsUniqueDaysAcrossOverlappingStays() async throws {
+    func testCountsUniqueDaysAcrossOverlappingStays() async throws {
         // Stays are typically provided in reverse chronological order (descending by enteredOn) via @Query.
         // We simulate this order here to match the optimized logic in SchengenCalculator.
         let stays = [
@@ -29,12 +28,12 @@ struct SchengenCalculatorTests {
 
         let summary = SchengenCalculator.summary(for: stays, asOf: date(2026, 2, 15), calendar: calendar)
 
-        #expect(summary.usedDays == 6)
-        #expect(summary.remainingDays == 84)
-        #expect(summary.overstayDays == 0)
+        XCTAssertTrue(summary.usedDays == 6)
+        XCTAssertTrue(summary.remainingDays == 84)
+        XCTAssertTrue(summary.overstayDays == 0)
     }
 
-    @Test func overridesRemoveSchengenDays() async throws {
+    func testOverridesRemoveSchengenDays() async throws {
         let stays = [
             Stay(countryName: "Germany", region: .schengen, enteredOn: date(2026, 2, 1), exitedOn: date(2026, 2, 3)),
         ]
@@ -49,11 +48,11 @@ struct SchengenCalculatorTests {
             calendar: calendar
         )
 
-        #expect(summary.usedDays == 2)
-        #expect(summary.remainingDays == 88)
+        XCTAssertTrue(summary.usedDays == 2)
+        XCTAssertTrue(summary.remainingDays == 88)
     }
 
-    @Test func overridesAddSchengenDays() async throws {
+    func testOverridesAddSchengenDays() async throws {
         let stays: [Stay] = []
         let overrides = [
             DayOverride(date: date(2026, 2, 4), countryName: "France", region: .schengen),
@@ -67,11 +66,11 @@ struct SchengenCalculatorTests {
             calendar: calendar
         )
 
-        #expect(summary.usedDays == 2)
-        #expect(summary.remainingDays == 88)
+        XCTAssertTrue(summary.usedDays == 2)
+        XCTAssertTrue(summary.remainingDays == 88)
     }
 
-    @Test func ignoresStaysCompletelyBeforeWindow() async throws {
+    func testIgnoresStaysCompletelyBeforeWindow() async throws {
         let referenceDate = date(2026, 7, 1) // window starts 2026-01-03
         let stays = [
             Stay(countryName: "France", region: .schengen, enteredOn: date(2026, 1, 1), exitedOn: date(2026, 1, 2)),
@@ -79,10 +78,10 @@ struct SchengenCalculatorTests {
 
         let summary = SchengenCalculator.summary(for: stays, asOf: referenceDate, calendar: calendar)
 
-        #expect(summary.usedDays == 0)
+        XCTAssertTrue(summary.usedDays == 0)
     }
 
-    @Test func clampsStaysPartiallyBeforeWindow() async throws {
+    func testClampsStaysPartiallyBeforeWindow() async throws {
         let referenceDate = date(2026, 7, 1) // window starts 2026-01-03
         let stays = [
             Stay(countryName: "France", region: .schengen, enteredOn: date(2026, 1, 1), exitedOn: date(2026, 1, 5)),
@@ -91,10 +90,10 @@ struct SchengenCalculatorTests {
         let summary = SchengenCalculator.summary(for: stays, asOf: referenceDate, calendar: calendar)
 
         // Should count Jan 3, 4, 5
-        #expect(summary.usedDays == 3)
+        XCTAssertTrue(summary.usedDays == 3)
     }
 
-    @Test func ignoresStaysCompletelyAfterWindow() async throws {
+    func testIgnoresStaysCompletelyAfterWindow() async throws {
         let referenceDate = date(2026, 7, 1)
         let stays = [
             Stay(countryName: "France", region: .schengen, enteredOn: date(2026, 7, 2), exitedOn: date(2026, 7, 10)),
@@ -102,10 +101,10 @@ struct SchengenCalculatorTests {
 
         let summary = SchengenCalculator.summary(for: stays, asOf: referenceDate, calendar: calendar)
 
-        #expect(summary.usedDays == 0)
+        XCTAssertTrue(summary.usedDays == 0)
     }
 
-    @Test func clampsStaysPartiallyAfterWindow() async throws {
+    func testClampsStaysPartiallyAfterWindow() async throws {
         let referenceDate = date(2026, 7, 1)
         let stays = [
             Stay(countryName: "France", region: .schengen, enteredOn: date(2026, 6, 30), exitedOn: date(2026, 7, 5)),
@@ -114,10 +113,10 @@ struct SchengenCalculatorTests {
         let summary = SchengenCalculator.summary(for: stays, asOf: referenceDate, calendar: calendar)
 
         // Should count June 30, July 1
-        #expect(summary.usedDays == 2)
+        XCTAssertTrue(summary.usedDays == 2)
     }
 
-    @Test func handleEmptyStaysList() async throws {
+    func testHandleEmptyStaysList() async throws {
         let stays: [Stay] = []
         let overrides: [DayOverride] = []
 
@@ -128,8 +127,8 @@ struct SchengenCalculatorTests {
             calendar: calendar
         )
 
-        #expect(summary.usedDays == 0)
-        #expect(summary.remainingDays == 90)
-        #expect(summary.overstayDays == 0)
+        XCTAssertTrue(summary.usedDays == 0)
+        XCTAssertTrue(summary.remainingDays == 90)
+        XCTAssertTrue(summary.overstayDays == 0)
     }
 }

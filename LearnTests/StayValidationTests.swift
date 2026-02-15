@@ -1,10 +1,9 @@
 
-import Testing
+import XCTest
 import Foundation
 import SwiftData
 @testable import Learn
-
-struct StayValidationTests {
+final class StayValidationTests: XCTestCase {
     private var calendar: Calendar {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = TimeZone(secondsFromGMT: 0) ?? .current
@@ -15,18 +14,18 @@ struct StayValidationTests {
         calendar.date(from: DateComponents(year: year, month: month, day: day))!
     }
 
-    @Test func overlapCount_EmptyStays_ReturnsZero() {
+    func testOverlapCount_EmptyStays_ReturnsZero() {
         let count = StayValidation.overlapCount(stays: [], calendar: calendar)
-        #expect(count == 0)
+        XCTAssertTrue(count == 0)
     }
 
-    @Test func overlapCount_SingleStay_ReturnsZero() {
+    func testOverlapCount_SingleStay_ReturnsZero() {
         let stay = Stay(countryName: "A", region: .schengen, enteredOn: date(2026, 1, 1), exitedOn: date(2026, 1, 5))
         let count = StayValidation.overlapCount(stays: [stay], calendar: calendar)
-        #expect(count == 0)
+        XCTAssertTrue(count == 0)
     }
 
-    @Test func overlapCount_DisjointStays_ReturnsZero() {
+    func testOverlapCount_DisjointStays_ReturnsZero() {
         // Stay 1: 1-5
         // Stay 2: 6-10
         // Ensures disjoint intervals are not counted as overlaps even if processed out of order.
@@ -35,10 +34,10 @@ struct StayValidationTests {
 
         // Pass in ascending order to test robustness against input order assumptions.
         let count = StayValidation.overlapCount(stays: [stay1, stay2], calendar: calendar)
-        #expect(count == 0)
+        XCTAssertTrue(count == 0)
     }
 
-    @Test func overlapCount_SimpleOverlap_ReturnsCount() {
+    func testOverlapCount_SimpleOverlap_ReturnsCount() {
         // Stay 1: 1-5
         // Stay 2: 4-8
         // Overlap: 4-5
@@ -46,20 +45,20 @@ struct StayValidationTests {
         let stay2 = Stay(countryName: "B", region: .schengen, enteredOn: date(2026, 1, 4), exitedOn: date(2026, 1, 8))
 
         let count = StayValidation.overlapCount(stays: [stay2, stay1], calendar: calendar)
-        #expect(count == 1)
+        XCTAssertTrue(count == 1)
     }
 
-    @Test func overlapCount_NestedOverlap_ReturnsCount() {
+    func testOverlapCount_NestedOverlap_ReturnsCount() {
         // Stay 1: 1-10
         // Stay 2: 3-6 (Inside Stay 1)
         let stay1 = Stay(countryName: "A", region: .schengen, enteredOn: date(2026, 1, 1), exitedOn: date(2026, 1, 10))
         let stay2 = Stay(countryName: "B", region: .schengen, enteredOn: date(2026, 1, 3), exitedOn: date(2026, 1, 6))
 
         let count = StayValidation.overlapCount(stays: [stay2, stay1], calendar: calendar)
-        #expect(count == 1)
+        XCTAssertTrue(count == 1)
     }
 
-    @Test func overlapCount_TouchingStays_ReturnsCount() {
+    func testOverlapCount_TouchingStays_ReturnsCount() {
         // Stay 1: 1-5
         // Stay 2: 5-10
         // Touching on day 5 counts as overlap.
@@ -67,10 +66,10 @@ struct StayValidationTests {
         let stay2 = Stay(countryName: "B", region: .schengen, enteredOn: date(2026, 1, 5), exitedOn: date(2026, 1, 10))
 
         let count = StayValidation.overlapCount(stays: [stay2, stay1], calendar: calendar)
-        #expect(count == 1)
+        XCTAssertTrue(count == 1)
     }
 
-    @Test func overlapCount_UnsortedInput_DetectsOverlapsCorrectly() {
+    func testOverlapCount_UnsortedInput_DetectsOverlapsCorrectly() {
         // Stay 1: 1-5
         // Stay 2: 4-8
         // Stay 3: 7-10
@@ -86,10 +85,10 @@ struct StayValidationTests {
 
         // Pass in unsorted/mixed order
         let count = StayValidation.overlapCount(stays: [stay2, stay3, stay1], calendar: calendar)
-        #expect(count == 2)
+        XCTAssertTrue(count == 2)
     }
 
-    @Test func overlapCount_AscendingInput_DetectsOverlapsCorrectly() {
+    func testOverlapCount_AscendingInput_DetectsOverlapsCorrectly() {
         // Same as above, but explicitly sorted ascending input.
         // Ensures logic does not rely on descending sort assumption.
 
@@ -98,10 +97,10 @@ struct StayValidationTests {
         let stay3 = Stay(countryName: "C", region: .schengen, enteredOn: date(2026, 1, 7), exitedOn: date(2026, 1, 10))
 
         let count = StayValidation.overlapCount(stays: [stay1, stay2, stay3], calendar: calendar)
-        #expect(count == 2)
+        XCTAssertTrue(count == 2)
     }
 
-    @Test func overlappingStaysDetectsConflicts() {
+    func testOverlappingStaysDetectsConflicts() {
         let stay1 = Stay(countryName: "A", region: .schengen, enteredOn: date(2026, 1, 1), exitedOn: date(2026, 1, 5))
         let stay2 = Stay(countryName: "B", region: .schengen, enteredOn: date(2026, 1, 6), exitedOn: date(2026, 1, 10))
         let stays = [stay1, stay2]
@@ -115,9 +114,9 @@ struct StayValidationTests {
             calendar: calendar
         )
 
-        #expect(overlaps.count == 2)
-        #expect(overlaps.contains(where: { $0.countryName == "A" }))
-        #expect(overlaps.contains(where: { $0.countryName == "B" }))
+        XCTAssertTrue(overlaps.count == 2)
+        XCTAssertTrue(overlaps.contains(where: { $0.countryName == "A" }))
+        XCTAssertTrue(overlaps.contains(where: { $0.countryName == "B" }))
 
         // No overlap (Jan 11-15)
         let noOverlaps = StayValidation.overlappingStays(
@@ -128,10 +127,10 @@ struct StayValidationTests {
             calendar: calendar
         )
 
-        #expect(noOverlaps.isEmpty)
+        XCTAssertTrue(noOverlaps.isEmpty)
     }
 
-    @Test func overlappingStaysExcludesCurrentStay() {
+    func testOverlappingStaysExcludesCurrentStay() {
         let stay1 = Stay(countryName: "A", region: .schengen, enteredOn: date(2026, 1, 1), exitedOn: date(2026, 1, 5))
         let stay2 = Stay(countryName: "B", region: .schengen, enteredOn: date(2026, 1, 6), exitedOn: date(2026, 1, 10))
         let stays = [stay1, stay2]
@@ -145,10 +144,10 @@ struct StayValidationTests {
             calendar: calendar
         )
 
-        #expect(overlaps.isEmpty)
+        XCTAssertTrue(overlaps.isEmpty)
     }
 
-    @Test func overlappingStaysHandlesOpenEndedStays() {
+    func testOverlappingStaysHandlesOpenEndedStays() {
         // Open ended stay starts Jan 15
         let stay3 = Stay(countryName: "C", region: .schengen, enteredOn: date(2026, 1, 15), exitedOn: nil)
         let stays = [stay3]
@@ -162,8 +161,8 @@ struct StayValidationTests {
             calendar: calendar
         )
 
-        #expect(overlaps.count == 1)
-        #expect(overlaps.first?.countryName == "C")
+        XCTAssertTrue(overlaps.count == 1)
+        XCTAssertTrue(overlaps.first?.countryName == "C")
 
         // Overlaps when input is open ended (Jan 18 - Future)
         let openInputOverlaps = StayValidation.overlappingStays(
@@ -174,11 +173,11 @@ struct StayValidationTests {
             calendar: calendar
         )
 
-        #expect(openInputOverlaps.count == 1)
-        #expect(openInputOverlaps.first?.countryName == "C")
+        XCTAssertTrue(openInputOverlaps.count == 1)
+        XCTAssertTrue(openInputOverlaps.first?.countryName == "C")
     }
 
-    @Test func overlappingStaysHandlesTouchingDates() {
+    func testOverlappingStaysHandlesTouchingDates() {
         let stay1 = Stay(countryName: "A", region: .schengen, enteredOn: date(2026, 1, 1), exitedOn: date(2026, 1, 5))
         let stay2 = Stay(countryName: "B", region: .schengen, enteredOn: date(2026, 1, 6), exitedOn: date(2026, 1, 10))
         let stays = [stay1, stay2]
@@ -194,27 +193,29 @@ struct StayValidationTests {
             calendar: calendar
         )
 
-        #expect(overlaps.count == 2)
-        #expect(overlaps.contains(where: { $0.countryName == "A" }))
-        #expect(overlaps.contains(where: { $0.countryName == "B" }))
-    @Test func gapDaysCalculatesCorrectly() {
+        XCTAssertTrue(overlaps.count == 2)
+        XCTAssertTrue(overlaps.contains(where: { $0.countryName == "A" }))
+        XCTAssertTrue(overlaps.contains(where: { $0.countryName == "B" }))
+    }
+
+    func testGapDaysCalculatesCorrectly() {
         // 1. Simple gap (2 days gap: Jan 5 to Jan 7 -> gap is Jan 6, 1 day)
         // Stay 1: Jan 1 - Jan 5
         // Stay 2: Jan 7 - Jan 10
         // Gap: Jan 6 (1 day)
         let stay1 = Stay(countryName: "A", region: .schengen, enteredOn: date(2026, 1, 1), exitedOn: date(2026, 1, 5))
         let stay2 = Stay(countryName: "B", region: .schengen, enteredOn: date(2026, 1, 7), exitedOn: date(2026, 1, 10))
-        #expect(StayValidation.gapDays(stays: [stay1, stay2], calendar: calendar) == 1)
+        XCTAssertTrue(StayValidation.gapDays(stays: [stay1, stay2], calendar: calendar) == 1)
 
         // 2. No gap (consecutive: Jan 5 to Jan 6)
         // Stay 3: Jan 6 - Jan 10
         let stay3 = Stay(countryName: "C", region: .schengen, enteredOn: date(2026, 1, 6), exitedOn: date(2026, 1, 10))
-        #expect(StayValidation.gapDays(stays: [stay1, stay3], calendar: calendar) == 0)
+        XCTAssertTrue(StayValidation.gapDays(stays: [stay1, stay3], calendar: calendar) == 0)
 
         // 3. Overlap (Jan 4 start, before Jan 5 end) - should be 0 gap
         // Stay 4: Jan 4 - Jan 8
         let stay4 = Stay(countryName: "D", region: .schengen, enteredOn: date(2026, 1, 4), exitedOn: date(2026, 1, 8))
-        #expect(StayValidation.gapDays(stays: [stay1, stay4], calendar: calendar) == 0)
+        XCTAssertTrue(StayValidation.gapDays(stays: [stay1, stay4], calendar: calendar) == 0)
 
         // 4. Multiple gaps
         // Stay 1: 1-5
@@ -222,16 +223,16 @@ struct StayValidationTests {
         // Stay 5: 15-20 (gap: 11-14, size 4)
         // Total gap: 1 + 4 = 5
         let stay5 = Stay(countryName: "E", region: .schengen, enteredOn: date(2026, 1, 15), exitedOn: date(2026, 1, 20))
-        #expect(StayValidation.gapDays(stays: [stay1, stay2, stay5], calendar: calendar) == 5)
+        XCTAssertTrue(StayValidation.gapDays(stays: [stay1, stay2, stay5], calendar: calendar) == 5)
 
         // 5. Unsorted input (Stay 2 before Stay 1 in list)
         // Should sort to [stay1, stay2] and calculate gap 1.
-        #expect(StayValidation.gapDays(stays: [stay2, stay1], calendar: calendar) == 1)
+        XCTAssertTrue(StayValidation.gapDays(stays: [stay2, stay1], calendar: calendar) == 1)
 
         // 6. Single stay
-        #expect(StayValidation.gapDays(stays: [stay1], calendar: calendar) == 0)
+        XCTAssertTrue(StayValidation.gapDays(stays: [stay1], calendar: calendar) == 0)
 
         // 7. Empty list
-        #expect(StayValidation.gapDays(stays: [], calendar: calendar) == 0)
+        XCTAssertTrue(StayValidation.gapDays(stays: [], calendar: calendar) == 0)
     }
 }
