@@ -12,9 +12,12 @@ import SwiftData
 struct BorderLogApp: App {
     var sharedModelContainer: ModelContainer = ModelContainerProvider.makeContainer()
 
+    @StateObject private var authManager = AuthenticationManager()
+
     var body: some Scene {
         WindowGroup {
-            RootView()
+            MainNavigationView()
+                .environmentObject(authManager)
         }
         .modelContainer(sharedModelContainer)
     }
