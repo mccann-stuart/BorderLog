@@ -114,4 +114,20 @@ struct SchengenCalculatorTests {
         // Should count June 30, July 1
         #expect(summary.usedDays == 2)
     }
+
+    @Test func handleEmptyStaysList() async throws {
+        let stays: [Stay] = []
+        let overrides: [DayOverride] = []
+
+        let summary = SchengenCalculator.summary(
+            for: stays,
+            overrides: overrides,
+            asOf: date(2026, 2, 15),
+            calendar: calendar
+        )
+
+        #expect(summary.usedDays == 0)
+        #expect(summary.remainingDays == 90)
+        #expect(summary.overstayDays == 0)
+    }
 }
