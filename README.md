@@ -528,5 +528,10 @@ Enable expatriates, digital nomads, and frequent international travelers to accu
 8. Add seed/sample data and a reset path for QA.
 9. Run a smoke test pass on a clean device and document known gaps.
 
+## M2 milestone — Inference v1
+- Widget location capture + ingestion
+- Photo signal ingestion
+- Daily ledger generation + confidence + explainability UI
+
 ## Run
 Open `Learn.xcodeproj` in Xcode and run the iOS app target.
