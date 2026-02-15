@@ -6,6 +6,14 @@
 	objectVersion = 90;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		4B9C85CD2F426E1000C510A8 /* DashboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4B9C85CC2F426E1000C510A8 /* DashboardView.swift */; };
+		4B9C85CF2F426E3900C510A8 /* WorldMapView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4B9C85CE2F426E3900C510A8 /* WorldMapView.swift */; };
+		4B9C85D12F426E4C00C510A8 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4B9C85D02F426E4C00C510A8 /* SettingsView.swift */; };
+		4B9C85D32F426E5C00C510A8 /* UserAccountView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4B9C85D22F426E5C00C510A8 /* UserAccountView.swift */; };
+		4B9C85D52F426E7A00C510A8 /* MainNavigationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4B9C85D42F426E7A00C510A8 /* MainNavigationView.swift */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXContainerItemProxy section */
 		4BF474CB2F3FAB7B0026C07A /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -24,10 +32,32 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		4B9C85CC2F426E1000C510A8 /* DashboardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardView.swift; sourceTree = "<group>"; };
+		4B9C85CE2F426E3900C510A8 /* WorldMapView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorldMapView.swift; sourceTree = "<group>"; };
+		4B9C85D02F426E4C00C510A8 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		4B9C85D22F426E5C00C510A8 /* UserAccountView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserAccountView.swift; sourceTree = "<group>"; };
+		4B9C85D42F426E7A00C510A8 /* MainNavigationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainNavigationView.swift; sourceTree = "<group>"; };
 		4BF474BB2F3FAB7A0026C07A /* Learn.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Learn.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		4BF474CA2F3FAB7B0026C07A /* LearnTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = LearnTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		4BF474D42F3FAB7B0026C07A /* LearnUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = LearnUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
+
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		4B9C85D62F426FA900C510A8 /* Exceptions for "LearnTests" folder in "Learn" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				SchengenCalculatorTests.swift,
+			);
+			target = 4BF474BA2F3FAB7A0026C07A /* Learn */;
+		};
+		4B9C85D72F426FA900C510A8 /* Exceptions for "LearnTests" folder in "LearnTests" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				SchengenCalculatorTests.swift,
+			);
+			target = 4BF474C92F3FAB7B0026C07A /* LearnTests */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		4BF474BD2F3FAB7A0026C07A /* Learn */ = {
@@ -37,6 +67,10 @@
 		};
 		4BF474CD2F3FAB7B0026C07A /* LearnTests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				4B9C85D62F426FA900C510A8 /* Exceptions for "LearnTests" folder in "Learn" target */,
+				4B9C85D72F426FA900C510A8 /* Exceptions for "LearnTests" folder in "LearnTests" target */,
+			);
 			path = LearnTests;
 			sourceTree = "<group>";
 		};
@@ -73,6 +107,11 @@
 				4BF474CD2F3FAB7B0026C07A /* LearnTests */,
 				4BF474D72F3FAB7B0026C07A /* LearnUITests */,
 				4BF474BC2F3FAB7A0026C07A /* Products */,
+				4B9C85CC2F426E1000C510A8 /* DashboardView.swift */,
+				4B9C85CE2F426E3900C510A8 /* WorldMapView.swift */,
+				4B9C85D02F426E4C00C510A8 /* SettingsView.swift */,
+				4B9C85D22F426E5C00C510A8 /* UserAccountView.swift */,
+				4B9C85D42F426E7A00C510A8 /* MainNavigationView.swift */,
 			);
 			sourceTree = "<group>";
 			usesTabs = 0;
@@ -216,6 +255,11 @@
 		4BF474B72F3FAB7A0026C07A /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			files = (
+				4B9C85D32F426E5C00C510A8 /* UserAccountView.swift in Sources */,
+				4B9C85CF2F426E3900C510A8 /* WorldMapView.swift in Sources */,
+				4B9C85D52F426E7A00C510A8 /* MainNavigationView.swift in Sources */,
+				4B9C85CD2F426E1000C510A8 /* DashboardView.swift in Sources */,
+				4B9C85D12F426E4C00C510A8 /* SettingsView.swift in Sources */,
 			);
 		};
 		4BF474C62F3FAB7B0026C07A /* Sources */ = {
@@ -370,27 +414,27 @@
 		4BF474DF2F3FAB7B0026C07A /* Debug configuration for PBXNativeTarget "Learn" */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				APP_GROUP_ID = group.com.MCCANN.Learn;
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = JZ834V3GDM;
+				DEVELOPMENT_TEAM = "";
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_AppGroupId = "$(APP_GROUP_ID)";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.business";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
-				APP_GROUP_ID = "group.com.MCCANN.Learn";
-				INFOPLIST_KEY_AppGroupId = "$(APP_GROUP_ID)";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.MCCANN.Learn;
+				PRODUCT_BUNDLE_IDENTIFIER = borderless1001;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
@@ -405,27 +449,27 @@
 		4BF474E02F3FAB7B0026C07A /* Release configuration for PBXNativeTarget "Learn" */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				APP_GROUP_ID = group.com.MCCANN.Learn;
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = JZ834V3GDM;
+				DEVELOPMENT_TEAM = "";
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_AppGroupId = "$(APP_GROUP_ID)";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.business";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
-				APP_GROUP_ID = "group.com.MCCANN.Learn";
-				INFOPLIST_KEY_AppGroupId = "$(APP_GROUP_ID)";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.MCCANN.Learn;
+				PRODUCT_BUNDLE_IDENTIFIER = borderless1001;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;

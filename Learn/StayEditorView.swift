@@ -96,6 +96,16 @@ struct StayEditorView: View {
         } message: {
             Text(overlapMessage)
         }
+        .onChange(of: draft.countryCode) { newValue in
+            let trimmed = newValue.trimmingCharacters(in: .whitespacesAndNewlines)
+            if trimmed.isEmpty {
+                draft.region = .other
+            } else if SchengenMembers.isMember(trimmed) {
+                draft.region = .schengen
+            } else {
+                draft.region = .nonSchengen
+            }
+        }
     }
 
     private var canSave: Bool {

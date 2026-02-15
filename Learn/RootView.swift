@@ -16,7 +16,7 @@ struct RootView: View {
             SignInView()
                 .environmentObject(authManager)
         } else {
-            ContentView()
+            MainNavigationView()
                 .environmentObject(authManager)
         }
     }
@@ -39,7 +39,7 @@ private struct SignInView: View {
                 .padding(.horizontal, 24)
 
             SignInWithAppleButton(.signIn) { request in
-                request.requestedScopes = [.fullName, .email]
+                request.requestedScopes = []
             } onCompletion: { result in
                 switch result {
                 case .success(let authorization):

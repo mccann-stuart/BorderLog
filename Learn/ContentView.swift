@@ -7,6 +7,7 @@
 
 import SwiftUI
 import SwiftData
+import Foundation
 
 struct ContentView: View {
     @Environment(\.modelContext) private var modelContext
@@ -41,6 +42,12 @@ struct ContentView: View {
                 Section {
                     SchengenSummaryRow(summary: schengenSummary)
                         .listRowSeparator(.hidden)
+                }
+                
+                Section("Configuration") {
+                    Text("Schengen membership: hard-coded (M1)")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                 }
 
                 if overlapCount > 0 || gapDays > 0 {
@@ -113,6 +120,10 @@ struct ContentView: View {
 
                 ToolbarItem(placement: .automatic) {
                     Menu {
+                        NavigationLink("About / Setup") {
+                            AboutSetupView()
+                        }
+
                         Button("Seed Sample Data") {
                             seedSampleData()
                         }
@@ -302,6 +313,29 @@ private struct StatPill: View {
         .padding(.vertical, 6)
         .background(tint.opacity(0.12))
         .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+    }
+}
+
+struct AboutSetupView: View {
+    var body: some View {
+        Form {
+            Section("About") {
+                Text("BorderLog is a privacy-first, local-first app for tracking days in/out and Schengen 90/180.")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+            }
+
+            Section("Setup") {
+                Text("App Group: configure Info.plist key ‘AppGroupId’ and enable the App Groups capability.")
+                Text("Sign in with Apple: required. Enable capability and use the system button.")
+                Text("iCloud: optional for M1. Add later if you want device sync.")
+            }
+
+            Section("Data Sources (M1)") {
+                Text("Manual stays and day overrides only. Inference via widgets and photos arrives in M2.")
+            }
+        }
+        .navigationTitle("About / Setup")
     }
 }
 
