@@ -7,47 +7,47 @@
 
 import SwiftUI
 import SwiftData
+import Foundation
 
 struct ContentView: View {
     @Environment(\.modelContext) private var modelContext
     @Query(sort: [SortDescriptor(\Stay.enteredOn, order: .reverse)]) private var stays: [Stay]
     @Query(sort: [SortDescriptor(\DayOverride.date, order: .reverse)]) private var overrides: [DayOverride]
-    @AppStorage("appleUserId") private var appleUserId: String = ""
+    @EnvironmentObject private var authManager: AuthenticationManager
+
+    private var dataManager: DataManager {
+        DataManager(modelContext: modelContext)
+    }
 
     @State private var isPresentingAddStay = false
     @State private var isPresentingAddOverride = false
     @State private var isConfirmingReset = false
     @State private var isShowingSeedAlert = false
-
-    private var schengenSummary: SchengenSummary {
-        SchengenCalculator.summary(for: stays, overrides: overrides, asOf: Date())
-    }
-
-    private var overlapCount: Int {
-        StayValidation.overlapCount(stays: stays, calendar: .current)
-    }
-
-    private var gapDays: Int {
-        StayValidation.gapDays(stays: stays, calendar: .current)
-    }
+    @State private var schengenState = SchengenState()
 
     var body: some View {
         NavigationStack {
             List {
                 Section {
-                    SchengenSummaryRow(summary: schengenSummary)
+                    SchengenSummaryRow(summary: schengenState.summary)
                         .listRowSeparator(.hidden)
                 }
+                
+                Section("Configuration") {
+                    Text("Schengen membership: hard-coded (M1)")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
 
-                if overlapCount > 0 || gapDays > 0 {
+                if schengenState.overlapCount > 0 || schengenState.gapDays > 0 {
                     Section("Data Quality") {
-                        if overlapCount > 0 {
-                            Text("Overlapping stays detected: \(overlapCount). Review overlaps or mark as transit days.")
+                        if schengenState.overlapCount > 0 {
+                            Text("Overlapping stays detected: \(schengenState.overlapCount). Review overlaps or mark as transit days.")
                                 .font(.callout)
                                 .foregroundStyle(.secondary)
                         }
-                        if gapDays > 0 {
-                            Text("Gaps between stays: \(gapDays) day(s). Consider adding stays or overrides.")
+                        if schengenState.gapDays > 0 {
+                            Text("Gaps between stays: \(schengenState.gapDays) day(s). Consider adding stays or overrides.")
                                 .font(.callout)
                                 .foregroundStyle(.secondary)
                         }
@@ -109,6 +109,10 @@ struct ContentView: View {
 
                 ToolbarItem(placement: .automatic) {
                     Menu {
+                        NavigationLink("About / Setup") {
+                            AboutSetupView()
+                        }
+
                         Button("Seed Sample Data") {
                             seedSampleData()
                         }
@@ -120,7 +124,7 @@ struct ContentView: View {
                         Divider()
 
                         Button("Sign Out") {
-                            appleUserId = ""
+                            authManager.signOut()
                         }
                     } label: {
                         Image(systemName: "ellipsis.circle")
@@ -150,70 +154,38 @@ struct ContentView: View {
                 }
             }
         }
+        .task(id: stays) {
+            await schengenState.update(stays: stays, overrides: overrides)
+        }
+        .task(id: overrides) {
+            await schengenState.update(stays: stays, overrides: overrides)
+        }
     }
 
     private func deleteStays(offsets: IndexSet) {
-        for index in offsets {
-            modelContext.delete(stays[index])
-        }
+        dataManager.delete(offsets: offsets, from: stays)
     }
 
     private func deleteOverrides(offsets: IndexSet) {
-        for index in offsets {
-            modelContext.delete(overrides[index])
-        }
+        dataManager.delete(offsets: offsets, from: overrides)
     }
 
     private func resetAllData() {
-        stays.forEach { modelContext.delete($0) }
-        overrides.forEach { modelContext.delete($0) }
+        do {
+            try dataManager.resetAllData()
+        } catch {
+            print("Failed to reset data: \(error)")
+        }
     }
 
     private func seedSampleData() {
-        guard stays.isEmpty && overrides.isEmpty else {
-            isShowingSeedAlert = true
-            return
+        do {
+            if try !dataManager.seedSampleData() {
+                isShowingSeedAlert = true
+            }
+        } catch {
+            print("Failed to seed data: \(error)")
         }
-
-        let calendar = Calendar.current
-        let today = calendar.startOfDay(for: Date())
-        let stay1 = Stay(
-            countryName: "Portugal",
-            countryCode: "PT",
-            region: .schengen,
-            enteredOn: calendar.date(byAdding: .day, value: -40, to: today) ?? today,
-            exitedOn: calendar.date(byAdding: .day, value: -10, to: today) ?? today,
-            notes: "Work trip"
-        )
-        let stay2 = Stay(
-            countryName: "United Kingdom",
-            countryCode: "UK",
-            region: .nonSchengen,
-            enteredOn: calendar.date(byAdding: .day, value: -9, to: today) ?? today,
-            exitedOn: calendar.date(byAdding: .day, value: -2, to: today) ?? today,
-            notes: "Client meetings"
-        )
-        let stay3 = Stay(
-            countryName: "Spain",
-            countryCode: "ES",
-            region: .schengen,
-            enteredOn: calendar.date(byAdding: .day, value: -1, to: today) ?? today,
-            exitedOn: nil,
-            notes: "Current"
-        )
-
-        modelContext.insert(stay1)
-        modelContext.insert(stay2)
-        modelContext.insert(stay3)
-
-        let overrideDay = DayOverride(
-            date: calendar.date(byAdding: .day, value: -15, to: today) ?? today,
-            countryName: "Ireland",
-            countryCode: "IE",
-            region: .nonSchengen,
-            notes: "Day trip"
-        )
-        modelContext.insert(overrideDay)
     }
 }
 
@@ -336,6 +308,29 @@ private struct StatPill: View {
         .padding(.vertical, 6)
         .background(tint.opacity(0.12))
         .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+    }
+}
+
+struct AboutSetupView: View {
+    var body: some View {
+        Form {
+            Section("About") {
+                Text("BorderLog is a privacy-first, local-first app for tracking days in/out and Schengen 90/180.")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+            }
+
+            Section("Setup") {
+                Text("App Group: configure Info.plist key ‘AppGroupId’ and enable the App Groups capability.")
+                Text("Sign in with Apple: required. Enable capability and use the system button.")
+                Text("iCloud: optional for M1. Add later if you want device sync.")
+            }
+
+            Section("Data Sources (M1)") {
+                Text("Manual stays and day overrides only. Inference via widgets and photos arrives in M2.")
+            }
+        }
+        .navigationTitle("About / Setup")
     }
 }
 

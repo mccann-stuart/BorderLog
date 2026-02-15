@@ -8,6 +8,9 @@ export default {
       return new Response("Method Not Allowed", { status: 405 });
     }
 
+    // Helper to validate version string (alphanumeric, dot, dash, underscore)
+    const isValidVersion = (v) => /^[a-zA-Z0-9.\-_]+$/.test(v);
+
     // Helper to fetch from R2
     const fetchFromR2 = async (key) => {
       // Check if binding exists
@@ -16,6 +19,9 @@ export default {
         // or a 500 error if strict. Given this is a template, a clear error or mock is better.
         // Let's return a 500 with a clear message.
         return new Response("R2 Bucket 'CONFIG_BUCKET' not configured in environment", { status: 500 });
+        // If binding is missing, return a generic error in production, but log internally
+        console.error("R2 Bucket 'CONFIG_BUCKET' not configured in environment");
+        return new Response("Internal Server Error", { status: 500 });
       }
 
       try {
@@ -23,11 +29,14 @@ export default {
 
         if (object === null) {
           return new Response(`Object '${key}' Not Found`, { status: 404 });
+          return new Response("Not Found", { status: 404 });
         }
 
         const headers = new Headers();
         object.writeHttpMetadata(headers);
         headers.set("etag", object.httpEtag);
+        // Add security headers
+        headers.set("X-Content-Type-Options", "nosniff");
 
         // Handle conditional requests (If-None-Match)
         const ifNoneMatch = request.headers.get("If-None-Match");
@@ -40,6 +49,12 @@ export default {
         });
       } catch (e) {
         return new Response(`Error fetching from R2: ${e.message}`, { status: 500 });
+        // Log the actual error but return a generic message to the client
+        console.error(`Error fetching from R2: ${e.message}`);
+        return new Response("Internal Server Error", {
+            status: 500,
+            headers: { "X-Content-Type-Options": "nosniff" }
+        });
       }
     };
 
@@ -58,6 +73,12 @@ export default {
       // "zones.json (Schengen membership...)" -> likely zones.json is the file, but versioning implies zones-v1.json or zones/v1.json
       // PRD: "GET /config/zones/{version} → zone definitions"
       // Let's assume the key is `zones/${version}.json` for clarity.
+      if (!isValidVersion(version)) {
+        return new Response("Invalid version format", {
+            status: 400,
+            headers: { "X-Content-Type-Options": "nosniff" }
+        });
+      }
       return fetchFromR2(`zones/${version}.json`);
     }
 
@@ -65,6 +86,12 @@ export default {
     const rulesMatch = path.match(/^\/config\/rules\/([^/]+)$/);
     if (rulesMatch) {
       const version = rulesMatch[1];
+      if (!isValidVersion(version)) {
+        return new Response("Invalid version format", {
+            status: 400,
+            headers: { "X-Content-Type-Options": "nosniff" }
+        });
+      }
       return fetchFromR2(`rules/${version}.json`);
     }
 
@@ -72,6 +99,12 @@ export default {
     const countriesMatch = path.match(/^\/config\/countries\/([^/]+)$/);
     if (countriesMatch) {
       const version = countriesMatch[1];
+      if (!isValidVersion(version)) {
+        return new Response("Invalid version format", {
+            status: 400,
+            headers: { "X-Content-Type-Options": "nosniff" }
+        });
+      }
       return fetchFromR2(`countries/${version}.json`);
     }
 

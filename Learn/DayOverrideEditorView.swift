@@ -30,18 +30,11 @@ struct DayOverrideEditorView: View {
                 DatePicker("Day", selection: $draft.date, displayedComponents: .date)
             }
 
-            Section("Location") {
-                TextField("Country", text: $draft.countryName)
-
-                TextField("Country Code", text: $draft.countryCode)
-                    .textInputAutocapitalization(.characters)
-
-                Picker("Region", selection: $draft.region) {
-                    ForEach(Region.allCases) { region in
-                        Text(region.rawValue).tag(region)
-                    }
-                }
-            }
+            LocationFormSection(
+                countryName: $draft.countryName,
+                countryCode: $draft.countryCode,
+                region: $draft.region
+            )
 
             Section("Notes") {
                 TextField("Notes", text: $draft.notes, axis: .vertical)
@@ -91,6 +84,16 @@ struct DayOverrideEditorView: View {
         } message: {
             Text("An override already exists for this day. Replacing it will remove the previous entry.")
         }
+        .onChange(of: draft.countryCode) { newValue in
+            let trimmed = newValue.trimmingCharacters(in: .whitespacesAndNewlines)
+            if trimmed.isEmpty {
+                draft.region = .other
+            } else if SchengenMembers.isMember(trimmed) {
+                draft.region = .schengen
+            } else {
+                draft.region = .nonSchengen
+            }
+        }
     }
 
     private var canSave: Bool {
@@ -102,12 +105,12 @@ struct DayOverrideEditorView: View {
         let normalizedDate = calendar.startOfDay(for: draft.date)
         draft.date = normalizedDate
 
-        if let conflict = overrides.first(where: { overrideDay in
-            if let existingOverride, overrideDay === existingOverride {
-                return false
-            }
-            return calendar.isDate(overrideDay.date, inSameDayAs: normalizedDate)
-        }) {
+        if let conflict = DayOverrideValidation.conflictingOverride(
+            for: normalizedDate,
+            in: overrides,
+            excluding: existingOverride,
+            calendar: calendar
+        ) {
             replaceTarget = conflict
             isShowingReplaceAlert = true
             return

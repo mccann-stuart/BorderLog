@@ -11,13 +11,14 @@ import SwiftData
 struct StayEditorView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
-    @Query(sort: [SortDescriptor(\Stay.enteredOn, order: .reverse)]) private var stays: [Stay]
 
     private let existingStay: Stay?
     @State private var draft: StayDraft
     @State private var isConfirmingDelete = false
     @State private var isShowingOverlapAlert = false
     @State private var overlapMessage = ""
+
+    private let noteCharacterLimit = 1000
 
     init(stay: Stay? = nil) {
         self.existingStay = stay
@@ -26,18 +27,11 @@ struct StayEditorView: View {
 
     var body: some View {
         Form {
-            Section("Location") {
-                TextField("Country", text: $draft.countryName)
-
-                TextField("Country Code", text: $draft.countryCode)
-                    .textInputAutocapitalization(.characters)
-
-                Picker("Region", selection: $draft.region) {
-                    ForEach(Region.allCases) { region in
-                        Text(region.rawValue).tag(region)
-                    }
-                }
-            }
+            LocationFormSection(
+                countryName: $draft.countryName,
+                countryCode: $draft.countryCode,
+                region: $draft.region
+            )
 
             Section("Dates") {
                 DatePicker("Entry", selection: $draft.enteredOn, displayedComponents: .date)
@@ -61,6 +55,15 @@ struct StayEditorView: View {
             Section("Notes") {
                 TextField("Notes", text: $draft.notes, axis: .vertical)
                     .lineLimit(3...6)
+                    .onChange(of: draft.notes) { _, newValue in
+                        if newValue.count > noteCharacterLimit {
+                            draft.notes = String(newValue.prefix(noteCharacterLimit))
+                        }
+                    }
+                Text("\(draft.notes.count)/\(noteCharacterLimit)")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .trailing)
             }
         }
         .navigationTitle(existingStay == nil ? "New Stay" : "Edit Stay")
@@ -104,6 +107,16 @@ struct StayEditorView: View {
         } message: {
             Text(overlapMessage)
         }
+        .onChange(of: draft.countryCode) { newValue in
+            let trimmed = newValue.trimmingCharacters(in: .whitespacesAndNewlines)
+            if trimmed.isEmpty {
+                draft.region = .other
+            } else if SchengenMembers.isMember(trimmed) {
+                draft.region = .schengen
+            } else {
+                draft.region = .nonSchengen
+            }
+        }
     }
 
     private var canSave: Bool {
@@ -115,10 +128,37 @@ struct StayEditorView: View {
         let normalizedEntry = calendar.startOfDay(for: draft.enteredOn)
         let normalizedExit = draft.hasExitDate ? calendar.startOfDay(for: draft.exitedOn) : nil
 
+        let searchStart = normalizedEntry
+        let searchEnd = normalizedExit ?? Date.distantFuture
+
+        let queryEnd: Date
+        if normalizedExit == nil {
+             queryEnd = Date.distantFuture
+        } else {
+             queryEnd = calendar.date(byAdding: .day, value: 1, to: searchEnd) ?? searchEnd
+        }
+
+        let distantFuture = Date.distantFuture
+
+        let descriptor = FetchDescriptor<Stay>(
+            predicate: #Predicate<Stay> { stay in
+                stay.enteredOn < queryEnd &&
+                (stay.exitedOn ?? distantFuture) >= searchStart
+            }
+        )
+
+        let potentialOverlaps: [Stay]
+        do {
+            potentialOverlaps = try modelContext.fetch(descriptor)
+        } catch {
+             print("Fetch failed: \(error)")
+             potentialOverlaps = []
+        }
+
         let overlaps = StayValidation.overlappingStays(
             enteredOn: normalizedEntry,
             exitedOn: normalizedExit,
-            stays: stays,
+            stays: potentialOverlaps,
             excluding: existingStay,
             calendar: calendar
         )

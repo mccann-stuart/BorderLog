@@ -8,16 +8,8 @@
 import Foundation
 import SwiftData
 
-enum Region: String, CaseIterable, Codable, Identifiable {
-    case schengen = "Schengen"
-    case nonSchengen = "Non-Schengen"
-    case other = "Other"
-
-    var id: String { rawValue }
-}
-
 @Model
-final class Stay {
+final class Stay: TravelEntry {
     var countryName: String
     var countryCode: String?
     var regionRaw: String
@@ -41,21 +33,8 @@ final class Stay {
         self.notes = notes
     }
 
-    var region: Region {
-        get { Region(rawValue: regionRaw) ?? .other }
-        set { regionRaw = newValue.rawValue }
-    }
-
     var isOngoing: Bool {
         exitedOn == nil
-    }
-
-    var displayTitle: String {
-        let trimmedCode = countryCode?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-        if trimmedCode.isEmpty {
-            return countryName
-        }
-        return "\(countryName) (\(trimmedCode.uppercased()))"
     }
 
     func durationInDays(asOf referenceDate: Date = Date(), calendar: Calendar = .current) -> Int {
@@ -66,3 +45,5 @@ final class Stay {
         return days + 1
     }
 }
+
+extension Stay: SchengenStay {}

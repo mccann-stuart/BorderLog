@@ -9,19 +9,21 @@ import SwiftUI
 import AuthenticationServices
 
 struct RootView: View {
-    @AppStorage("appleUserId") private var appleUserId: String = ""
+    @StateObject private var authManager = AuthenticationManager()
 
     var body: some View {
-        if appleUserId.isEmpty {
+        if authManager.appleUserId.isEmpty {
             SignInView()
+                .environmentObject(authManager)
         } else {
-            ContentView()
+            MainNavigationView()
+                .environmentObject(authManager)
         }
     }
 }
 
 private struct SignInView: View {
-    @AppStorage("appleUserId") private var appleUserId: String = ""
+    @EnvironmentObject private var authManager: AuthenticationManager
     @State private var isShowingError = false
     @State private var errorMessage = ""
 
@@ -37,12 +39,12 @@ private struct SignInView: View {
                 .padding(.horizontal, 24)
 
             SignInWithAppleButton(.signIn) { request in
-                request.requestedScopes = [.fullName, .email]
+                request.requestedScopes = []
             } onCompletion: { result in
                 switch result {
                 case .success(let authorization):
                     if let credential = authorization.credential as? ASAuthorizationAppleIDCredential {
-                        appleUserId = credential.user
+                        authManager.signIn(userId: credential.user)
                     } else {
                         showError("Unable to read Apple ID credential.")
                     }
