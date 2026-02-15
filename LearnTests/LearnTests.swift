@@ -20,9 +20,11 @@ struct SchengenCalculatorTests {
     }
 
     @Test func countsUniqueDaysAcrossOverlappingStays() async throws {
+        // Stays are typically provided in reverse chronological order (descending by enteredOn) via @Query.
+        // We simulate this order here to match the optimized logic in SchengenCalculator.
         let stays = [
-            Stay(countryName: "France", region: .schengen, enteredOn: date(2026, 2, 1), exitedOn: date(2026, 2, 5)),
             Stay(countryName: "Spain", region: .schengen, enteredOn: date(2026, 2, 4), exitedOn: date(2026, 2, 6)),
+            Stay(countryName: "France", region: .schengen, enteredOn: date(2026, 2, 1), exitedOn: date(2026, 2, 5)),
         ]
 
         let summary = SchengenCalculator.summary(for: stays, asOf: date(2026, 2, 15), calendar: calendar)

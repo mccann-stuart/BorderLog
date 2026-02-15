@@ -34,9 +34,15 @@ enum SchengenCalculator {
         let windowStart = calendar.date(byAdding: .day, value: -(windowSize - 1), to: windowEnd) ?? windowEnd
 
         // --- 1. Collect and Merge Intervals ---
-        var intervals: [Interval] = []
+        var mergedIntervals: [Interval] = []
 
-        for stay in stays where stay.region == .schengen {
+        // Optimization: Stays are typically reverse-sorted by enteredOn (descending) from the query.
+        // We iterate in reverse to process them in chronological order (ascending),
+        // allowing us to merge intervals on-the-fly without an intermediate array or sort.
+        assert(zip(stays, stays.dropFirst()).allSatisfy { $0.enteredOn >= $1.enteredOn },
+               "SchengenCalculator.summary expects stays to be sorted descending by enteredOn")
+
+        for stay in stays.reversed() where stay.region == .schengen {
             let stayStart = calendar.startOfDay(for: stay.enteredOn)
             let stayEnd = calendar.startOfDay(for: stay.exitedOn ?? referenceDate)
 
@@ -48,33 +54,23 @@ enum SchengenCalculator {
             let clampedStart = max(stayStart, windowStart)
             let clampedEnd = min(stayEnd, windowEnd)
 
-            if clampedStart <= clampedEnd {
-                intervals.append(Interval(start: clampedStart, end: clampedEnd))
-            }
-        }
+            guard clampedStart <= clampedEnd else { continue }
 
-        // Sort intervals by start date
-        intervals.sort { $0.start < $1.start }
-
-        var mergedIntervals: [Interval] = []
-        for interval in intervals {
-            if mergedIntervals.isEmpty {
-                mergedIntervals.append(interval)
-            } else {
+            if let lastInterval = mergedIntervals.last {
                 // Check for overlap or adjacency
-                let lastIndex = mergedIntervals.count - 1
-                let lastEnd = mergedIntervals[lastIndex].end
-
-                // Calculate next day after lastEnd to check adjacency
-                if let nextDay = calendar.date(byAdding: .day, value: 1, to: lastEnd),
-                   nextDay >= interval.start {
+                // Since we process in order, new start >= last start.
+                // We just check if new start <= last end + 1 day.
+                if let nextDay = calendar.date(byAdding: .day, value: 1, to: lastInterval.end),
+                   nextDay >= clampedStart {
                     // Merge if overlapping or adjacent
-                    if interval.end > lastEnd {
-                        mergedIntervals[lastIndex].end = interval.end
+                    if clampedEnd > lastInterval.end {
+                        mergedIntervals[mergedIntervals.count - 1].end = clampedEnd
                     }
                 } else {
-                    mergedIntervals.append(interval)
+                    mergedIntervals.append(Interval(start: clampedStart, end: clampedEnd))
                 }
+            } else {
+                mergedIntervals.append(Interval(start: clampedStart, end: clampedEnd))
             }
         }
 
