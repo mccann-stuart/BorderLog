@@ -84,7 +84,7 @@ struct DayOverrideEditorView: View {
         } message: {
             Text("An override already exists for this day. Replacing it will remove the previous entry.")
         }
-        .onChange(of: draft.countryCode) { newValue in
+        .onChange(of: draft.countryCode) { _, newValue in
             let trimmed = newValue.trimmingCharacters(in: .whitespacesAndNewlines)
             if trimmed.isEmpty {
                 draft.region = .other

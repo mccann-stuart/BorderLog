@@ -107,7 +107,7 @@ struct StayEditorView: View {
         } message: {
             Text(overlapMessage)
         }
-        .onChange(of: draft.countryCode) { newValue in
+        .onChange(of: draft.countryCode) { _, newValue in
             let trimmed = newValue.trimmingCharacters(in: .whitespacesAndNewlines)
             if trimmed.isEmpty {
                 draft.region = .other

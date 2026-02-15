@@ -1,8 +1,9 @@
 import SwiftUI
+import Combine
 
 class AuthenticationManager: ObservableObject {
     @Published var appleUserId: String = ""
-
+    
     private let service = "com.MCCANN.Learn"
     private let account = "appleUserId"
 

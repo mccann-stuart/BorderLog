@@ -311,29 +311,6 @@ private struct StatPill: View {
     }
 }
 
-struct AboutSetupView: View {
-    var body: some View {
-        Form {
-            Section("About") {
-                Text("BorderLog is a privacy-first, local-first app for tracking days in/out and Schengen 90/180.")
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-            }
-
-            Section("Setup") {
-                Text("App Group: configure Info.plist key ‘AppGroupId’ and enable the App Groups capability.")
-                Text("Sign in with Apple: required. Enable capability and use the system button.")
-                Text("iCloud: optional for M1. Add later if you want device sync.")
-            }
-
-            Section("Data Sources (M1)") {
-                Text("Manual stays and day overrides only. Inference via widgets and photos arrives in M2.")
-            }
-        }
-        .navigationTitle("About / Setup")
-    }
-}
-
 #Preview {
     ContentView()
         .modelContainer(for: [Stay.self, DayOverride.self], inMemory: true)

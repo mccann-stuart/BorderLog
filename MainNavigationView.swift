@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import SwiftData
 
 struct MainNavigationView: View {
     @EnvironmentObject private var authManager: AuthenticationManager

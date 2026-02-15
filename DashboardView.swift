@@ -25,9 +25,13 @@ struct DashboardView: View {
             let days = stay.durationInDays()
             let key = stay.countryCode ?? stay.countryName
             
-            if var info = countryDict[key] {
-                info.totalDays += days
-                countryDict[key] = info
+            if let info = countryDict[key] {
+                countryDict[key] = CountryDaysInfo(
+                    countryName: info.countryName,
+                    countryCode: info.countryCode,
+                    totalDays: info.totalDays + days,
+                    region: info.region
+                )
             } else {
                 countryDict[key] = CountryDaysInfo(
                     countryName: stay.countryName,
@@ -131,7 +135,7 @@ struct CountryDaysInfo: Identifiable {
     let id = UUID()
     let countryName: String
     let countryCode: String?
-    let totalDays: Int
+    var totalDays: Int
     let region: Region
     
     var flagEmoji: String {

@@ -47,15 +47,14 @@ final class SchengenState {
             )
         }
 
-        // Perform heavy calculation on background thread
-        // Use a detached task to ensure it runs off the main thread.
-        // We use 'try?' to handle cancellation gracefully (if the view's task is cancelled).
-        guard let result = try? await Task.detached(priority: .userInitiated, operation: {
-            let summary = SchengenCalculator.summary(for: stayInfos, overrides: overrideInfos)
-            let overlapCount = StayValidation.overlapCount(stays: stayInfos, calendar: .current)
-            let gapDays = StayValidation.gapDays(stays: stayInfos, calendar: .current)
-            return (summary, overlapCount, gapDays)
-        }).value else {
+        let calendar = Calendar.current
+        let overlapCount = StayValidation.overlapCount(stays: stayInfos, calendar: calendar)
+        let gapDays = StayValidation.gapDays(stays: stayInfos, calendar: calendar)
+
+        let summary = SchengenCalculator.summary(for: stayInfos, overrides: overrideInfos, calendar: calendar)
+        let result = (summary, overlapCount, gapDays)
+
+        if Task.isCancelled {
             return
         }
 

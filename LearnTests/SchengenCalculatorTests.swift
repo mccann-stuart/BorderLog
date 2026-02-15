@@ -1,3 +1,4 @@
+#if canImport(XCTest)
 import XCTest
 import Foundation
 @testable import Learn
@@ -74,3 +75,4 @@ final class SchengenCalculatorTests: XCTestCase {
         XCTAssertTrue(summary.overstayDays == 0)
     }
 }
+#endif
