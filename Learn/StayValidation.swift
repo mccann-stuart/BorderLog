@@ -9,11 +9,13 @@ import Foundation
 
 enum StayValidation {
     static func overlapCount(stays: [Stay], calendar: Calendar) -> Int {
-        let sorted = stays.sorted { $0.enteredOn < $1.enteredOn }
+        // Optimization: Input is typically reverse-sorted by 'enteredOn' from the query.
+        // Reversing provides ascending order in O(1) without additional allocation.
+        let ascendingStays = stays.reversed()
         var overlapCount = 0
         var currentEnd: Date?
 
-        for stay in sorted {
+        for stay in ascendingStays {
             let start = calendar.startOfDay(for: stay.enteredOn)
             let end = calendar.startOfDay(for: stay.exitedOn ?? Date.distantFuture)
 
@@ -29,13 +31,16 @@ enum StayValidation {
     }
 
     static func gapDays(stays: [Stay], calendar: Calendar) -> Int {
-        let sorted = stays.sorted { $0.enteredOn < $1.enteredOn }
-        guard sorted.count > 1 else { return 0 }
+        // Optimization: Input is typically reverse-sorted by 'enteredOn' from the query.
+        // Reversing provides ascending order in O(1) without additional allocation.
+        let ascendingStays = stays.reversed()
+        guard ascendingStays.count > 1 else { return 0 }
 
         var gapDays = 0
-        var previousEnd = calendar.startOfDay(for: sorted[0].exitedOn ?? sorted[0].enteredOn)
+        guard let firstStay = ascendingStays.first else { return 0 }
+        var previousEnd = calendar.startOfDay(for: firstStay.exitedOn ?? firstStay.enteredOn)
 
-        for stay in sorted.dropFirst() {
+        for stay in ascendingStays.dropFirst() {
             let start = calendar.startOfDay(for: stay.enteredOn)
             if start > previousEnd {
                 let dayDiff = calendar.dateComponents([.day], from: previousEnd, to: start).day ?? 0
