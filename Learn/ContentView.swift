@@ -17,6 +17,7 @@ struct ContentView: View {
     @State private var isPresentingAddStay = false
     @State private var isPresentingAddOverride = false
     @State private var isConfirmingReset = false
+    @State private var isShowingSeedAlert = false
 
     private var schengenSummary: SchengenSummary {
         SchengenCalculator.summary(for: stays, overrides: overrides, asOf: Date())
@@ -133,11 +134,20 @@ struct ContentView: View {
             } message: {
                 Text("This will remove all stays and day overrides from this device.")
             }
+            .alert("Sample data unavailable", isPresented: $isShowingSeedAlert) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text("Reset all data before seeding the sample dataset.")
+            }
             .sheet(isPresented: $isPresentingAddStay) {
-                StayEditorView()
+                NavigationStack {
+                    StayEditorView()
+                }
             }
             .sheet(isPresented: $isPresentingAddOverride) {
-                DayOverrideEditorView()
+                NavigationStack {
+                    DayOverrideEditorView()
+                }
             }
         }
     }
@@ -161,6 +171,7 @@ struct ContentView: View {
 
     private func seedSampleData() {
         guard stays.isEmpty && overrides.isEmpty else {
+            isShowingSeedAlert = true
             return
         }
 
@@ -244,9 +255,9 @@ private struct StayRow: View {
         let formatter = Date.FormatStyle(date: .abbreviated, time: .omitted)
         let start = stay.enteredOn.formatted(formatter)
         if let exit = stay.exitedOn {
-            return "\(start) – \(exit.formatted(formatter))"
+            return "\(start) - \(exit.formatted(formatter))"
         }
-        return "\(start) – Present"
+        return "\(start) - Present"
     }
 }
 
@@ -304,7 +315,7 @@ private struct SchengenSummaryRow: View {
         let formatter = Date.FormatStyle(date: .abbreviated, time: .omitted)
         let start = summary.windowStart.formatted(formatter)
         let end = summary.windowEnd.formatted(formatter)
-        return "Window: \(start) – \(end)"
+        return "Window: \(start) - \(end)"
     }
 }
 
