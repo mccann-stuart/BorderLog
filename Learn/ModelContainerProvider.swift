@@ -7,6 +7,7 @@
 
 import Foundation
 import SwiftData
+import os
 
 enum AppConfig {
     static let appGroupId = "group.com.MCCANN.Learn"
@@ -23,6 +24,8 @@ enum BorderLogMigrationPlan: SchemaMigrationPlan {
 }
 
 enum ModelContainerProvider {
+    private static let logger = Logger(subsystem: "com.MCCANN.Learn", category: "Persistence")
+
     static func makeContainer() -> ModelContainer {
         let schema = Schema(versionedSchema: BorderLogSchemaV1.self)
         let appGroupConfig = ModelConfiguration(schema: schema, groupContainer: .identifier(AppConfig.appGroupId))
@@ -31,7 +34,7 @@ enum ModelContainerProvider {
         do {
             return try ModelContainer(for: schema, migrationPlan: BorderLogMigrationPlan.self, configurations: [appGroupConfig])
         } catch {
-            print("App Group store unavailable. Falling back to local store. Error: \(error)")
+            logger.error("App Group store unavailable. Falling back to local store. Error: \(error, privacy: .public)")
             do {
                 return try ModelContainer(for: schema, migrationPlan: BorderLogMigrationPlan.self, configurations: [fallbackConfig])
             } catch {

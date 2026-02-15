@@ -68,4 +68,50 @@ struct SchengenCalculatorTests {
         #expect(summary.usedDays == 2)
         #expect(summary.remainingDays == 88)
     }
+
+    @Test func ignoresStaysCompletelyBeforeWindow() async throws {
+        let referenceDate = date(2026, 7, 1) // window starts 2026-01-03
+        let stays = [
+            Stay(countryName: "France", region: .schengen, enteredOn: date(2026, 1, 1), exitedOn: date(2026, 1, 2)),
+        ]
+
+        let summary = SchengenCalculator.summary(for: stays, asOf: referenceDate, calendar: calendar)
+
+        #expect(summary.usedDays == 0)
+    }
+
+    @Test func clampsStaysPartiallyBeforeWindow() async throws {
+        let referenceDate = date(2026, 7, 1) // window starts 2026-01-03
+        let stays = [
+            Stay(countryName: "France", region: .schengen, enteredOn: date(2026, 1, 1), exitedOn: date(2026, 1, 5)),
+        ]
+
+        let summary = SchengenCalculator.summary(for: stays, asOf: referenceDate, calendar: calendar)
+
+        // Should count Jan 3, 4, 5
+        #expect(summary.usedDays == 3)
+    }
+
+    @Test func ignoresStaysCompletelyAfterWindow() async throws {
+        let referenceDate = date(2026, 7, 1)
+        let stays = [
+            Stay(countryName: "France", region: .schengen, enteredOn: date(2026, 7, 2), exitedOn: date(2026, 7, 10)),
+        ]
+
+        let summary = SchengenCalculator.summary(for: stays, asOf: referenceDate, calendar: calendar)
+
+        #expect(summary.usedDays == 0)
+    }
+
+    @Test func clampsStaysPartiallyAfterWindow() async throws {
+        let referenceDate = date(2026, 7, 1)
+        let stays = [
+            Stay(countryName: "France", region: .schengen, enteredOn: date(2026, 6, 30), exitedOn: date(2026, 7, 5)),
+        ]
+
+        let summary = SchengenCalculator.summary(for: stays, asOf: referenceDate, calendar: calendar)
+
+        // Should count June 30, July 1
+        #expect(summary.usedDays == 2)
+    }
 }
