@@ -478,6 +478,7 @@ M1 — Foundations
 	•	Sign in with Apple required flow
 	•	Manual stays + day overrides
 	•	Schengen calculator engine (90/180)
+	•	Summary dashboard
 
 M2 — Inference v1
 	•	Widget location capture + ingestion
@@ -527,20 +528,5 @@ Enable expatriates, digital nomads, and frequent international travelers to accu
 8. Add seed/sample data and a reset path for QA.
 9. Run a smoke test pass on a clean device and document known gaps.
 
-### M1 implementation status
-- SwiftData schema (Stay, DayOverride) implemented
-- App Group-backed ModelContainer with fallback implemented (see ModelContainerProvider.swift; set Info.plist key `AppGroupId`)
-- Required Sign in with Apple gate implemented (RootView + AuthenticationManager)
-- Manual stays CRUD and day overrides UI implemented (validation for overlaps, duplicate-day override replace flow)
-- Schengen 90/180 engine implemented (SchengenCalculator) with unit tests (SchengenCalculatorTests)
-- Summary dashboard added in ContentView (SchengenSummaryRow)
-- Sample data seeding and reset path provided via toolbar menu
-
-### Setup notes for developers
-- In the app target Info.plist, add a String key `AppGroupId` with your App Group identifier (e.g., `group.com.yourcompany.borderlog`)
-- Ensure the app target has capabilities: App Groups and Sign in with Apple enabled
-- Optional: Add iCloud capability later (not required for M1)
-
 ## Run
 Open `Learn.xcodeproj` in Xcode and run the iOS app target.
-

@@ -478,6 +478,7 @@ M1 — Foundations
 	•	Sign in with Apple required flow
 	•	Manual stays + day overrides
 	•	Schengen calculator engine (90/180)
+	•	Summary dashboard
 
 M2 — Inference v1
 	•	Widget location capture + ingestion
