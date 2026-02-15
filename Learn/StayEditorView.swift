@@ -11,7 +11,6 @@ import SwiftData
 struct StayEditorView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
-    @Query(sort: [SortDescriptor(\Stay.enteredOn, order: .reverse)]) private var stays: [Stay]
 
     private let existingStay: Stay?
     @State private var draft: StayDraft
@@ -108,10 +107,37 @@ struct StayEditorView: View {
         let normalizedEntry = calendar.startOfDay(for: draft.enteredOn)
         let normalizedExit = draft.hasExitDate ? calendar.startOfDay(for: draft.exitedOn) : nil
 
+        let searchStart = normalizedEntry
+        let searchEnd = normalizedExit ?? Date.distantFuture
+
+        let queryEnd: Date
+        if normalizedExit == nil {
+             queryEnd = Date.distantFuture
+        } else {
+             queryEnd = calendar.date(byAdding: .day, value: 1, to: searchEnd) ?? searchEnd
+        }
+
+        let distantFuture = Date.distantFuture
+
+        let descriptor = FetchDescriptor<Stay>(
+            predicate: #Predicate<Stay> { stay in
+                stay.enteredOn < queryEnd &&
+                (stay.exitedOn ?? distantFuture) >= searchStart
+            }
+        )
+
+        let potentialOverlaps: [Stay]
+        do {
+            potentialOverlaps = try modelContext.fetch(descriptor)
+        } catch {
+             print("Fetch failed: \(error)")
+             potentialOverlaps = []
+        }
+
         let overlaps = StayValidation.overlappingStays(
             enteredOn: normalizedEntry,
             exitedOn: normalizedExit,
-            stays: stays,
+            stays: potentialOverlaps,
             excluding: existingStay,
             calendar: calendar
         )
