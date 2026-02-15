@@ -10,47 +10,83 @@ import AuthenticationServices
 
 struct RootView: View {
     @StateObject private var authManager = AuthenticationManager()
+    @AppStorage("hasCompletedFirstLaunch") private var hasCompletedFirstLaunch = false
 
     var body: some View {
-        if authManager.appleUserId.isEmpty {
-            SignInView()
-                .environmentObject(authManager)
-        } else {
-            MainNavigationView()
-                .environmentObject(authManager)
+        Group {
+            if authManager.appleUserId.isEmpty {
+                if hasCompletedFirstLaunch {
+                    SignInScreen(
+                        title: "Sign in to BorderLog",
+                        subtitle: "Use your Apple ID to access your travel history on this device.",
+                        showHighlights: false,
+                        onSignedIn: {}
+                    )
+                } else {
+                    SignInScreen(
+                        title: "Welcome to BorderLog",
+                        subtitle: "Track country stays, stay Schengen-compliant, and keep your data on-device.",
+                        showHighlights: true,
+                        onSignedIn: {
+                            hasCompletedFirstLaunch = true
+                        }
+                    )
+                }
+            } else {
+                MainNavigationView()
+            }
+        }
+        .environmentObject(authManager)
+        .onAppear {
+            if !authManager.appleUserId.isEmpty && !hasCompletedFirstLaunch {
+                hasCompletedFirstLaunch = true
+            }
         }
     }
 }
 
-private struct SignInView: View {
+private struct SignInScreen: View {
     @EnvironmentObject private var authManager: AuthenticationManager
     @State private var isShowingError = false
     @State private var errorMessage = ""
+    
+    let title: String
+    let subtitle: String
+    let showHighlights: Bool
+    let onSignedIn: () -> Void
 
     var body: some View {
-        VStack(spacing: 18) {
-            Text("BorderLog")
-                .font(.largeTitle.bold())
+        VStack(spacing: 22) {
+            VStack(spacing: 12) {
+                Image(systemName: "globe.americas.fill")
+                    .font(.system(size: 56))
+                    .foregroundStyle(.blue)
 
-            Text("Sign in with Apple is required to use BorderLog. Your travel data stays on this device unless you enable iCloud sync.")
+                Text(title)
+                    .font(.largeTitle.bold())
+            }
+
+            Text(subtitle)
                 .font(.callout)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 24)
 
+            if showHighlights {
+                VStack(alignment: .leading, spacing: 10) {
+                    Label("Log stays with dates and notes", systemImage: "calendar")
+                    Label("See Schengen 90/180 usage", systemImage: "gauge.with.dots.needle.67percent")
+                    Label("Keep data local-first", systemImage: "lock.fill")
+                }
+                .font(.callout)
+                .frame(maxWidth: 320, alignment: .leading)
+                .padding(.top, 4)
+            }
+
             SignInWithAppleButton(.signIn) { request in
                 request.requestedScopes = []
             } onCompletion: { result in
-                switch result {
-                case .success(let authorization):
-                    if let credential = authorization.credential as? ASAuthorizationAppleIDCredential {
-                        authManager.signIn(userId: credential.user)
-                    } else {
-                        showError("Unable to read Apple ID credential.")
-                    }
-                case .failure(let error):
-                    showError(error.localizedDescription)
-                }
+                handleSignIn(result)
             }
             .signInWithAppleButtonStyle(.black)
             .frame(height: 44)
@@ -68,6 +104,20 @@ private struct SignInView: View {
     private func showError(_ message: String) {
         errorMessage = message
         isShowingError = true
+    }
+    
+    private func handleSignIn(_ result: Result<ASAuthorization, Error>) {
+        switch result {
+        case .success(let authorization):
+            if let credential = authorization.credential as? ASAuthorizationAppleIDCredential {
+                authManager.signIn(userId: credential.user)
+                onSignedIn()
+            } else {
+                showError("Unable to read Apple ID credential.")
+            }
+        case .failure(let error):
+            showError(error.localizedDescription)
+        }
     }
 }
 
