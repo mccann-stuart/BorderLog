@@ -10,22 +10,11 @@ import SwiftData
 
 @main
 struct BorderLogApp: App {
-    var sharedModelContainer: ModelContainer = {
-        let schema = Schema([
-            Stay.self,
-        ])
-        let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
-
-        do {
-            return try ModelContainer(for: schema, configurations: [modelConfiguration])
-        } catch {
-            fatalError("Could not create ModelContainer: \(error)")
-        }
-    }()
+    var sharedModelContainer: ModelContainer = ModelContainerProvider.makeContainer()
 
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            RootView()
         }
         .modelContainer(sharedModelContainer)
     }

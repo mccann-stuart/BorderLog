@@ -516,5 +516,16 @@ Enable expatriates, digital nomads, and frequent international travelers to accu
 - Rolling Schengen 90/180 summary with used, remaining, and overstay days
 - Local persistence using SwiftData
 
+## M1 plan
+1. Define the SwiftData schema for stays, day overrides, and Schengen rollups.
+2. Wire the App Group SwiftData store and basic data migrations.
+3. Implement required Sign in with Apple flow and first-run gate.
+4. Build manual stay CRUD UI with validation for overlaps and missing exits.
+5. Build day-level override UI with a simple per-day editor.
+6. Implement the Schengen 90/180 rolling-window engine and unit tests.
+7. Add a summary dashboard for used/remaining/overstay days.
+8. Add seed/sample data and a reset path for QA.
+9. Run a smoke test pass on a clean device and document known gaps.
+
 ## Run
 Open `Learn.xcodeproj` in Xcode and run the macOS app target.

@@ -11,10 +11,23 @@ import SwiftData
 struct ContentView: View {
     @Environment(\.modelContext) private var modelContext
     @Query(sort: [SortDescriptor(\Stay.enteredOn, order: .reverse)]) private var stays: [Stay]
-    @State private var isPresentingAdd = false
+    @Query(sort: [SortDescriptor(\DayOverride.date, order: .reverse)]) private var overrides: [DayOverride]
+    @AppStorage("appleUserId") private var appleUserId: String = ""
+
+    @State private var isPresentingAddStay = false
+    @State private var isPresentingAddOverride = false
+    @State private var isConfirmingReset = false
 
     private var schengenSummary: SchengenSummary {
-        SchengenCalculator.summary(for: stays, asOf: Date())
+        SchengenCalculator.summary(for: stays, overrides: overrides, asOf: Date())
+    }
+
+    private var overlapCount: Int {
+        StayValidation.overlapCount(stays: stays, calendar: .current)
+    }
+
+    private var gapDays: Int {
+        StayValidation.gapDays(stays: stays, calendar: .current)
     }
 
     var body: some View {
@@ -23,6 +36,21 @@ struct ContentView: View {
                 Section {
                     SchengenSummaryRow(summary: schengenSummary)
                         .listRowSeparator(.hidden)
+                }
+
+                if overlapCount > 0 || gapDays > 0 {
+                    Section("Data Quality") {
+                        if overlapCount > 0 {
+                            Text("Overlapping stays detected: \(overlapCount). Review overlaps or mark as transit days.")
+                                .font(.callout)
+                                .foregroundStyle(.secondary)
+                        }
+                        if gapDays > 0 {
+                            Text("Gaps between stays: \(gapDays) day(s). Consider adding stays or overrides.")
+                                .font(.callout)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
                 }
 
                 Section("Stays") {
@@ -35,7 +63,7 @@ struct ContentView: View {
                     } else {
                         ForEach(stays) { stay in
                             NavigationLink {
-                                StayDetailView(stay: stay)
+                                StayEditorView(stay: stay)
                             } label: {
                                 StayRow(stay: stay)
                             }
@@ -43,19 +71,73 @@ struct ContentView: View {
                         .onDelete(perform: deleteStays)
                     }
                 }
+
+                Section("Day Overrides") {
+                    if overrides.isEmpty {
+                        ContentUnavailableView(
+                            "No overrides",
+                            systemImage: "calendar.badge.exclamationmark",
+                            description: Text("Add a day override to correct a specific date.")
+                        )
+                    } else {
+                        ForEach(overrides) { overrideDay in
+                            NavigationLink {
+                                DayOverrideEditorView(overrideDay: overrideDay)
+                            } label: {
+                                DayOverrideRow(overrideDay: overrideDay)
+                            }
+                        }
+                        .onDelete(perform: deleteOverrides)
+                    }
+                }
             }
             .navigationTitle("BorderLog")
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
-                    Button {
-                        isPresentingAdd = true
+                    Menu {
+                        Button("Add Stay") {
+                            isPresentingAddStay = true
+                        }
+                        Button("Add Day Override") {
+                            isPresentingAddOverride = true
+                        }
                     } label: {
-                        Label("Add Stay", systemImage: "plus")
+                        Label("Add", systemImage: "plus")
+                    }
+                }
+
+                ToolbarItem(placement: .automatic) {
+                    Menu {
+                        Button("Seed Sample Data") {
+                            seedSampleData()
+                        }
+
+                        Button("Reset All Data", role: .destructive) {
+                            isConfirmingReset = true
+                        }
+
+                        Divider()
+
+                        Button("Sign Out") {
+                            appleUserId = ""
+                        }
+                    } label: {
+                        Image(systemName: "ellipsis.circle")
                     }
                 }
             }
-            .sheet(isPresented: $isPresentingAdd) {
+            .confirmationDialog("Delete all local data?", isPresented: $isConfirmingReset) {
+                Button("Delete All", role: .destructive) {
+                    resetAllData()
+                }
+            } message: {
+                Text("This will remove all stays and day overrides from this device.")
+            }
+            .sheet(isPresented: $isPresentingAddStay) {
                 StayEditorView()
+            }
+            .sheet(isPresented: $isPresentingAddOverride) {
+                DayOverrideEditorView()
             }
         }
     }
@@ -64,6 +146,63 @@ struct ContentView: View {
         for index in offsets {
             modelContext.delete(stays[index])
         }
+    }
+
+    private func deleteOverrides(offsets: IndexSet) {
+        for index in offsets {
+            modelContext.delete(overrides[index])
+        }
+    }
+
+    private func resetAllData() {
+        stays.forEach { modelContext.delete($0) }
+        overrides.forEach { modelContext.delete($0) }
+    }
+
+    private func seedSampleData() {
+        guard stays.isEmpty && overrides.isEmpty else {
+            return
+        }
+
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: Date())
+        let stay1 = Stay(
+            countryName: "Portugal",
+            countryCode: "PT",
+            region: .schengen,
+            enteredOn: calendar.date(byAdding: .day, value: -40, to: today) ?? today,
+            exitedOn: calendar.date(byAdding: .day, value: -10, to: today) ?? today,
+            notes: "Work trip"
+        )
+        let stay2 = Stay(
+            countryName: "United Kingdom",
+            countryCode: "UK",
+            region: .nonSchengen,
+            enteredOn: calendar.date(byAdding: .day, value: -9, to: today) ?? today,
+            exitedOn: calendar.date(byAdding: .day, value: -2, to: today) ?? today,
+            notes: "Client meetings"
+        )
+        let stay3 = Stay(
+            countryName: "Spain",
+            countryCode: "ES",
+            region: .schengen,
+            enteredOn: calendar.date(byAdding: .day, value: -1, to: today) ?? today,
+            exitedOn: nil,
+            notes: "Current"
+        )
+
+        modelContext.insert(stay1)
+        modelContext.insert(stay2)
+        modelContext.insert(stay3)
+
+        let overrideDay = DayOverride(
+            date: calendar.date(byAdding: .day, value: -15, to: today) ?? today,
+            countryName: "Ireland",
+            countryCode: "IE",
+            region: .nonSchengen,
+            notes: "Day trip"
+        )
+        modelContext.insert(overrideDay)
     }
 }
 
@@ -111,6 +250,35 @@ private struct StayRow: View {
     }
 }
 
+private struct DayOverrideRow: View {
+    let overrideDay: DayOverride
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(overrideDay.displayTitle)
+                .font(.headline)
+
+            HStack {
+                Text(dateText)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+
+                Spacer()
+
+                Text(overrideDay.region.rawValue)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .padding(.vertical, 4)
+    }
+
+    private var dateText: String {
+        let formatter = Date.FormatStyle(date: .abbreviated, time: .omitted)
+        return overrideDay.date.formatted(formatter)
+    }
+}
+
 private struct SchengenSummaryRow: View {
     let summary: SchengenSummary
 
@@ -121,12 +289,8 @@ private struct SchengenSummaryRow: View {
 
             HStack(spacing: 12) {
                 StatPill(title: "Used", value: "\(summary.usedDays)d")
-
-                if summary.overstayDays > 0 {
-                    StatPill(title: "Over", value: "\(summary.overstayDays)d", tint: .red)
-                } else {
-                    StatPill(title: "Remaining", value: "\(summary.remainingDays)d", tint: .green)
-                }
+                StatPill(title: "Remaining", value: "\(summary.remainingDays)d", tint: .green)
+                StatPill(title: "Overstay", value: "\(summary.overstayDays)d", tint: .red)
             }
 
             Text(windowText)
@@ -166,5 +330,5 @@ private struct StatPill: View {
 
 #Preview {
     ContentView()
-        .modelContainer(for: Stay.self, inMemory: true)
+        .modelContainer(for: [Stay.self, DayOverride.self], inMemory: true)
 }

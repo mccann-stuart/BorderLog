@@ -18,6 +18,7 @@ struct SchengenSummary {
 enum SchengenCalculator {
     static func summary(
         for stays: [Stay],
+        overrides: [DayOverride] = [],
         asOf referenceDate: Date = Date(),
         calendar: Calendar = .current
     ) -> SchengenSummary {
@@ -40,6 +41,19 @@ enum SchengenCalculator {
                 uniqueDays.insert(day)
                 guard let nextDay = calendar.date(byAdding: .day, value: 1, to: day) else { break }
                 day = nextDay
+            }
+        }
+
+        for overrideDay in overrides {
+            let day = calendar.startOfDay(for: overrideDay.date)
+            if day < windowStart || day > windowEnd {
+                continue
+            }
+
+            if overrideDay.region == .schengen {
+                uniqueDays.insert(day)
+            } else {
+                uniqueDays.remove(day)
             }
         }
 
