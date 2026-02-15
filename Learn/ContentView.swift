@@ -12,7 +12,7 @@ struct ContentView: View {
     @Environment(\.modelContext) private var modelContext
     @Query(sort: [SortDescriptor(\Stay.enteredOn, order: .reverse)]) private var stays: [Stay]
     @Query(sort: [SortDescriptor(\DayOverride.date, order: .reverse)]) private var overrides: [DayOverride]
-    @AppStorage("appleUserId") private var appleUserId: String = ""
+    @EnvironmentObject private var authManager: AuthenticationManager
 
     @State private var isPresentingAddStay = false
     @State private var isPresentingAddOverride = false
@@ -120,7 +120,7 @@ struct ContentView: View {
                         Divider()
 
                         Button("Sign Out") {
-                            appleUserId = ""
+                            authManager.signOut()
                         }
                     } label: {
                         Image(systemName: "ellipsis.circle")
