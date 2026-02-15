@@ -9,12 +9,46 @@ import SwiftUI
 import AuthenticationServices
 
 struct RootView: View {
+    
+
     @StateObject private var authManager = AuthenticationManager()
     @AppStorage("hasCompletedFirstLaunch") private var hasCompletedFirstLaunch = false
 
     var body: some View {
-        MainNavigationView()
+        Group {
+            if AuthenticationManager.isAppleSignInEnabled {
+                if authManager.appleUserId.isEmpty {
+                    if hasCompletedFirstLaunch {
+                        SignInScreen(
+                            title: "Sign in to Border Log",
+                            subtitle: "Sign up with Apple ID to access your travel history on this device",
+                            showHighlights: false,
+                            onSignedIn: {}
+                        )
+                    } else {
+                        SignInScreen(
+                            title: "Welcome to Border Log",
+                            subtitle: "Track country stays, stay compliant, and keep your data on-device",
+                            showHighlights: true,
+                            onSignedIn: {
+                                hasCompletedFirstLaunch = true
+                            }
+                        )
+                    }
+                } else {
+                    MainNavigationView()
+                }
+            } else {
+                MainNavigationView()
+            }
+        }
         .environmentObject(authManager)
+        .onAppear {
+            guard AuthenticationManager.isAppleSignInEnabled else { return }
+            if !authManager.appleUserId.isEmpty && !hasCompletedFirstLaunch {
+                hasCompletedFirstLaunch = true
+            }
+        }
     }
 }
 
