@@ -14,6 +14,10 @@ struct ContentView: View {
     @Query(sort: [SortDescriptor(\DayOverride.date, order: .reverse)]) private var overrides: [DayOverride]
     @AppStorage("appleUserId") private var appleUserId: String = ""
 
+    private var dataManager: DataManager {
+        DataManager(modelContext: modelContext)
+    }
+
     @State private var isPresentingAddStay = false
     @State private var isPresentingAddOverride = false
     @State private var isConfirmingReset = false
@@ -153,67 +157,29 @@ struct ContentView: View {
     }
 
     private func deleteStays(offsets: IndexSet) {
-        for index in offsets {
-            modelContext.delete(stays[index])
-        }
+        dataManager.delete(offsets: offsets, from: stays)
     }
 
     private func deleteOverrides(offsets: IndexSet) {
-        for index in offsets {
-            modelContext.delete(overrides[index])
-        }
+        dataManager.delete(offsets: offsets, from: overrides)
     }
 
     private func resetAllData() {
-        stays.forEach { modelContext.delete($0) }
-        overrides.forEach { modelContext.delete($0) }
+        do {
+            try dataManager.resetAllData()
+        } catch {
+            print("Failed to reset data: \(error)")
+        }
     }
 
     private func seedSampleData() {
-        guard stays.isEmpty && overrides.isEmpty else {
-            isShowingSeedAlert = true
-            return
+        do {
+            if try !dataManager.seedSampleData() {
+                isShowingSeedAlert = true
+            }
+        } catch {
+            print("Failed to seed data: \(error)")
         }
-
-        let calendar = Calendar.current
-        let today = calendar.startOfDay(for: Date())
-        let stay1 = Stay(
-            countryName: "Portugal",
-            countryCode: "PT",
-            region: .schengen,
-            enteredOn: calendar.date(byAdding: .day, value: -40, to: today) ?? today,
-            exitedOn: calendar.date(byAdding: .day, value: -10, to: today) ?? today,
-            notes: "Work trip"
-        )
-        let stay2 = Stay(
-            countryName: "United Kingdom",
-            countryCode: "UK",
-            region: .nonSchengen,
-            enteredOn: calendar.date(byAdding: .day, value: -9, to: today) ?? today,
-            exitedOn: calendar.date(byAdding: .day, value: -2, to: today) ?? today,
-            notes: "Client meetings"
-        )
-        let stay3 = Stay(
-            countryName: "Spain",
-            countryCode: "ES",
-            region: .schengen,
-            enteredOn: calendar.date(byAdding: .day, value: -1, to: today) ?? today,
-            exitedOn: nil,
-            notes: "Current"
-        )
-
-        modelContext.insert(stay1)
-        modelContext.insert(stay2)
-        modelContext.insert(stay3)
-
-        let overrideDay = DayOverride(
-            date: calendar.date(byAdding: .day, value: -15, to: today) ?? today,
-            countryName: "Ireland",
-            countryCode: "IE",
-            region: .nonSchengen,
-            notes: "Day trip"
-        )
-        modelContext.insert(overrideDay)
     }
 }
 
