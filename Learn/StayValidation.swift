@@ -8,7 +8,7 @@
 import Foundation
 
 enum StayValidation {
-    static func overlapCount(stays: [Stay], calendar: Calendar) -> Int {
+    static func overlapCount<S: SchengenStay>(stays: [S], calendar: Calendar) -> Int {
         let sorted = stays.sorted { $0.enteredOn < $1.enteredOn }
         var overlapCount = 0
         var currentEnd: Date?
@@ -28,7 +28,7 @@ enum StayValidation {
         return overlapCount
     }
 
-    static func gapDays(stays: [Stay], calendar: Calendar) -> Int {
+    static func gapDays<S: SchengenStay>(stays: [S], calendar: Calendar) -> Int {
         let sorted = stays.sorted { $0.enteredOn < $1.enteredOn }
         guard sorted.count > 1 else { return 0 }
 

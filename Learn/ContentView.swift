@@ -22,36 +22,25 @@ struct ContentView: View {
     @State private var isPresentingAddOverride = false
     @State private var isConfirmingReset = false
     @State private var isShowingSeedAlert = false
-
-    private var schengenSummary: SchengenSummary {
-        SchengenCalculator.summary(for: stays, overrides: overrides, asOf: Date())
-    }
-
-    private var overlapCount: Int {
-        StayValidation.overlapCount(stays: stays, calendar: .current)
-    }
-
-    private var gapDays: Int {
-        StayValidation.gapDays(stays: stays, calendar: .current)
-    }
+    @State private var schengenState = SchengenState()
 
     var body: some View {
         NavigationStack {
             List {
                 Section {
-                    SchengenSummaryRow(summary: schengenSummary)
+                    SchengenSummaryRow(summary: schengenState.summary)
                         .listRowSeparator(.hidden)
                 }
 
-                if overlapCount > 0 || gapDays > 0 {
+                if schengenState.overlapCount > 0 || schengenState.gapDays > 0 {
                     Section("Data Quality") {
-                        if overlapCount > 0 {
-                            Text("Overlapping stays detected: \(overlapCount). Review overlaps or mark as transit days.")
+                        if schengenState.overlapCount > 0 {
+                            Text("Overlapping stays detected: \(schengenState.overlapCount). Review overlaps or mark as transit days.")
                                 .font(.callout)
                                 .foregroundStyle(.secondary)
                         }
-                        if gapDays > 0 {
-                            Text("Gaps between stays: \(gapDays) day(s). Consider adding stays or overrides.")
+                        if schengenState.gapDays > 0 {
+                            Text("Gaps between stays: \(schengenState.gapDays) day(s). Consider adding stays or overrides.")
                                 .font(.callout)
                                 .foregroundStyle(.secondary)
                         }
@@ -153,6 +142,12 @@ struct ContentView: View {
                     DayOverrideEditorView()
                 }
             }
+        }
+        .task(id: stays) {
+            await schengenState.update(stays: stays, overrides: overrides)
+        }
+        .task(id: overrides) {
+            await schengenState.update(stays: stays, overrides: overrides)
         }
     }
 

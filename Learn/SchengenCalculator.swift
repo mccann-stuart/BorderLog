@@ -7,7 +7,7 @@
 
 import Foundation
 
-struct SchengenSummary {
+struct SchengenSummary: Sendable {
     let usedDays: Int
     let remainingDays: Int
     let overstayDays: Int
@@ -24,9 +24,9 @@ enum SchengenCalculator {
         var end: Date
     }
 
-    static func summary(
-        for stays: [Stay],
-        overrides: [DayOverride] = [],
+    static func summary<S: SchengenStay, O: SchengenOverride>(
+        for stays: [S],
+        overrides: [O] = [],
         asOf referenceDate: Date = Date(),
         calendar: Calendar = .current
     ) -> SchengenSummary {
