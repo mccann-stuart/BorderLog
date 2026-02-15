@@ -10,11 +10,12 @@ import SwiftData
 import os
 
 enum AppConfig {
-    static let appGroupId: String = {
+    static let appGroupId: String? = {
         guard let groupId = Bundle.main.object(forInfoDictionaryKey: "AppGroupId") as? String else {
-            fatalError("AppGroupId not found in Info.plist")
+            return nil
         }
-        return groupId
+        let trimmed = groupId.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : trimmed
     }()
 }
 
@@ -33,15 +34,26 @@ enum ModelContainerProvider {
 
     static func makeContainer() -> ModelContainer {
         let schema = Schema(versionedSchema: BorderLogSchemaV1.self)
-        let appGroupConfig = ModelConfiguration(schema: schema, groupContainer: .identifier(AppConfig.appGroupId))
         let fallbackConfig = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
+        let memoryConfig = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
+
+        if let appGroupId = AppConfig.appGroupId {
+            let appGroupConfig = ModelConfiguration(schema: schema, groupContainer: .identifier(appGroupId))
+            do {
+                return try ModelContainer(for: schema, migrationPlan: BorderLogMigrationPlan.self, configurations: [appGroupConfig])
+            } catch {
+                logger.error("App Group store unavailable. Falling back to local store. Error: \(error, privacy: .public)")
+            }
+        } else {
+            logger.error("AppGroupId missing or empty in Info.plist. Falling back to local store.")
+        }
 
         do {
-            return try ModelContainer(for: schema, migrationPlan: BorderLogMigrationPlan.self, configurations: [appGroupConfig])
+            return try ModelContainer(for: schema, migrationPlan: BorderLogMigrationPlan.self, configurations: [fallbackConfig])
         } catch {
-            logger.error("App Group store unavailable. Falling back to local store. Error: \(error, privacy: .public)")
+            logger.error("Local store unavailable. Falling back to in-memory store. Error: \(error, privacy: .public)")
             do {
-                return try ModelContainer(for: schema, migrationPlan: BorderLogMigrationPlan.self, configurations: [fallbackConfig])
+                return try ModelContainer(for: schema, migrationPlan: BorderLogMigrationPlan.self, configurations: [memoryConfig])
             } catch {
                 fatalError("Could not create ModelContainer: \(error)")
             }
