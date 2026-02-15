@@ -31,16 +31,14 @@ enum StayValidation {
     }
 
     static func gapDays(stays: [Stay], calendar: Calendar) -> Int {
-        // Optimization: Input is typically reverse-sorted by 'enteredOn' from the query.
-        // Reversing provides ascending order in O(1) without additional allocation.
-        let ascendingStays = stays.reversed()
-        guard ascendingStays.count > 1 else { return 0 }
+        let sorted = stays.sorted { $0.enteredOn < $1.enteredOn }
+        guard sorted.count > 1 else { return 0 }
 
         var gapDays = 0
-        guard let firstStay = ascendingStays.first else { return 0 }
+        guard let firstStay = sorted.first else { return 0 }
         var previousEnd = calendar.startOfDay(for: firstStay.exitedOn ?? firstStay.enteredOn)
 
-        for stay in ascendingStays.dropFirst() {
+        for stay in sorted.dropFirst() {
             let start = calendar.startOfDay(for: stay.enteredOn)
             if start > previousEnd {
                 let dayDiff = calendar.dateComponents([.day], from: previousEnd, to: start).day ?? 0
