@@ -45,3 +45,5 @@ final class Stay: TravelEntry {
         return days + 1
     }
 }
+
+extension Stay: SchengenStay {}

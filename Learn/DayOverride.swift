@@ -31,3 +31,5 @@ final class DayOverride: TravelEntry {
     }
 
 }
+
+extension DayOverride: SchengenOverride {}
