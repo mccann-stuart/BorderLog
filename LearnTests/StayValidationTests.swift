@@ -55,6 +55,102 @@ struct StayValidationTests {
         #expect(count == 2)
     }
 
+    @Test func overlappingStaysDetectsConflicts() {
+        let stay1 = Stay(countryName: "A", region: .schengen, enteredOn: date(2026, 1, 1), exitedOn: date(2026, 1, 5))
+        let stay2 = Stay(countryName: "B", region: .schengen, enteredOn: date(2026, 1, 6), exitedOn: date(2026, 1, 10))
+        let stays = [stay1, stay2]
+
+        // Overlaps with stay1 (Jan 4-5) and stay2 (Jan 6-8)
+        let overlaps = StayValidation.overlappingStays(
+            enteredOn: date(2026, 1, 4),
+            exitedOn: date(2026, 1, 8),
+            stays: stays,
+            excluding: nil,
+            calendar: calendar
+        )
+
+        #expect(overlaps.count == 2)
+        #expect(overlaps.contains(where: { $0.countryName == "A" }))
+        #expect(overlaps.contains(where: { $0.countryName == "B" }))
+
+        // No overlap (Jan 11-15)
+        let noOverlaps = StayValidation.overlappingStays(
+            enteredOn: date(2026, 1, 11),
+            exitedOn: date(2026, 1, 15),
+            stays: stays,
+            excluding: nil,
+            calendar: calendar
+        )
+
+        #expect(noOverlaps.isEmpty)
+    }
+
+    @Test func overlappingStaysExcludesCurrentStay() {
+        let stay1 = Stay(countryName: "A", region: .schengen, enteredOn: date(2026, 1, 1), exitedOn: date(2026, 1, 5))
+        let stay2 = Stay(countryName: "B", region: .schengen, enteredOn: date(2026, 1, 6), exitedOn: date(2026, 1, 10))
+        let stays = [stay1, stay2]
+
+        // Overlaps with stay1, but we exclude it (simulating edit)
+        let overlaps = StayValidation.overlappingStays(
+            enteredOn: date(2026, 1, 2),
+            exitedOn: date(2026, 1, 4),
+            stays: stays,
+            excluding: stay1,
+            calendar: calendar
+        )
+
+        #expect(overlaps.isEmpty)
+    }
+
+    @Test func overlappingStaysHandlesOpenEndedStays() {
+        // Open ended stay starts Jan 15
+        let stay3 = Stay(countryName: "C", region: .schengen, enteredOn: date(2026, 1, 15), exitedOn: nil)
+        let stays = [stay3]
+
+        // Overlaps with open ended stay (Jan 20-25)
+        let overlaps = StayValidation.overlappingStays(
+            enteredOn: date(2026, 1, 20),
+            exitedOn: date(2026, 1, 25),
+            stays: stays,
+            excluding: nil,
+            calendar: calendar
+        )
+
+        #expect(overlaps.count == 1)
+        #expect(overlaps.first?.countryName == "C")
+
+        // Overlaps when input is open ended (Jan 18 - Future)
+        let openInputOverlaps = StayValidation.overlappingStays(
+            enteredOn: date(2026, 1, 18),
+            exitedOn: nil,
+            stays: stays,
+            excluding: nil,
+            calendar: calendar
+        )
+
+        #expect(openInputOverlaps.count == 1)
+        #expect(openInputOverlaps.first?.countryName == "C")
+    }
+
+    @Test func overlappingStaysHandlesTouchingDates() {
+        let stay1 = Stay(countryName: "A", region: .schengen, enteredOn: date(2026, 1, 1), exitedOn: date(2026, 1, 5))
+        let stay2 = Stay(countryName: "B", region: .schengen, enteredOn: date(2026, 1, 6), exitedOn: date(2026, 1, 10))
+        let stays = [stay1, stay2]
+
+        // Touching dates (Jan 5-6)
+        // Should overlap with stay1 (ends Jan 5) and stay2 (starts Jan 6)
+        // because ranges are inclusive [start, end]
+        let overlaps = StayValidation.overlappingStays(
+            enteredOn: date(2026, 1, 5),
+            exitedOn: date(2026, 1, 6),
+            stays: stays,
+            excluding: nil,
+            calendar: calendar
+        )
+
+        #expect(overlaps.count == 2)
+        #expect(overlaps.contains(where: { $0.countryName == "A" }))
+        #expect(overlaps.contains(where: { $0.countryName == "B" }))
     @Test func gapDaysCalculatesCorrectly() {
         // 1. Simple gap (2 days gap: Jan 5 to Jan 7 -> gap is Jan 6, 1 day)
         // Stay 1: Jan 1 - Jan 5
