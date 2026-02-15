@@ -18,6 +18,8 @@ struct StayEditorView: View {
     @State private var isShowingOverlapAlert = false
     @State private var overlapMessage = ""
 
+    private let noteCharacterLimit = 1000
+
     init(stay: Stay? = nil) {
         self.existingStay = stay
         _draft = State(initialValue: StayDraft(stay: stay))
@@ -53,6 +55,15 @@ struct StayEditorView: View {
             Section("Notes") {
                 TextField("Notes", text: $draft.notes, axis: .vertical)
                     .lineLimit(3...6)
+                    .onChange(of: draft.notes) { _, newValue in
+                        if newValue.count > noteCharacterLimit {
+                            draft.notes = String(newValue.prefix(noteCharacterLimit))
+                        }
+                    }
+                Text("\(draft.notes.count)/\(noteCharacterLimit)")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .trailing)
             }
         }
         .navigationTitle(existingStay == nil ? "New Stay" : "Edit Stay")
