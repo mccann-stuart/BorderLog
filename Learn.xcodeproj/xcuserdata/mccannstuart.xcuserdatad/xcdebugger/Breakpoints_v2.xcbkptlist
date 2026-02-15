@@ -18,6 +18,106 @@
             endingLineNumber = "5"
             landmarkName = "AuthenticationManager"
             landmarkType = "3">
+            <Locations>
+               <Location
+                  uuid = "EAF8C43C-6A58-4276-9D82-89DDC0B25E1D - f96212dbda8192c0"
+                  shouldBeEnabled = "Yes"
+                  ignoreCount = "0"
+                  continueAfterRunningActions = "No"
+                  symbolName = "property wrapper backing initializer of Learn.AuthenticationManager.appleUserId : Swift.String"
+                  moduleName = "Learn.debug.dylib"
+                  usesParentBreakpointCondition = "Yes"
+                  urlString = "file:///Users/mccannstuart/Library/CloudStorage/OneDrive-TheBostonConsultingGroup,Inc/Documents/GitHub/BorderLog/Learn/AuthenticationManager.swift"
+                  startingColumnNumber = "9223372036854775807"
+                  endingColumnNumber = "9223372036854775807"
+                  startingLineNumber = "0"
+                  endingLineNumber = "0">
+               </Location>
+               <Location
+                  uuid = "EAF8C43C-6A58-4276-9D82-89DDC0B25E1D - 1a00602f6a4e6296"
+                  shouldBeEnabled = "Yes"
+                  ignoreCount = "0"
+                  continueAfterRunningActions = "No"
+                  symbolName = "Learn.AuthenticationManager.appleUserId.getter : Swift.String"
+                  moduleName = "Learn.debug.dylib"
+                  usesParentBreakpointCondition = "Yes"
+                  urlString = "file:///Users/mccannstuart/Library/CloudStorage/OneDrive-TheBostonConsultingGroup,Inc/Documents/GitHub/BorderLog/Learn/AuthenticationManager.swift"
+                  startingColumnNumber = "9223372036854775807"
+                  endingColumnNumber = "9223372036854775807"
+                  startingLineNumber = "0"
+                  endingLineNumber = "0">
+               </Location>
+               <Location
+                  uuid = "EAF8C43C-6A58-4276-9D82-89DDC0B25E1D - fd223006377728a"
+                  shouldBeEnabled = "Yes"
+                  ignoreCount = "0"
+                  continueAfterRunningActions = "No"
+                  symbolName = "Learn.AuthenticationManager.appleUserId.setter : Swift.String"
+                  moduleName = "Learn.debug.dylib"
+                  usesParentBreakpointCondition = "Yes"
+                  urlString = "file:///Users/mccannstuart/Library/CloudStorage/OneDrive-TheBostonConsultingGroup,Inc/Documents/GitHub/BorderLog/Learn/AuthenticationManager.swift"
+                  startingColumnNumber = "9223372036854775807"
+                  endingColumnNumber = "9223372036854775807"
+                  startingLineNumber = "0"
+                  endingLineNumber = "0">
+               </Location>
+               <Location
+                  uuid = "EAF8C43C-6A58-4276-9D82-89DDC0B25E1D - 22d084b0805f5699"
+                  shouldBeEnabled = "Yes"
+                  ignoreCount = "0"
+                  continueAfterRunningActions = "No"
+                  symbolName = "Learn.AuthenticationManager.appleUserId.modify : Swift.String"
+                  moduleName = "Learn.debug.dylib"
+                  usesParentBreakpointCondition = "Yes"
+                  urlString = "file:///Users/mccannstuart/Library/CloudStorage/OneDrive-TheBostonConsultingGroup,Inc/Documents/GitHub/BorderLog/Learn/AuthenticationManager.swift"
+                  startingColumnNumber = "9223372036854775807"
+                  endingColumnNumber = "9223372036854775807"
+                  startingLineNumber = "0"
+                  endingLineNumber = "0">
+               </Location>
+               <Location
+                  uuid = "EAF8C43C-6A58-4276-9D82-89DDC0B25E1D - 45c9521318848fb3"
+                  shouldBeEnabled = "Yes"
+                  ignoreCount = "0"
+                  continueAfterRunningActions = "No"
+                  symbolName = "Learn.AuthenticationManager.$appleUserId.getter : Combine.Published&lt;Swift.String&gt;.Publisher"
+                  moduleName = "Learn.debug.dylib"
+                  usesParentBreakpointCondition = "Yes"
+                  urlString = "file:///Users/mccannstuart/Library/CloudStorage/OneDrive-TheBostonConsultingGroup,Inc/Documents/GitHub/BorderLog/Learn/AuthenticationManager.swift"
+                  startingColumnNumber = "9223372036854775807"
+                  endingColumnNumber = "9223372036854775807"
+                  startingLineNumber = "0"
+                  endingLineNumber = "0">
+               </Location>
+               <Location
+                  uuid = "EAF8C43C-6A58-4276-9D82-89DDC0B25E1D - ca95646071a53ce3"
+                  shouldBeEnabled = "Yes"
+                  ignoreCount = "0"
+                  continueAfterRunningActions = "No"
+                  symbolName = "Learn.AuthenticationManager.$appleUserId.setter : Combine.Published&lt;Swift.String&gt;.Publisher"
+                  moduleName = "Learn.debug.dylib"
+                  usesParentBreakpointCondition = "Yes"
+                  urlString = "file:///Users/mccannstuart/Library/CloudStorage/OneDrive-TheBostonConsultingGroup,Inc/Documents/GitHub/BorderLog/%3Cstdin%3E"
+                  startingColumnNumber = "9223372036854775807"
+                  endingColumnNumber = "9223372036854775807"
+                  startingLineNumber = "0"
+                  endingLineNumber = "0">
+               </Location>
+               <Location
+                  uuid = "EAF8C43C-6A58-4276-9D82-89DDC0B25E1D - 49f50db5275a0ab6"
+                  shouldBeEnabled = "Yes"
+                  ignoreCount = "0"
+                  continueAfterRunningActions = "No"
+                  symbolName = "Learn.AuthenticationManager.$appleUserId.modify : Combine.Published&lt;Swift.String&gt;.Publisher"
+                  moduleName = "Learn.debug.dylib"
+                  usesParentBreakpointCondition = "Yes"
+                  urlString = "file:///Users/mccannstuart/Library/CloudStorage/OneDrive-TheBostonConsultingGroup,Inc/Documents/GitHub/BorderLog/Learn/AuthenticationManager.swift"
+                  startingColumnNumber = "9223372036854775807"
+                  endingColumnNumber = "9223372036854775807"
+                  startingLineNumber = "0"
+                  endingLineNumber = "0">
+               </Location>
+            </Locations>
          </BreakpointContent>
       </BreakpointProxy>
    </Breakpoints>
