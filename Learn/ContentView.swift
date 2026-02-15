@@ -14,6 +14,10 @@ struct ContentView: View {
     @Query(sort: [SortDescriptor(\DayOverride.date, order: .reverse)]) private var overrides: [DayOverride]
     @EnvironmentObject private var authManager: AuthenticationManager
 
+    private var dataManager: DataManager {
+        DataManager(modelContext: modelContext)
+    }
+
     @State private var isPresentingAddStay = false
     @State private var isPresentingAddOverride = false
     @State private var isConfirmingReset = false
@@ -153,29 +157,29 @@ struct ContentView: View {
     }
 
     private func deleteStays(offsets: IndexSet) {
-        for index in offsets {
-            modelContext.delete(stays[index])
-        }
+        dataManager.delete(offsets: offsets, from: stays)
     }
 
     private func deleteOverrides(offsets: IndexSet) {
-        for index in offsets {
-            modelContext.delete(overrides[index])
-        }
+        dataManager.delete(offsets: offsets, from: overrides)
     }
 
     private func resetAllData() {
-        stays.forEach { modelContext.delete($0) }
-        overrides.forEach { modelContext.delete($0) }
+        do {
+            try dataManager.resetAllData()
+        } catch {
+            print("Failed to reset data: \(error)")
+        }
     }
 
     private func seedSampleData() {
-        guard stays.isEmpty && overrides.isEmpty else {
-            isShowingSeedAlert = true
-            return
+        do {
+            if try !dataManager.seedSampleData() {
+                isShowingSeedAlert = true
+            }
+        } catch {
+            print("Failed to seed data: \(error)")
         }
-
-        SampleData.seed(context: modelContext)
     }
 }
 
