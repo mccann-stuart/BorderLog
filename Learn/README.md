@@ -528,4 +528,4 @@ Enable expatriates, digital nomads, and frequent international travelers to accu
 9. Run a smoke test pass on a clean device and document known gaps.
 
 ## Run
-Open `Learn.xcodeproj` in Xcode and run the macOS app target.
+Open `Learn.xcodeproj` in Xcode and run the iOS app target.
