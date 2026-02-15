@@ -1,0 +1,12 @@
+name = "borderlog-api"
+main = "backend/src/index.js"
+compatibility_date = "2024-04-05"
+
+# R2 Bucket binding for configuration artifacts
+[[r2_buckets]]
+binding = "CONFIG_BUCKET"
+bucket_name = "borderlog-config"
+preview_bucket_name = "borderlog-config-preview"
+
+# Ignore files managed outside of the Swift files for the iOS app
+# This is handled by .gitignore and project structure, but we can be explicit if needed.
