@@ -95,12 +95,12 @@ struct DayOverrideEditorView: View {
         let normalizedDate = calendar.startOfDay(for: draft.date)
         draft.date = normalizedDate
 
-        if let conflict = overrides.first(where: { overrideDay in
-            if let existingOverride, overrideDay === existingOverride {
-                return false
-            }
-            return calendar.isDate(overrideDay.date, inSameDayAs: normalizedDate)
-        }) {
+        if let conflict = DayOverrideValidation.conflictingOverride(
+            for: normalizedDate,
+            in: overrides,
+            excluding: existingOverride,
+            calendar: calendar
+        ) {
             replaceTarget = conflict
             isShowingReplaceAlert = true
             return
