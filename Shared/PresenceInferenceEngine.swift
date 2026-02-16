@@ -117,10 +117,10 @@ struct PresenceInferenceEngine {
             if let overrideInfo = overrideMap[dayKey] {
                 let overrideKey = CountryKey(code: overrideInfo.countryCode, name: overrideInfo.countryName)
                 let accumulator = bucket.countries[overrideKey] ?? CountryAccumulator()
-                let sources: SignalSourceMask = [.override]
-                    .union(accumulator.stayCount > 0 ? .stay : [])
-                    .union(accumulator.photoCount > 0 ? .photo : [])
-                    .union(accumulator.locationCount > 0 ? .location : [])
+                var sources = SignalSourceMask.override
+                if accumulator.stayCount > 0 { sources.formUnion(.stay) }
+                if accumulator.photoCount > 0 { sources.formUnion(.photo) }
+                if accumulator.locationCount > 0 { sources.formUnion(.location) }
 
                 let result = PresenceDayResult(
                     dayKey: dayKey,
@@ -191,10 +191,10 @@ struct PresenceInferenceEngine {
                 continue
             }
 
-            let sources: SignalSourceMask = []
-                .union(winner.value.stayCount > 0 ? .stay : [])
-                .union(winner.value.photoCount > 0 ? .photo : [])
-                .union(winner.value.locationCount > 0 ? .location : [])
+            var sources = SignalSourceMask()
+            if winner.value.stayCount > 0 { sources.formUnion(.stay) }
+            if winner.value.photoCount > 0 { sources.formUnion(.photo) }
+            if winner.value.locationCount > 0 { sources.formUnion(.location) }
 
             let result = PresenceDayResult(
                 dayKey: dayKey,

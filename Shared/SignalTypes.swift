@@ -22,7 +22,7 @@ struct SignalSourceMask: OptionSet, Codable, Sendable {
     static let location = SignalSourceMask(rawValue: 1 << 3)
 
     static let none: SignalSourceMask = []
-    static let all: SignalSourceMask = [.override, .stay, .photo, .location]
+    static let all: SignalSourceMask = [.`override`, .stay, .photo, .location]
 }
 
 struct LocationSignalInfo: Sendable {

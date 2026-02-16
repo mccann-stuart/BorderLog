@@ -39,7 +39,7 @@ enum BorderLogSchemaV2: VersionedSchema {
 enum BorderLogMigrationPlan: SchemaMigrationPlan {
     static var schemas: [any VersionedSchema.Type] = [BorderLogSchemaV1.self, BorderLogSchemaV2.self]
     static var stages: [MigrationStage] = [
-        .lightweight(from: BorderLogSchemaV1.self, to: BorderLogSchemaV2.self)
+        .lightweight(fromVersion: BorderLogSchemaV1.self, toVersion: BorderLogSchemaV2.self)
     ]
 }
 

@@ -7,6 +7,8 @@
 
 import Foundation
 import CoreLocation
+import MapKit
+import MapKit
 
 struct CountryResolution: Sendable {
     let countryCode: String?
@@ -31,7 +33,6 @@ actor CountryResolutionCache {
 }
 
 final class CLGeocoderCountryResolver: CountryResolving {
-    private let geocoder = CLGeocoder()
     private let cache = CountryResolutionCache()
 
     func resolveCountry(for location: CLLocation) async -> CountryResolution? {
@@ -41,12 +42,16 @@ final class CLGeocoderCountryResolver: CountryResolving {
         }
 
         do {
-            let placemarks = try await geocoder.reverseGeocodeLocation(location)
-            let placemark = placemarks.first
+            guard let request = MKReverseGeocodingRequest(location: location) else {
+                return nil
+            }
+            let mapItems = try await request.mapItems
+            let mapItem = mapItems.first
+            let addressRepresentations = mapItem?.addressRepresentations
             let resolution = CountryResolution(
-                countryCode: placemark?.isoCountryCode,
-                countryName: placemark?.country,
-                timeZone: placemark?.timeZone
+                countryCode: addressRepresentations?.region?.identifier,
+                countryName: addressRepresentations?.regionName,
+                timeZone: mapItem?.timeZone
             )
             if resolution.countryCode != nil || resolution.countryName != nil {
                 await cache.set(resolution, for: key)

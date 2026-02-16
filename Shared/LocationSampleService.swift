@@ -21,7 +21,7 @@ final class LocationSampleService: NSObject, CLLocationManagerDelegate {
     }
 
     func requestAuthorizationIfNeeded() {
-        let status = CLLocationManager.authorizationStatus()
+        let status = manager.authorizationStatus
         if status == .notDetermined {
             manager.requestWhenInUseAuthorization()
         }
@@ -32,7 +32,7 @@ final class LocationSampleService: NSObject, CLLocationManagerDelegate {
         modelContext: ModelContext,
         resolver: CountryResolving = CLGeocoderCountryResolver()
     ) async -> LocationSample? {
-        let status = CLLocationManager.authorizationStatus()
+        let status = manager.authorizationStatus
         guard status == .authorizedWhenInUse || status == .authorizedAlways else {
             return nil
         }

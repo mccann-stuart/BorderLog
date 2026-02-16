@@ -42,7 +42,8 @@ struct BorderLogWidgetProvider: TimelineProvider {
     }
 
     private static func latestSample(from modelContext: ModelContext) -> LocationSample? {
-        let descriptor = FetchDescriptor<LocationSample>(sortBy: [SortDescriptor(\LocationSample.timestamp, order: .reverse)], fetchLimit: 1)
+        var descriptor = FetchDescriptor<LocationSample>(sortBy: [SortDescriptor(\LocationSample.timestamp, order: .reverse)])
+        descriptor.fetchLimit = 1
         return (try? modelContext.fetch(descriptor))?.first
     }
 }
