@@ -10,6 +10,7 @@ import SwiftData
 
 struct MainNavigationView: View {
     @EnvironmentObject private var authManager: AuthenticationManager
+    @Environment(\.modelContext) private var modelContext
     
     @State private var selectedTab = 0
     @State private var isShowingMenu = false
@@ -17,6 +18,7 @@ struct MainNavigationView: View {
     @State private var isShowingAccount = false
     @State private var isPresentingAddStay = false
     @State private var isPresentingAddOverride = false
+    @State private var didBootstrapInference = false
     
     var body: some View {
         ZStack {
@@ -120,6 +122,13 @@ struct MainNavigationView: View {
             NavigationStack {
                 DayOverrideEditorView()
             }
+        }
+        .task {
+            guard !didBootstrapInference else { return }
+            didBootstrapInference = true
+            await LedgerRecomputeService.recomputeAll(modelContext: modelContext)
+            let ingestor = PhotoSignalIngestor(modelContext: modelContext)
+            _ = await ingestor.ingest(mode: .auto)
         }
     }
 }
@@ -262,6 +271,6 @@ private struct MenuButton: View {
 
 #Preview {
     MainNavigationView()
-        .modelContainer(for: [Stay.self, DayOverride.self], inMemory: true)
+        .modelContainer(for: [Stay.self, DayOverride.self, LocationSample.self, PhotoSignal.self, PresenceDay.self, PhotoIngestState.self], inMemory: true)
         .environmentObject(AuthenticationManager())
 }

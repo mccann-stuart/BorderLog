@@ -13,6 +13,7 @@ struct ContentView: View {
     @Environment(\.modelContext) private var modelContext
     @Query(sort: [SortDescriptor(\Stay.enteredOn, order: .reverse)]) private var stays: [Stay]
     @Query(sort: [SortDescriptor(\DayOverride.date, order: .reverse)]) private var overrides: [DayOverride]
+    @Query(sort: [SortDescriptor(\PresenceDay.date, order: .reverse)]) private var presenceDays: [PresenceDay]
     @EnvironmentObject private var authManager: AuthenticationManager
 
     private var dataManager: DataManager {
@@ -70,6 +71,24 @@ struct ContentView: View {
                             }
                         }
                         .onDelete(perform: deleteStays)
+                    }
+                }
+
+                Section("Daily Ledger") {
+                    if presenceDays.isEmpty {
+                        ContentUnavailableView(
+                            "No ledger data",
+                            systemImage: "calendar",
+                            description: Text("Enable location or photo access to infer daily presence.")
+                        )
+                    } else {
+                        ForEach(presenceDays.prefix(30)) { day in
+                            NavigationLink {
+                                PresenceDayDetailView(day: day)
+                            } label: {
+                                PresenceDayRow(day: day)
+                            }
+                        }
                     }
                 }
 
@@ -158,9 +177,14 @@ struct ContentView: View {
         }
         .task(id: stays) {
             await schengenState.update(stays: stays, overrides: overrides)
+            await LedgerRecomputeService.recomputeAll(modelContext: modelContext)
         }
         .task(id: overrides) {
             await schengenState.update(stays: stays, overrides: overrides)
+            await LedgerRecomputeService.recomputeAll(modelContext: modelContext)
+        }
+        .task {
+            await LedgerRecomputeService.recomputeAll(modelContext: modelContext)
         }
     }
 
@@ -264,6 +288,60 @@ private struct DayOverrideRow: View {
     }
 }
 
+private struct PresenceDayRow: View {
+    let day: PresenceDay
+
+    private var dayText: String {
+        day.dayKey
+    }
+
+    private var countryText: String {
+        if let name = day.countryName ?? day.countryCode {
+            return name
+        }
+        return "Unknown"
+    }
+
+    private var confidenceColor: Color {
+        switch day.confidenceLabel {
+        case .high: return .green
+        case .medium: return .orange
+        case .low: return .secondary
+        }
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                Text(countryText)
+                    .font(.headline)
+
+                if day.isOverride {
+                    Text("Override")
+                        .font(.caption)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(Color.accentColor.opacity(0.15))
+                        .clipShape(Capsule())
+                }
+            }
+
+            HStack {
+                Text(dayText)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+
+                Spacer()
+
+                Text(day.confidenceLabel.rawValue.capitalized)
+                    .font(.caption)
+                    .foregroundStyle(confidenceColor)
+            }
+        }
+        .padding(.vertical, 4)
+    }
+}
+
 private struct SchengenSummaryRow: View {
     let summary: SchengenSummary
 
@@ -315,5 +393,5 @@ private struct StatPill: View {
 
 #Preview {
     ContentView()
-        .modelContainer(for: [Stay.self, DayOverride.self], inMemory: true)
+        .modelContainer(for: [Stay.self, DayOverride.self, LocationSample.self, PhotoSignal.self, PresenceDay.self, PhotoIngestState.self], inMemory: true)
 }

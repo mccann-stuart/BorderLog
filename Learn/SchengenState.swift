@@ -48,11 +48,13 @@ final class SchengenState {
         }
 
         let calendar = Calendar.current
-        let overlapCount = StayValidation.overlapCount(stays: stayInfos, calendar: calendar)
-        let gapDays = StayValidation.gapDays(stays: stayInfos, calendar: calendar)
+        let result = await Task.detached(priority: .userInitiated) {
+            let overlapCount = await StayValidation.overlapCount(stays: stayInfos, calendar: calendar)
+            let gapDays = await StayValidation.gapDays(stays: stayInfos, calendar: calendar)
+            let summary = await SchengenCalculator.summary(for: stayInfos, overrides: overrideInfos, calendar: calendar)
 
-        let summary = SchengenCalculator.summary(for: stayInfos, overrides: overrideInfos, calendar: calendar)
-        let result = (summary, overlapCount, gapDays)
+            return (summary, overlapCount, gapDays)
+        }.value
 
         if Task.isCancelled {
             return

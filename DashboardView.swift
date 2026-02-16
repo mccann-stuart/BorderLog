@@ -9,35 +9,33 @@ import SwiftUI
 import SwiftData
 
 struct DashboardView: View {
-    @Environment(\.modelContext) private var modelContext
-    @Query(sort: [SortDescriptor(\Stay.enteredOn, order: .reverse)]) private var stays: [Stay]
-    @Query(sort: [SortDescriptor(\DayOverride.date, order: .reverse)]) private var overrides: [DayOverride]
+    @Query(sort: [SortDescriptor(\PresenceDay.date, order: .reverse)]) private var presenceDays: [PresenceDay]
     
-    private var schengenSummary: SchengenSummary {
-        SchengenCalculator.summary(for: stays, overrides: overrides, asOf: Date())
+    private var schengenSummary: SchengenLedgerSummary {
+        SchengenLedgerCalculator.summary(for: presenceDays, asOf: Date())
     }
     
     // Group stays by country and calculate total days
     private var countryDaysSummary: [CountryDaysInfo] {
         var countryDict: [String: CountryDaysInfo] = [:]
         
-        for stay in stays {
-            let days = stay.durationInDays()
-            let key = stay.countryCode ?? stay.countryName
+        for day in presenceDays {
+            guard let countryName = day.countryName ?? day.countryCode else { continue }
+            let key = day.countryCode ?? countryName
             
             if let info = countryDict[key] {
                 countryDict[key] = CountryDaysInfo(
                     countryName: info.countryName,
                     countryCode: info.countryCode,
-                    totalDays: info.totalDays + days,
+                    totalDays: info.totalDays + 1,
                     region: info.region
                 )
             } else {
                 countryDict[key] = CountryDaysInfo(
-                    countryName: stay.countryName,
-                    countryCode: stay.countryCode,
-                    totalDays: days,
-                    region: stay.region
+                    countryName: countryName,
+                    countryCode: day.countryCode,
+                    totalDays: 1,
+                    region: day.countryCode.flatMap { SchengenMembers.isMember($0) ? .schengen : .nonSchengen } ?? .other
                 )
             }
         }
@@ -83,6 +81,12 @@ struct DashboardView: View {
                                 color: .red
                             )
                         }
+                    }
+
+                    if schengenSummary.unknownDays > 0 {
+                        Text("Unknown days in window: \(schengenSummary.unknownDays)")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
                     }
                 }
                 .padding()
@@ -241,5 +245,5 @@ private struct StatCard: View {
 
 #Preview {
     DashboardView()
-        .modelContainer(for: [Stay.self, DayOverride.self], inMemory: true)
+        .modelContainer(for: [Stay.self, DayOverride.self, LocationSample.self, PhotoSignal.self, PresenceDay.self, PhotoIngestState.self], inMemory: true)
 }

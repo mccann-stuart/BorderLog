@@ -50,5 +50,36 @@ struct SampleData {
             notes: "Day trip"
         )
         context.insert(overrideDay)
+
+        let sampleLocationTimestamp = calendar.date(byAdding: .day, value: -1, to: today) ?? today
+        let sampleLocation = LocationSample(
+            timestamp: sampleLocationTimestamp,
+            latitude: 40.4168,
+            longitude: -3.7038,
+            accuracyMeters: 65,
+            source: .app,
+            timeZoneId: TimeZone.current.identifier,
+            dayKey: DayKey.make(from: sampleLocationTimestamp, timeZone: TimeZone.current),
+            countryCode: "ES",
+            countryName: "Spain"
+        )
+        context.insert(sampleLocation)
+
+        let samplePhotoTimestamp = calendar.date(byAdding: .day, value: -20, to: today) ?? today
+        let samplePhoto = PhotoSignal(
+            timestamp: samplePhotoTimestamp,
+            latitude: 48.8566,
+            longitude: 2.3522,
+            assetIdHash: UUID().uuidString,
+            timeZoneId: TimeZone.current.identifier,
+            dayKey: DayKey.make(from: samplePhotoTimestamp, timeZone: TimeZone.current),
+            countryCode: "FR",
+            countryName: "France"
+        )
+        context.insert(samplePhoto)
+
+        Task { @MainActor in
+            await LedgerRecomputeService.recomputeAll(modelContext: context)
+        }
     }
 }
