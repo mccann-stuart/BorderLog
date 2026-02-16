@@ -533,5 +533,22 @@ Enable expatriates, digital nomads, and frequent international travelers to accu
 - Photo signal ingestion
 - Daily ledger generation + confidence + explainability UI
 
+## M2 plan
+1. Add SwiftData schema v2 with `LocationSample`, `PhotoSignal`, `PresenceDay`, and `PhotoIngestState`, plus a lightweight migration.
+2. Define new model files with unique constraints on `PresenceDay.dayKey` and `PhotoSignal.assetIdHash`.
+3. Add shared utilities: `DayKey`, `CountryResolving` protocol, and `CLGeocoderCountryResolver` with caching.
+4. Implement `LocationSampleService` to capture a single fix, resolve country/timezone, store a sample, and trigger ledger recompute.
+5. Implement `PhotoSignalIngestor` to scan the last 12 months (incremental on subsequent runs), hash asset IDs, store signals, and trigger recompute.
+6. Create a WidgetKit extension that captures location on refresh and displays the last sample.
+7. Build `PresenceInferenceEngine` scoring logic with weights (override > stay > photo > location).
+8. Add `LedgerRecomputeService` to upsert `PresenceDay` by dayKey and handle unknowns.
+9. Add a Daily Ledger section in Details with confidence pills, evidence, and an override action.
+10. Switch Dashboard metrics to use `PresenceDay` with unknown-day reporting.
+11. Add permission status/actions for location and photos + manual rescan in Settings.
+12. Update Info.plist keys and App Group entitlements for app + widget.
+13. Extend data reset/seed to include new models and optional sample ledger.
+14. Add unit tests for inference scoring, day-key bucketing, unknown-day behavior, and Schengen ledger summary.
+15. Keep README and in-app setup copy aligned with M2 inference capabilities.
+
 ## Run
 Open `Learn.xcodeproj` in Xcode and run the iOS app target.

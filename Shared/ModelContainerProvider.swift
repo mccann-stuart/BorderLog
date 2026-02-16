@@ -24,16 +24,30 @@ enum BorderLogSchemaV1: VersionedSchema {
     static var models: [any PersistentModel.Type] = [Stay.self, DayOverride.self]
 }
 
+enum BorderLogSchemaV2: VersionedSchema {
+    static var versionIdentifier: Schema.Version = .init(2, 0, 0)
+    static var models: [any PersistentModel.Type] = [
+        Stay.self,
+        DayOverride.self,
+        LocationSample.self,
+        PhotoSignal.self,
+        PresenceDay.self,
+        PhotoIngestState.self
+    ]
+}
+
 enum BorderLogMigrationPlan: SchemaMigrationPlan {
-    static var schemas: [any VersionedSchema.Type] = [BorderLogSchemaV1.self]
-    static var stages: [MigrationStage] = []
+    static var schemas: [any VersionedSchema.Type] = [BorderLogSchemaV1.self, BorderLogSchemaV2.self]
+    static var stages: [MigrationStage] = [
+        .lightweight(from: BorderLogSchemaV1.self, to: BorderLogSchemaV2.self)
+    ]
 }
 
 enum ModelContainerProvider {
     private static let logger = Logger(subsystem: "com.MCCANN.Learn", category: "Persistence")
 
     static func makeContainer() -> ModelContainer {
-        let schema = Schema(versionedSchema: BorderLogSchemaV1.self)
+        let schema = Schema(versionedSchema: BorderLogSchemaV2.self)
         let fallbackConfig = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
         let memoryConfig = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
 

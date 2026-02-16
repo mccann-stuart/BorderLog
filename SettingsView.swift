@@ -7,6 +7,8 @@
 
 import SwiftUI
 import SwiftData
+import CoreLocation
+import Photos
 
 struct SettingsView: View {
     @Environment(\.modelContext) private var modelContext
@@ -14,6 +16,10 @@ struct SettingsView: View {
     
     @State private var isConfirmingReset = false
     @State private var isShowingSeedAlert = false
+    @State private var locationStatus: CLAuthorizationStatus = CLLocationManager.authorizationStatus()
+    @State private var photoStatus: PHAuthorizationStatus = PHPhotoLibrary.authorizationStatus(for: .readWrite)
+    @State private var isIngestingPhotos = false
+    @State private var locationService = LocationSampleService()
     
     private var dataManager: DataManager {
         DataManager(modelContext: modelContext)
@@ -53,6 +59,36 @@ struct SettingsView: View {
                             .foregroundStyle(.secondary)
                     }
                 }
+
+                Section("Data Sources") {
+                    HStack {
+                        Text("Location Access")
+                        Spacer()
+                        Text(locationStatusText)
+                            .foregroundStyle(.secondary)
+                    }
+
+                    Button("Request Location Access") {
+                        locationService.requestAuthorizationIfNeeded()
+                        refreshPermissions()
+                    }
+
+                    HStack {
+                        Text("Photos Access")
+                        Spacer()
+                        Text(photoStatusText)
+                            .foregroundStyle(.secondary)
+                    }
+
+                    Button("Request Photos Access") {
+                        requestPhotosAccess()
+                    }
+
+                    Button(isIngestingPhotos ? "Rescanning Photos..." : "Rescan Photos") {
+                        rescanPhotos()
+                    }
+                    .disabled(isIngestingPhotos)
+                }
                 
                 Section("Privacy") {
                     VStack(alignment: .leading, spacing: 8) {
@@ -85,6 +121,9 @@ struct SettingsView: View {
             } message: {
                 Text("Reset all data before seeding the sample dataset.")
             }
+            .onAppear {
+                refreshPermissions()
+            }
         }
     }
     
@@ -105,6 +144,50 @@ struct SettingsView: View {
             print("Failed to seed data: \(error)")
         }
     }
+
+    private func refreshPermissions() {
+        locationStatus = CLLocationManager.authorizationStatus()
+        photoStatus = PHPhotoLibrary.authorizationStatus(for: .readWrite)
+    }
+
+    private func requestPhotosAccess() {
+        PHPhotoLibrary.requestAuthorization(for: .readWrite) { _ in
+            DispatchQueue.main.async {
+                refreshPermissions()
+            }
+        }
+    }
+
+    private func rescanPhotos() {
+        isIngestingPhotos = true
+        Task { @MainActor in
+            let ingestor = PhotoSignalIngestor(modelContext: modelContext)
+            _ = await ingestor.ingest(mode: .manualFullScan)
+            isIngestingPhotos = false
+        }
+    }
+
+    private var locationStatusText: String {
+        switch locationStatus {
+        case .authorizedAlways: return "Always"
+        case .authorizedWhenInUse: return "When In Use"
+        case .denied: return "Denied"
+        case .restricted: return "Restricted"
+        case .notDetermined: return "Not Determined"
+        @unknown default: return "Unknown"
+        }
+    }
+
+    private var photoStatusText: String {
+        switch photoStatus {
+        case .authorized: return "Authorized"
+        case .limited: return "Limited"
+        case .denied: return "Denied"
+        case .restricted: return "Restricted"
+        case .notDetermined: return "Not Determined"
+        @unknown default: return "Unknown"
+        }
+    }
 }
 
 struct AboutSetupView: View {
@@ -122,8 +205,8 @@ struct AboutSetupView: View {
                 Text("iCloud: optional for M1. Add later if you want device sync.")
             }
 
-            Section("Data Sources (M1)") {
-                Text("Manual stays and day overrides only. Inference via widgets and photos arrives in M2.")
+            Section("Data Sources (M2)") {
+                Text("Manual stays and day overrides. Inference via widgets and photos is enabled in M2.")
             }
         }
         .navigationTitle("About / Setup")
@@ -132,5 +215,5 @@ struct AboutSetupView: View {
 
 #Preview {
     SettingsView()
-        .modelContainer(for: [Stay.self, DayOverride.self], inMemory: true)
+        .modelContainer(for: [Stay.self, DayOverride.self, LocationSample.self, PhotoSignal.self, PresenceDay.self, PhotoIngestState.self], inMemory: true)
 }

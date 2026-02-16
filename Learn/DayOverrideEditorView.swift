@@ -19,9 +19,14 @@ struct DayOverrideEditorView: View {
     @State private var isShowingReplaceAlert = false
     @State private var replaceTarget: DayOverride?
 
-    init(overrideDay: DayOverride? = nil) {
+    init(overrideDay: DayOverride? = nil, presetDate: Date? = nil, presetCountryName: String? = nil, presetCountryCode: String? = nil) {
         self.existingOverride = overrideDay
-        _draft = State(initialValue: DayOverrideDraft(overrideDay: overrideDay))
+        _draft = State(initialValue: DayOverrideDraft(
+            overrideDay: overrideDay,
+            presetDate: presetDate,
+            presetCountryName: presetCountryName,
+            presetCountryCode: presetCountryCode
+        ))
     }
 
     var body: some View {
@@ -156,7 +161,7 @@ private struct DayOverrideDraft {
     var region: Region
     var notes: String
 
-    init(overrideDay: DayOverride?) {
+    init(overrideDay: DayOverride?, presetDate: Date? = nil, presetCountryName: String? = nil, presetCountryCode: String? = nil) {
         if let overrideDay {
             self.date = overrideDay.date
             self.countryName = overrideDay.countryName
@@ -164,10 +169,17 @@ private struct DayOverrideDraft {
             self.region = overrideDay.region
             self.notes = overrideDay.notes
         } else {
-            self.date = Date()
-            self.countryName = ""
-            self.countryCode = ""
-            self.region = .schengen
+            self.date = presetDate ?? Date()
+            self.countryName = presetCountryName ?? ""
+            self.countryCode = presetCountryCode ?? ""
+            let trimmedCode = (presetCountryCode ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+            if trimmedCode.isEmpty {
+                self.region = .other
+            } else if SchengenMembers.isMember(trimmedCode) {
+                self.region = .schengen
+            } else {
+                self.region = .nonSchengen
+            }
             self.notes = ""
         }
     }
@@ -175,5 +187,5 @@ private struct DayOverrideDraft {
 
 #Preview {
     DayOverrideEditorView()
-        .modelContainer(for: [Stay.self, DayOverride.self], inMemory: true)
+        .modelContainer(for: [Stay.self, DayOverride.self, LocationSample.self, PhotoSignal.self, PresenceDay.self, PhotoIngestState.self], inMemory: true)
 }
