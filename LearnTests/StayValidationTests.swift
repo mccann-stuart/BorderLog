@@ -235,4 +235,57 @@ final class StayValidationTests: XCTestCase {
         // 7. Empty list
         XCTAssertTrue(StayValidation.gapDays(stays: [Stay](), calendar: calendar) == 0)
     }
+
+    func testOverlapCount_Optimized_WithReverseSortedInput_ReturnsCount() {
+        // Optimized variant requires reverse sorted input (descending)
+        let stay1 = Stay(countryName: "A", region: .schengen, enteredOn: date(2026, 1, 1), exitedOn: date(2026, 1, 5))
+        let stay2 = Stay(countryName: "B", region: .schengen, enteredOn: date(2026, 1, 4), exitedOn: date(2026, 1, 8))
+        let stay3 = Stay(countryName: "C", region: .schengen, enteredOn: date(2026, 1, 7), exitedOn: date(2026, 1, 10))
+
+        // Input: [stay3, stay2, stay1] (Descending)
+        let count = StayValidation.overlapCount(reverseSortedStays: [stay3, stay2, stay1], calendar: calendar)
+        XCTAssertTrue(count == 2)
+
+        // Disjoint reverse sorted
+        let countDisjoint = StayValidation.overlapCount(reverseSortedStays: [stay2, stay1], calendar: calendar)
+        // stay2 (Jan 4-8), stay1 (Jan 1-5) -> Overlap Jan 4-5.
+        // Wait, Disjoint test used stay1 (1-5) and stay2 (6-10).
+        let stayA = Stay(countryName: "A", region: .schengen, enteredOn: date(2026, 1, 1), exitedOn: date(2026, 1, 5))
+        let stayB = Stay(countryName: "B", region: .schengen, enteredOn: date(2026, 1, 6), exitedOn: date(2026, 1, 10))
+        let countDisjoint2 = StayValidation.overlapCount(reverseSortedStays: [stayB, stayA], calendar: calendar)
+        XCTAssertTrue(countDisjoint2 == 0)
+    }
+
+    func testGapDays_Optimized_WithReverseSortedInput_CalculatesCorrectly() {
+        // 1. Simple gap
+        let stay1 = Stay(countryName: "A", region: .schengen, enteredOn: date(2026, 1, 1), exitedOn: date(2026, 1, 5))
+        let stay2 = Stay(countryName: "B", region: .schengen, enteredOn: date(2026, 1, 7), exitedOn: date(2026, 1, 10))
+        // Reverse sorted: [stay2, stay1]
+        XCTAssertTrue(StayValidation.gapDays(reverseSortedStays: [stay2, stay1], calendar: calendar) == 1)
+
+        // 2. No gap (consecutive)
+        let stay3 = Stay(countryName: "C", region: .schengen, enteredOn: date(2026, 1, 6), exitedOn: date(2026, 1, 10))
+        XCTAssertTrue(StayValidation.gapDays(reverseSortedStays: [stay3, stay1], calendar: calendar) == 0)
+    }
+
+    func testGapDays_WithOpenEndedStay_CalculatesCorrectly() {
+        // Stay 1: Jan 1 - Jan 5
+        // Stay 2: Jan 10 - Ongoing
+        // Stay 3: Jan 20 - Jan 25
+
+        let stay1 = Stay(countryName: "A", region: .schengen, enteredOn: date(2026, 1, 1), exitedOn: date(2026, 1, 5))
+        let stay2 = Stay(countryName: "B", region: .schengen, enteredOn: date(2026, 1, 10), exitedOn: nil)
+        let stay3 = Stay(countryName: "C", region: .schengen, enteredOn: date(2026, 1, 20), exitedOn: date(2026, 1, 25))
+
+        // Expected gaps:
+        // Jan 5 to Jan 10 -> 4 days gap.
+        // Jan 10 to Jan 20 -> User is present (ongoing). No gap.
+        // Total: 4.
+
+        // Pass sorted input for standard function
+        XCTAssertTrue(StayValidation.gapDays(stays: [stay1, stay2, stay3], calendar: calendar) == 4)
+
+        // Pass reverse sorted input for optimized function
+        XCTAssertTrue(StayValidation.gapDays(reverseSortedStays: [stay3, stay2, stay1], calendar: calendar) == 4)
+    }
 }

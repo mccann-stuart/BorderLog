@@ -9,11 +9,37 @@ import Foundation
 
 enum StayValidation {
     static func overlapCount<S: SchengenStay>(stays: [S], calendar: Calendar) -> Int {
-        let sorted = stays.sorted { $0.enteredOn < $1.enteredOn }
+        return calculateOverlapCount(chronologicalStays: stays.sorted { $0.enteredOn < $1.enteredOn }, calendar: calendar)
+    }
+
+    static func overlapCount<S: SchengenStay>(reverseSortedStays stays: [S], calendar: Calendar) -> Int {
+        // Optimization: Stays are reverse-sorted by enteredOn (descending).
+        // We iterate in reverse to process them in chronological order (ascending),
+        // allowing us to merge intervals on-the-fly without an intermediate array or sort.
+        assert(zip(stays, stays.dropFirst()).allSatisfy { $0.enteredOn >= $1.enteredOn },
+               "StayValidation.overlapCount(reverseSortedStays:) expects stays to be sorted descending by enteredOn")
+
+        return calculateOverlapCount(chronologicalStays: stays.reversed(), calendar: calendar)
+    }
+
+    static func gapDays<S: SchengenStay>(stays: [S], calendar: Calendar) -> Int {
+        return calculateGapDays(chronologicalStays: stays.sorted { $0.enteredOn < $1.enteredOn }, calendar: calendar)
+    }
+
+    static func gapDays<S: SchengenStay>(reverseSortedStays stays: [S], calendar: Calendar) -> Int {
+        // Optimization: Input must be reverse-sorted (descending).
+        // Use reversed() for O(1) reordering.
+        assert(zip(stays, stays.dropFirst()).allSatisfy { $0.enteredOn >= $1.enteredOn },
+               "StayValidation.gapDays(reverseSortedStays:) expects stays to be sorted descending by enteredOn")
+
+        return calculateGapDays(chronologicalStays: stays.reversed(), calendar: calendar)
+    }
+
+    private static func calculateOverlapCount<S: Sequence>(chronologicalStays: S, calendar: Calendar) -> Int where S.Element: SchengenStay {
         var overlapCount = 0
         var currentEnd: Date?
 
-        for stay in sorted {
+        for stay in chronologicalStays {
             let start = calendar.startOfDay(for: stay.enteredOn)
             let end = calendar.startOfDay(for: stay.exitedOn ?? Date.distantFuture)
 
@@ -28,15 +54,16 @@ enum StayValidation {
         return overlapCount
     }
 
-    static func gapDays<S: SchengenStay>(stays: [S], calendar: Calendar) -> Int {
-        let sorted = stays.sorted { $0.enteredOn < $1.enteredOn }
-        guard sorted.count > 1 else { return 0 }
+    private static func calculateGapDays<C: Collection>(chronologicalStays: C, calendar: Calendar) -> Int where C.Element: SchengenStay {
+        guard chronologicalStays.count > 1 else { return 0 }
 
         var gapDays = 0
-        guard let firstStay = sorted.first else { return 0 }
-        var previousEnd = calendar.startOfDay(for: firstStay.exitedOn ?? firstStay.enteredOn)
+        guard let firstStay = chronologicalStays.first else { return 0 }
 
-        for stay in sorted.dropFirst() {
+        // Use distantFuture to represent ongoing stay, ensuring no gap is calculated after it
+        var previousEnd = calendar.startOfDay(for: firstStay.exitedOn ?? Date.distantFuture)
+
+        for stay in chronologicalStays.dropFirst() {
             let start = calendar.startOfDay(for: stay.enteredOn)
             if start > previousEnd {
                 let dayDiff = calendar.dateComponents([.day], from: previousEnd, to: start).day ?? 0
@@ -45,7 +72,7 @@ enum StayValidation {
                 }
             }
 
-            let end = calendar.startOfDay(for: stay.exitedOn ?? stay.enteredOn)
+            let end = calendar.startOfDay(for: stay.exitedOn ?? Date.distantFuture)
             if end > previousEnd {
                 previousEnd = end
             }
