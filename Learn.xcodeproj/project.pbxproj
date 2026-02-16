@@ -12,8 +12,22 @@
 		4B9C85D12F426E4C00C510A8 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4B9C85D02F426E4C00C510A8 /* SettingsView.swift */; };
 		4B9C85D32F426E5C00C510A8 /* UserAccountView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4B9C85D22F426E5C00C510A8 /* UserAccountView.swift */; };
 		4B9C85D52F426E7A00C510A8 /* MainNavigationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4B9C85D42F426E7A00C510A8 /* MainNavigationView.swift */; };
+		110510196EBB4557AA608E66 /* Info.plist.in in Resources */ = {isa = PBXBuildFile; fileRef = 24F357C954C0459180599F51 /* Info.plist.in */; };
 		4BEE3D0C2F4C2F9A00D6F0F1 /* BorderLogWidget.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = 4BEE3D0A2F4C2F9A00D6F0F1 /* BorderLogWidget.appex */; };
 /* End PBXBuildFile section */
+
+/* Begin PBXBuildRule section */
+		19576C181554483E82E2E1F6 /* Generate Info.plist from template */ = {
+			isa = PBXBuildRule;
+			compilerSpec = com.apple.compilers.proxy.script;
+			filePatterns = "*.plist.in";
+			fileType = pattern.proxy;
+			outputFiles = (
+				"$(PROJECT_DIR)/BorderLogWidget/Info.plist",
+			);
+			script = "cp \"$INPUT_FILE_PATH\" \"$OUTPUT_FILE_PATH\"";
+		};
+/* End PBXBuildRule section */
 
 /* Begin PBXContainerItemProxy section */
 		4BF474CB2F3FAB7B0026C07A /* PBXContainerItemProxy */ = {
@@ -50,6 +64,7 @@
 		4B9C85D02F426E4C00C510A8 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		4B9C85D22F426E5C00C510A8 /* UserAccountView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserAccountView.swift; sourceTree = "<group>"; };
 		4B9C85D42F426E7A00C510A8 /* MainNavigationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainNavigationView.swift; sourceTree = "<group>"; };
+		24F357C954C0459180599F51 /* Info.plist.in */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist.in; sourceTree = "<group>"; };
 		4BEE3D0A2F4C2F9A00D6F0F1 /* BorderLogWidget.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = BorderLogWidget.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		4BF474BB2F3FAB7A0026C07A /* Learn.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Learn.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		4BF474CA2F3FAB7B0026C07A /* LearnTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = LearnTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -71,13 +86,6 @@
 			);
 			target = 4BF474C92F3FAB7B0026C07A /* LearnTests */;
 		};
-		FDA6A0056B8C52FFB6E885BC /* Exceptions for "BorderLogWidget" folder in "BorderLogWidget" target */ = {
-			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
-			membershipExceptions = (
-				Info.plist,
-			);
-			target = 4BEE3D032F4C2F9A00D6F0F1 /* BorderLogWidget */;
-		};
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -88,9 +96,6 @@
 		};
 		4BEE3D0B2F4C2F9A00D6F0F1 /* BorderLogWidget */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			exceptions = (
-				FDA6A0056B8C52FFB6E885BC /* Exceptions for "BorderLogWidget" folder in "BorderLogWidget" target */,
-			);
 			path = BorderLogWidget;
 			sourceTree = "<group>";
 		};
@@ -180,6 +185,7 @@
 				4BEE3D092F4C2F9A00D6F0F1 /* Resources */,
 			);
 			buildRules = (
+				19576C181554483E82E2E1F6 /* Generate Info.plist from template */,
 			);
 			fileSystemSynchronizedGroups = (
 				4BEE3D012F4C2F9A00D6F0F1 /* Shared */,
@@ -304,6 +310,7 @@
 		4BEE3D092F4C2F9A00D6F0F1 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			files = (
+				110510196EBB4557AA608E66 /* Info.plist.in in Resources */,
 			);
 		};
 		4BF474B92F3FAB7A0026C07A /* Resources */ = {
