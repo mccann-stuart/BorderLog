@@ -21,9 +21,13 @@ struct PhotoSignalIngestor {
     let modelContext: ModelContext
     let resolver: CountryResolving
 
-    init(modelContext: ModelContext, resolver: CountryResolving = CLGeocoderCountryResolver()) {
+    init(modelContext: ModelContext, resolver: CountryResolving) {
         self.modelContext = modelContext
         self.resolver = resolver
+    }
+
+    init(modelContext: ModelContext) {
+        self.init(modelContext: modelContext, resolver: CLGeocoderCountryResolver())
     }
 
     func ingest(mode: IngestMode) async -> Int {

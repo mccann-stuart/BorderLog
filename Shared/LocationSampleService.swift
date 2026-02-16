@@ -30,8 +30,9 @@ final class LocationSampleService: NSObject, CLLocationManagerDelegate {
     func captureAndStore(
         source: LocationSampleSource,
         modelContext: ModelContext,
-        resolver: CountryResolving = CLGeocoderCountryResolver()
+        resolver: CountryResolving? = nil
     ) async -> LocationSample? {
+        let resolver = resolver ?? CLGeocoderCountryResolver()
         let status = manager.authorizationStatus
         guard status == .authorizedWhenInUse || status == .authorizedAlways else {
             return nil

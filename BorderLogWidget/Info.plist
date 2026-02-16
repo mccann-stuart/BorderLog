@@ -13,5 +13,11 @@
     <true/>
     <key>AppGroupId</key>
     <string>group.com.MCCANN.Learn</string>
+    <key>CFBundleIdentifier</key>
+    <string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+    <key>CFBundleShortVersionString</key>
+    <string>$(MARKETING_VERSION)</string>
+    <key>CFBundleVersion</key>
+    <string>$(CURRENT_PROJECT_VERSION)</string>
 </dict>
 </plist>

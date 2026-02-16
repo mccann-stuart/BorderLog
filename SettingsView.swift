@@ -16,7 +16,7 @@ struct SettingsView: View {
     
     @State private var isConfirmingReset = false
     @State private var isShowingSeedAlert = false
-    @State private var locationStatus: CLAuthorizationStatus = CLLocationManager.authorizationStatus()
+    @State private var locationStatus: CLAuthorizationStatus = CLLocationManager().authorizationStatus
     @State private var photoStatus: PHAuthorizationStatus = PHPhotoLibrary.authorizationStatus(for: .readWrite)
     @State private var isIngestingPhotos = false
     @State private var locationService = LocationSampleService()
@@ -146,7 +146,7 @@ struct SettingsView: View {
     }
 
     private func refreshPermissions() {
-        locationStatus = CLLocationManager.authorizationStatus()
+        locationStatus = CLLocationManager().authorizationStatus
         photoStatus = PHPhotoLibrary.authorizationStatus(for: .readWrite)
     }
 
