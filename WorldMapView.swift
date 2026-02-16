@@ -11,15 +11,17 @@ import MapKit
 struct WorldMapView: View {
     let visitedCountries: Set<String>
     
-    @State private var region = MKCoordinateRegion(
-        center: CLLocationCoordinate2D(latitude: 20, longitude: 0),
-        span: MKCoordinateSpan(latitudeDelta: 100, longitudeDelta: 180)
+    @State private var cameraPosition = MapCameraPosition.region(
+        MKCoordinateRegion(
+            center: CLLocationCoordinate2D(latitude: 20, longitude: 0),
+            span: MKCoordinateSpan(latitudeDelta: 100, longitudeDelta: 180)
+        )
     )
     
     var body: some View {
         ZStack {
             // Base map
-            Map(position: .constant(.region(region))) {
+            Map(position: $cameraPosition, interactionModes: .all) {
                 // Add annotations for visited countries
                 ForEach(Array(visitedCountries), id: \.self) { code in
                     if let coordinate = countryCoordinate(for: code) {
@@ -36,7 +38,6 @@ struct WorldMapView: View {
                 }
             }
             .mapStyle(.standard(elevation: .flat))
-            .allowsHitTesting(false)
             
             // Overlay with visited countries count
             VStack {
@@ -58,6 +59,7 @@ struct WorldMapView: View {
 
 // Helper function to get approximate coordinates for country codes
 private func countryCoordinate(for code: String) -> CLLocationCoordinate2D? {
+    let normalized = CountryCodeNormalizer.normalize(code) ?? code.uppercased()
     let coordinates: [String: CLLocationCoordinate2D] = [
         // Schengen countries
         "AT": CLLocationCoordinate2D(latitude: 47.5162, longitude: 14.5501), // Austria
@@ -121,7 +123,7 @@ private func countryCoordinate(for code: String) -> CLLocationCoordinate2D? {
         "IL": CLLocationCoordinate2D(latitude: 31.0461, longitude: 34.8516),  // Israel
     ]
     
-    return coordinates[code.uppercased()]
+    return coordinates[normalized]
 }
 
 #Preview {

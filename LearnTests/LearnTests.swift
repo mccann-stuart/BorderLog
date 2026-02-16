@@ -43,7 +43,7 @@ final class SchengenCalculatorWindowTests: XCTestCase {
             Stay(countryName: "Germany", region: .schengen, enteredOn: date(2026, 2, 1), exitedOn: date(2026, 2, 3)),
         ]
         let overrides = [
-            DayOverride(date: date(2026, 2, 2), countryName: "UK", region: .nonSchengen, notes: "Transit"),
+            DayOverride(date: date(2026, 2, 2), countryName: "United Kingdom", region: .nonSchengen, notes: "Transit"),
         ]
 
         let summary = SchengenCalculator.summary(

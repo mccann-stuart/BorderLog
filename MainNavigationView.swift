@@ -22,6 +22,8 @@ struct MainNavigationView: View {
     
     var body: some View {
         ZStack {
+            Color(UIColor.systemBackground)
+                .ignoresSafeArea()
             // Main content with tab view
             TabView(selection: $selectedTab) {
                 NavigationStack {
@@ -80,6 +82,7 @@ struct MainNavigationView: View {
                     Label("Details", systemImage: "list.bullet")
                 }
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
             
             // Side menu overlay
             if isShowingMenu {

@@ -179,12 +179,13 @@ struct StayEditorView: View {
     private func applySave() {
         let trimmedCountry = draft.countryName.trimmingCharacters(in: .whitespacesAndNewlines)
         let trimmedCode = draft.countryCode.trimmingCharacters(in: .whitespacesAndNewlines)
+        let normalizedCode = CountryCodeNormalizer.normalize(trimmedCode)
         let trimmedNotes = draft.notes.trimmingCharacters(in: .whitespacesAndNewlines)
         let exitDate = draft.hasExitDate ? draft.exitedOn : nil
 
         if let existingStay {
             existingStay.countryName = trimmedCountry
-            existingStay.countryCode = trimmedCode.isEmpty ? nil : trimmedCode.uppercased()
+            existingStay.countryCode = normalizedCode
             existingStay.region = draft.region
             existingStay.enteredOn = draft.enteredOn
             existingStay.exitedOn = exitDate
@@ -192,7 +193,7 @@ struct StayEditorView: View {
         } else {
             let stay = Stay(
                 countryName: trimmedCountry,
-                countryCode: trimmedCode.isEmpty ? nil : trimmedCode.uppercased(),
+                countryCode: normalizedCode,
                 region: draft.region,
                 enteredOn: draft.enteredOn,
                 exitedOn: exitDate,

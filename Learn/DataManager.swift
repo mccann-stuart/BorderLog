@@ -66,7 +66,7 @@ struct DataManager {
         )
         let stay2 = Stay(
             countryName: "United Kingdom",
-            countryCode: "UK",
+            countryCode: "GB",
             region: .nonSchengen,
             enteredOn: calendar.date(byAdding: .day, value: -9, to: today) ?? today,
             exitedOn: calendar.date(byAdding: .day, value: -2, to: today) ?? today,

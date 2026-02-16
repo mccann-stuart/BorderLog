@@ -21,7 +21,8 @@ struct DashboardView: View {
         
         for day in presenceDays {
             guard let countryName = day.countryName ?? day.countryCode else { continue }
-            let key = day.countryCode ?? countryName
+            let normalizedCode = CountryCodeNormalizer.normalize(day.countryCode)
+            let key = normalizedCode ?? countryName
             
             if let info = countryDict[key] {
                 countryDict[key] = CountryDaysInfo(
@@ -33,9 +34,9 @@ struct DashboardView: View {
             } else {
                 countryDict[key] = CountryDaysInfo(
                     countryName: countryName,
-                    countryCode: day.countryCode,
+                    countryCode: normalizedCode,
                     totalDays: 1,
-                    region: day.countryCode.flatMap { SchengenMembers.isMember($0) ? .schengen : .nonSchengen } ?? .other
+                    region: normalizedCode.flatMap { SchengenMembers.isMember($0) ? .schengen : .nonSchengen } ?? .other
                 )
             }
         }
@@ -152,7 +153,8 @@ struct CountryDaysInfo: Identifiable {
 private func countryCodeToEmoji(_ code: String) -> String {
     let base: UInt32 = 127397
     var emoji = ""
-    for scalar in code.uppercased().unicodeScalars {
+    let normalized = CountryCodeNormalizer.normalize(code) ?? code.uppercased()
+    for scalar in normalized.unicodeScalars {
         if let unicodeScalar = UnicodeScalar(base + scalar.value) {
             emoji.append(String(unicodeScalar))
         }

@@ -131,19 +131,20 @@ struct DayOverrideEditorView: View {
 
         let trimmedCountry = draft.countryName.trimmingCharacters(in: .whitespacesAndNewlines)
         let trimmedCode = draft.countryCode.trimmingCharacters(in: .whitespacesAndNewlines)
+        let normalizedCode = CountryCodeNormalizer.normalize(trimmedCode)
         let trimmedNotes = draft.notes.trimmingCharacters(in: .whitespacesAndNewlines)
 
         if let existingOverride {
             existingOverride.date = draft.date
             existingOverride.countryName = trimmedCountry
-            existingOverride.countryCode = trimmedCode.isEmpty ? nil : trimmedCode.uppercased()
+            existingOverride.countryCode = normalizedCode
             existingOverride.region = draft.region
             existingOverride.notes = trimmedNotes
         } else {
             let newOverride = DayOverride(
                 date: draft.date,
                 countryName: trimmedCountry,
-                countryCode: trimmedCode.isEmpty ? nil : trimmedCode.uppercased(),
+                countryCode: normalizedCode,
                 region: draft.region,
                 notes: trimmedNotes
             )

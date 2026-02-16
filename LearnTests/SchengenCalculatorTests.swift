@@ -50,7 +50,7 @@ final class SchengenCalculatorTests: XCTestCase {
     func testNonSchengen_stay_doesNotCount() {
         let ref = day(2026, 2, 15)
         let start = calendar.date(byAdding: .day, value: -30, to: ref)!
-        let stay = Stay(countryName: "United Kingdom", countryCode: "UK", region: .nonSchengen, enteredOn: start, exitedOn: ref)
+        let stay = Stay(countryName: "United Kingdom", countryCode: "GB", region: .nonSchengen, enteredOn: start, exitedOn: ref)
         let summary = SchengenCalculator.summary(for: [stay], overrides: [], asOf: ref, calendar: calendar)
         XCTAssertTrue(summary.usedDays == 0)
         XCTAssertTrue(summary.remainingDays == 90)
@@ -64,7 +64,7 @@ final class SchengenCalculatorTests: XCTestCase {
         let stay = Stay(countryName: "Portugal", countryCode: "PT", region: .schengen, enteredOn: start, exitedOn: ref)
 
         // One override moves a day to non-Schengen (removes 1)
-        let removeDay = DayOverride(date: calendar.date(byAdding: .day, value: -5, to: ref)!, countryName: "UK", countryCode: "UK", region: .nonSchengen)
+        let removeDay = DayOverride(date: calendar.date(byAdding: .day, value: -5, to: ref)!, countryName: "United Kingdom", countryCode: "GB", region: .nonSchengen)
         // One override adds a Schengen day outside the stay
         let addDay = DayOverride(date: calendar.date(byAdding: .day, value: -20, to: ref)!, countryName: "France", countryCode: "FR", region: .schengen)
 
