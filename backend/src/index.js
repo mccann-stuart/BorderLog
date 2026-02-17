@@ -5,7 +5,10 @@ export default {
     const method = request.method;
 
     if (method !== "GET" && method !== "HEAD") {
-      return new Response("Method Not Allowed", { status: 405 });
+      return new Response("Method Not Allowed", {
+        status: 405,
+        headers: { "X-Content-Type-Options": "nosniff" }
+      });
     }
 
     // Helper to validate version string (alphanumeric, dot, dash, underscore)
@@ -15,21 +18,21 @@ export default {
     const fetchFromR2 = async (key) => {
       // Check if binding exists
       if (!env.CONFIG_BUCKET) {
-        // If binding is missing, return a mock response for development/testing
-        // or a 500 error if strict. Given this is a template, a clear error or mock is better.
-        // Let's return a 500 with a clear message.
-        return new Response("R2 Bucket 'CONFIG_BUCKET' not configured in environment", { status: 500 });
-        // If binding is missing, return a generic error in production, but log internally
         console.error("R2 Bucket 'CONFIG_BUCKET' not configured in environment");
-        return new Response("Internal Server Error", { status: 500 });
+        return new Response("Internal Server Error", {
+            status: 500,
+            headers: { "X-Content-Type-Options": "nosniff" }
+        });
       }
 
       try {
         const object = await env.CONFIG_BUCKET.get(key);
 
         if (object === null) {
-          return new Response(`Object '${key}' Not Found`, { status: 404 });
-          return new Response("Not Found", { status: 404 });
+          return new Response("Not Found", {
+            status: 404,
+            headers: { "X-Content-Type-Options": "nosniff" }
+          });
         }
 
         const headers = new Headers();
@@ -48,7 +51,6 @@ export default {
           headers,
         });
       } catch (e) {
-        return new Response(`Error fetching from R2: ${e.message}`, { status: 500 });
         // Log the actual error but return a generic message to the client
         console.error(`Error fetching from R2: ${e.message}`);
         return new Response("Internal Server Error", {
@@ -68,11 +70,6 @@ export default {
     const zonesMatch = path.match(/^\/config\/zones\/([^/]+)$/);
     if (zonesMatch) {
       const version = zonesMatch[1];
-      // Assuming structure in bucket is zones/{version}.json or just zones/{version}
-      // PRD implies JSON content, so let's try to append .json if not present or just use key as is?
-      // "zones.json (Schengen membership...)" -> likely zones.json is the file, but versioning implies zones-v1.json or zones/v1.json
-      // PRD: "GET /config/zones/{version} → zone definitions"
-      // Let's assume the key is `zones/${version}.json` for clarity.
       if (!isValidVersion(version)) {
         return new Response("Invalid version format", {
             status: 400,
@@ -109,6 +106,9 @@ export default {
     }
 
     // Default response
-    return new Response("Not Found", { status: 404 });
+    return new Response("Not Found", {
+        status: 404,
+        headers: { "X-Content-Type-Options": "nosniff" }
+    });
   },
 };
