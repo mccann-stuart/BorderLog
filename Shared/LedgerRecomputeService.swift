@@ -157,44 +157,61 @@ enum LedgerRecomputeService {
     }
 
     private static func earliestSignalDate(modelContext: ModelContext) -> Date? {
-        let stays = fetchStays(from: Date.distantPast, to: Date.distantFuture, modelContext: modelContext)
-        let overrides = fetchOverrides(from: Date.distantPast, to: Date.distantFuture, modelContext: modelContext)
-        let locations = fetchLocations(from: Date.distantPast, to: Date.distantFuture, modelContext: modelContext)
-        let photos = fetchPhotos(from: Date.distantPast, to: Date.distantFuture, modelContext: modelContext)
+        // Optimization: Fetch only the earliest record for each type using database-level sorting and limiting,
+        // rather than fetching all records into memory to find the minimum.
+        let stayDate = fetchEarliestDate(for: Stay.self, sortBy: \.enteredOn, modelContext: modelContext)
+        let overrideDate = fetchEarliestDate(for: DayOverride.self, sortBy: \.date, modelContext: modelContext)
+        let locationDate = fetchEarliestDate(for: LocationSample.self, sortBy: \.timestamp, modelContext: modelContext)
+        let photoDate = fetchEarliestDate(for: PhotoSignal.self, sortBy: \.timestamp, modelContext: modelContext)
 
-        let stayDates = stays.map { $0.enteredOn }
-        let overrideDates = overrides.map { $0.date }
-        let locationDates = locations.map { $0.timestamp }
-        let photoDates = photos.map { $0.timestamp }
+        return [stayDate, overrideDate, locationDate, photoDate].compactMap { $0 }.min()
+    }
 
-        return (stayDates + overrideDates + locationDates + photoDates).min()
+    private static func fetchEarliestDate<T: PersistentModel>(
+        for type: T.Type,
+        sortBy keyPath: KeyPath<T, Date>,
+        modelContext: ModelContext
+    ) -> Date? {
+        var descriptor = FetchDescriptor<T>(sortBy: [SortDescriptor(keyPath, order: .forward)])
+        descriptor.fetchLimit = 1
+        return (try? modelContext.fetch(descriptor))?.first?[keyPath: keyPath]
     }
 
     private static func fetchStays(from start: Date, to end: Date, modelContext: ModelContext) -> [Stay] {
-        let descriptor = FetchDescriptor<Stay>()
-        let stays = (try? modelContext.fetch(descriptor)) ?? []
-        return stays.filter { stay in
-            let stayStart = stay.enteredOn
-            let stayEnd = stay.exitedOn ?? end
-            return stayStart <= end && stayEnd >= start
-        }
+        // Optimization: Use a predicate to filter stays at the database level instead of fetching all and filtering in memory.
+        // Logic: stay starts before range ends AND stay ends after range starts (or is ongoing).
+        let descriptor = FetchDescriptor<Stay>(
+            predicate: #Predicate { stay in
+                stay.enteredOn <= end && (stay.exitedOn == nil || stay.exitedOn! >= start)
+            }
+        )
+        return (try? modelContext.fetch(descriptor)) ?? []
     }
 
     private static func fetchOverrides(from start: Date, to end: Date, modelContext: ModelContext) -> [DayOverride] {
-        let descriptor = FetchDescriptor<DayOverride>()
-        let overrides = (try? modelContext.fetch(descriptor)) ?? []
-        return overrides.filter { $0.date >= start && $0.date <= end }
+        let descriptor = FetchDescriptor<DayOverride>(
+            predicate: #Predicate { override in
+                override.date >= start && override.date <= end
+            }
+        )
+        return (try? modelContext.fetch(descriptor)) ?? []
     }
 
     private static func fetchLocations(from start: Date, to end: Date, modelContext: ModelContext) -> [LocationSample] {
-        let descriptor = FetchDescriptor<LocationSample>()
-        let samples = (try? modelContext.fetch(descriptor)) ?? []
-        return samples.filter { $0.timestamp >= start && $0.timestamp <= end }
+        let descriptor = FetchDescriptor<LocationSample>(
+            predicate: #Predicate { sample in
+                sample.timestamp >= start && sample.timestamp <= end
+            }
+        )
+        return (try? modelContext.fetch(descriptor)) ?? []
     }
 
     private static func fetchPhotos(from start: Date, to end: Date, modelContext: ModelContext) -> [PhotoSignal] {
-        let descriptor = FetchDescriptor<PhotoSignal>()
-        let signals = (try? modelContext.fetch(descriptor)) ?? []
-        return signals.filter { $0.timestamp >= start && $0.timestamp <= end }
+        let descriptor = FetchDescriptor<PhotoSignal>(
+            predicate: #Predicate { signal in
+                signal.timestamp >= start && signal.timestamp <= end
+            }
+        )
+        return (try? modelContext.fetch(descriptor)) ?? []
     }
 }
