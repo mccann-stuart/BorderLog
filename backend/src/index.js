@@ -4,11 +4,26 @@ export default {
     const path = url.pathname;
     const method = request.method;
 
+    // Helper to add security headers
+    const addSecurityHeaders = (headers) => {
+      headers.set("X-Content-Type-Options", "nosniff");
+      headers.set("Strict-Transport-Security", "max-age=63072000; includeSubDomains; preload");
+      headers.set("Content-Security-Policy", "default-src 'none'; frame-ancestors 'none'; sandbox");
+      headers.set("X-Frame-Options", "DENY");
+      headers.set("Referrer-Policy", "no-referrer");
+      headers.set("Permissions-Policy", "interest-cohort=()");
+      return headers;
+    };
+
+    // Helper to create responses with security headers
+    const createResponse = (body, status = 200, extraHeaders = {}) => {
+        const headers = new Headers(extraHeaders);
+        addSecurityHeaders(headers);
+        return new Response(body, { status, headers });
+    };
+
     if (method !== "GET" && method !== "HEAD") {
-      return new Response("Method Not Allowed", {
-        status: 405,
-        headers: { "X-Content-Type-Options": "nosniff" }
-      });
+      return createResponse("Method Not Allowed", 405);
     }
 
     // Helper to validate version string (alphanumeric, dot, dash, underscore)
@@ -19,27 +34,22 @@ export default {
       // Check if binding exists
       if (!env.CONFIG_BUCKET) {
         console.error("R2 Bucket 'CONFIG_BUCKET' not configured in environment");
-        return new Response("Internal Server Error", {
-            status: 500,
-            headers: { "X-Content-Type-Options": "nosniff" }
-        });
+        return createResponse("Internal Server Error", 500);
       }
 
       try {
         const object = await env.CONFIG_BUCKET.get(key);
 
         if (object === null) {
-          return new Response("Not Found", {
-            status: 404,
-            headers: { "X-Content-Type-Options": "nosniff" }
-          });
+          return createResponse("Not Found", 404);
         }
 
         const headers = new Headers();
         object.writeHttpMetadata(headers);
         headers.set("etag", object.httpEtag);
+
         // Add security headers
-        headers.set("X-Content-Type-Options", "nosniff");
+        addSecurityHeaders(headers);
 
         // Handle conditional requests (If-None-Match)
         const ifNoneMatch = request.headers.get("If-None-Match");
@@ -53,10 +63,7 @@ export default {
       } catch (e) {
         // Log the actual error but return a generic message to the client
         console.error(`Error fetching from R2: ${e.message}`);
-        return new Response("Internal Server Error", {
-            status: 500,
-            headers: { "X-Content-Type-Options": "nosniff" }
-        });
+        return createResponse("Internal Server Error", 500);
       }
     };
 
@@ -71,10 +78,7 @@ export default {
     if (zonesMatch) {
       const version = zonesMatch[1];
       if (!isValidVersion(version)) {
-        return new Response("Invalid version format", {
-            status: 400,
-            headers: { "X-Content-Type-Options": "nosniff" }
-        });
+        return createResponse("Invalid version format", 400);
       }
       return fetchFromR2(`zones/${version}.json`);
     }
@@ -84,10 +88,7 @@ export default {
     if (rulesMatch) {
       const version = rulesMatch[1];
       if (!isValidVersion(version)) {
-        return new Response("Invalid version format", {
-            status: 400,
-            headers: { "X-Content-Type-Options": "nosniff" }
-        });
+        return createResponse("Invalid version format", 400);
       }
       return fetchFromR2(`rules/${version}.json`);
     }
@@ -97,18 +98,12 @@ export default {
     if (countriesMatch) {
       const version = countriesMatch[1];
       if (!isValidVersion(version)) {
-        return new Response("Invalid version format", {
-            status: 400,
-            headers: { "X-Content-Type-Options": "nosniff" }
-        });
+        return createResponse("Invalid version format", 400);
       }
       return fetchFromR2(`countries/${version}.json`);
     }
 
     // Default response
-    return new Response("Not Found", {
-        status: 404,
-        headers: { "X-Content-Type-Options": "nosniff" }
-    });
+    return createResponse("Not Found", 404);
   },
 };
