@@ -4,10 +4,17 @@ export default {
     const path = url.pathname;
     const method = request.method;
 
+    // Helper to add common headers to a Headers object
+    const addCommonHeaders = (headers) => {
+      headers.set("X-Content-Type-Options", "nosniff");
+    };
+
     if (method !== "GET" && method !== "HEAD") {
+      const headers = new Headers();
+      addCommonHeaders(headers);
       return new Response("Method Not Allowed", {
         status: 405,
-        headers: { "X-Content-Type-Options": "nosniff" }
+        headers
       });
     }
 
@@ -19,9 +26,11 @@ export default {
       // Check if binding exists
       if (!env.CONFIG_BUCKET) {
         console.error("R2 Bucket 'CONFIG_BUCKET' not configured in environment");
+        const headers = new Headers();
+        addCommonHeaders(headers);
         return new Response("Internal Server Error", {
             status: 500,
-            headers: { "X-Content-Type-Options": "nosniff" }
+            headers
         });
       }
 
@@ -29,17 +38,24 @@ export default {
         const object = await env.CONFIG_BUCKET.get(key);
 
         if (object === null) {
+          const headers = new Headers();
+          addCommonHeaders(headers);
           return new Response("Not Found", {
             status: 404,
-            headers: { "X-Content-Type-Options": "nosniff" }
+            headers
           });
         }
 
         const headers = new Headers();
         object.writeHttpMetadata(headers);
         headers.set("etag", object.httpEtag);
-        // Add security headers
-        headers.set("X-Content-Type-Options", "nosniff");
+
+        // Add common headers
+        addCommonHeaders(headers);
+
+        // Add Cache-Control for performance
+        // Cache for 5 minutes (300 seconds)
+        headers.set("Cache-Control", "public, max-age=300");
 
         // Handle conditional requests (If-None-Match)
         const ifNoneMatch = request.headers.get("If-None-Match");
@@ -53,9 +69,11 @@ export default {
       } catch (e) {
         // Log the actual error but return a generic message to the client
         console.error(`Error fetching from R2: ${e.message}`);
+        const headers = new Headers();
+        addCommonHeaders(headers);
         return new Response("Internal Server Error", {
             status: 500,
-            headers: { "X-Content-Type-Options": "nosniff" }
+            headers
         });
       }
     };
@@ -71,9 +89,11 @@ export default {
     if (zonesMatch) {
       const version = zonesMatch[1];
       if (!isValidVersion(version)) {
+        const headers = new Headers();
+        addCommonHeaders(headers);
         return new Response("Invalid version format", {
             status: 400,
-            headers: { "X-Content-Type-Options": "nosniff" }
+            headers
         });
       }
       return fetchFromR2(`zones/${version}.json`);
@@ -84,9 +104,11 @@ export default {
     if (rulesMatch) {
       const version = rulesMatch[1];
       if (!isValidVersion(version)) {
+        const headers = new Headers();
+        addCommonHeaders(headers);
         return new Response("Invalid version format", {
             status: 400,
-            headers: { "X-Content-Type-Options": "nosniff" }
+            headers
         });
       }
       return fetchFromR2(`rules/${version}.json`);
@@ -97,18 +119,22 @@ export default {
     if (countriesMatch) {
       const version = countriesMatch[1];
       if (!isValidVersion(version)) {
+        const headers = new Headers();
+        addCommonHeaders(headers);
         return new Response("Invalid version format", {
             status: 400,
-            headers: { "X-Content-Type-Options": "nosniff" }
+            headers
         });
       }
       return fetchFromR2(`countries/${version}.json`);
     }
 
     // Default response
+    const headers = new Headers();
+    addCommonHeaders(headers);
     return new Response("Not Found", {
         status: 404,
-        headers: { "X-Content-Type-Options": "nosniff" }
+        headers
     });
   },
 };
