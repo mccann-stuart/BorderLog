@@ -1,13 +1,22 @@
 export default {
   async fetch(request, env, ctx) {
+    // Helper to create response with security headers
+    const createResponse = (body, init = {}) => {
+      const response = new Response(body, init);
+      response.headers.set("X-Content-Type-Options", "nosniff");
+      response.headers.set("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
+      response.headers.set("Content-Security-Policy", "default-src 'none'");
+      response.headers.set("X-Frame-Options", "DENY");
+      return response;
+    };
+
     const url = new URL(request.url);
     const path = url.pathname;
     const method = request.method;
 
     if (method !== "GET" && method !== "HEAD") {
-      return new Response("Method Not Allowed", {
+      return createResponse("Method Not Allowed", {
         status: 405,
-        headers: { "X-Content-Type-Options": "nosniff" }
       });
     }
 
@@ -19,9 +28,8 @@ export default {
       // Check if binding exists
       if (!env.CONFIG_BUCKET) {
         console.error("R2 Bucket 'CONFIG_BUCKET' not configured in environment");
-        return new Response("Internal Server Error", {
+        return createResponse("Internal Server Error", {
             status: 500,
-            headers: { "X-Content-Type-Options": "nosniff" }
         });
       }
 
@@ -29,33 +37,29 @@ export default {
         const object = await env.CONFIG_BUCKET.get(key);
 
         if (object === null) {
-          return new Response("Not Found", {
+          return createResponse("Not Found", {
             status: 404,
-            headers: { "X-Content-Type-Options": "nosniff" }
           });
         }
 
         const headers = new Headers();
         object.writeHttpMetadata(headers);
         headers.set("etag", object.httpEtag);
-        // Add security headers
-        headers.set("X-Content-Type-Options", "nosniff");
 
         // Handle conditional requests (If-None-Match)
         const ifNoneMatch = request.headers.get("If-None-Match");
         if (ifNoneMatch && ifNoneMatch === object.httpEtag) {
-            return new Response(null, { status: 304, headers });
+            return createResponse(null, { status: 304, headers });
         }
 
-        return new Response(object.body, {
+        return createResponse(object.body, {
           headers,
         });
       } catch (e) {
         // Log the actual error but return a generic message to the client
         console.error(`Error fetching from R2: ${e.message}`);
-        return new Response("Internal Server Error", {
+        return createResponse("Internal Server Error", {
             status: 500,
-            headers: { "X-Content-Type-Options": "nosniff" }
         });
       }
     };
@@ -71,9 +75,8 @@ export default {
     if (zonesMatch) {
       const version = zonesMatch[1];
       if (!isValidVersion(version)) {
-        return new Response("Invalid version format", {
+        return createResponse("Invalid version format", {
             status: 400,
-            headers: { "X-Content-Type-Options": "nosniff" }
         });
       }
       return fetchFromR2(`zones/${version}.json`);
@@ -84,9 +87,8 @@ export default {
     if (rulesMatch) {
       const version = rulesMatch[1];
       if (!isValidVersion(version)) {
-        return new Response("Invalid version format", {
+        return createResponse("Invalid version format", {
             status: 400,
-            headers: { "X-Content-Type-Options": "nosniff" }
         });
       }
       return fetchFromR2(`rules/${version}.json`);
@@ -97,18 +99,16 @@ export default {
     if (countriesMatch) {
       const version = countriesMatch[1];
       if (!isValidVersion(version)) {
-        return new Response("Invalid version format", {
+        return createResponse("Invalid version format", {
             status: 400,
-            headers: { "X-Content-Type-Options": "nosniff" }
         });
       }
       return fetchFromR2(`countries/${version}.json`);
     }
 
     // Default response
-    return new Response("Not Found", {
+    return createResponse("Not Found", {
         status: 404,
-        headers: { "X-Content-Type-Options": "nosniff" }
     });
   },
 };
