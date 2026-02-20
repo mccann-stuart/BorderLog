@@ -4,10 +4,21 @@ export default {
     const path = url.pathname;
     const method = request.method;
 
+    // Helper to get security headers
+    const getSecurityHeaders = (baseHeaders = {}) => {
+        const headers = new Headers(baseHeaders);
+        headers.set("X-Content-Type-Options", "nosniff");
+        headers.set("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
+        headers.set("Content-Security-Policy", "default-src 'none'; frame-ancestors 'none'; sandbox");
+        headers.set("X-Frame-Options", "DENY");
+        headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
+        return headers;
+    };
+
     if (method !== "GET" && method !== "HEAD") {
       return new Response("Method Not Allowed", {
         status: 405,
-        headers: { "X-Content-Type-Options": "nosniff" }
+        headers: getSecurityHeaders()
       });
     }
 
@@ -21,7 +32,7 @@ export default {
         console.error("R2 Bucket 'CONFIG_BUCKET' not configured in environment");
         return new Response("Internal Server Error", {
             status: 500,
-            headers: { "X-Content-Type-Options": "nosniff" }
+            headers: getSecurityHeaders()
         });
       }
 
@@ -31,31 +42,32 @@ export default {
         if (object === null) {
           return new Response("Not Found", {
             status: 404,
-            headers: { "X-Content-Type-Options": "nosniff" }
+            headers: getSecurityHeaders()
           });
         }
 
         const headers = new Headers();
         object.writeHttpMetadata(headers);
         headers.set("etag", object.httpEtag);
+
         // Add security headers
-        headers.set("X-Content-Type-Options", "nosniff");
+        const securityHeaders = getSecurityHeaders(headers);
 
         // Handle conditional requests (If-None-Match)
         const ifNoneMatch = request.headers.get("If-None-Match");
         if (ifNoneMatch && ifNoneMatch === object.httpEtag) {
-            return new Response(null, { status: 304, headers });
+            return new Response(null, { status: 304, headers: securityHeaders });
         }
 
         return new Response(object.body, {
-          headers,
+          headers: securityHeaders,
         });
       } catch (e) {
         // Log the actual error but return a generic message to the client
         console.error(`Error fetching from R2: ${e.message}`);
         return new Response("Internal Server Error", {
             status: 500,
-            headers: { "X-Content-Type-Options": "nosniff" }
+            headers: getSecurityHeaders()
         });
       }
     };
@@ -73,7 +85,7 @@ export default {
       if (!isValidVersion(version)) {
         return new Response("Invalid version format", {
             status: 400,
-            headers: { "X-Content-Type-Options": "nosniff" }
+            headers: getSecurityHeaders()
         });
       }
       return fetchFromR2(`zones/${version}.json`);
@@ -86,7 +98,7 @@ export default {
       if (!isValidVersion(version)) {
         return new Response("Invalid version format", {
             status: 400,
-            headers: { "X-Content-Type-Options": "nosniff" }
+            headers: getSecurityHeaders()
         });
       }
       return fetchFromR2(`rules/${version}.json`);
@@ -99,7 +111,7 @@ export default {
       if (!isValidVersion(version)) {
         return new Response("Invalid version format", {
             status: 400,
-            headers: { "X-Content-Type-Options": "nosniff" }
+            headers: getSecurityHeaders()
         });
       }
       return fetchFromR2(`countries/${version}.json`);
@@ -108,7 +120,7 @@ export default {
     // Default response
     return new Response("Not Found", {
         status: 404,
-        headers: { "X-Content-Type-Options": "nosniff" }
+        headers: getSecurityHeaders()
     });
   },
 };
