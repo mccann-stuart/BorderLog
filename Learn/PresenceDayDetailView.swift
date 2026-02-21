@@ -187,8 +187,8 @@ private struct EvidenceSection: View {
             }
         }
         .onAppear { loadData() }
-        .onChange(of: dayKey) { _ in loadData() }
-        .onChange(of: date) { _ in loadData() }
+        .onChange(of: dayKey) { loadData() }
+        .onChange(of: date) { loadData() }
     }
     
     private func loadData() {

@@ -69,7 +69,9 @@ struct BorderLogWidgetEntryView: View {
                     .foregroundStyle(.secondary)
             }
         }
-        .padding()
+        .containerBackground(for: .widget) {
+            Color.clear
+        }
     }
 }
 
