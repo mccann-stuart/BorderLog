@@ -24,9 +24,9 @@ enum SchengenCalculator {
         var end: Date
     }
 
-    nonisolated static func summary<S: SchengenStay, O: SchengenOverride>(
-        for stays: [S],
-        overrides: [O] = [],
+    nonisolated static func summary(
+        for stays: [StayInfo],
+        overrides: [OverrideInfo] = [],
         asOf referenceDate: Date = Date(),
         calendar: Calendar = .current
     ) -> SchengenSummary {
@@ -125,5 +125,29 @@ enum SchengenCalculator {
             windowStart: windowStart,
             windowEnd: windowEnd
         )
+    }
+
+    @MainActor
+    static func summary(
+        for stays: [Stay],
+        overrides: [DayOverride] = [],
+        asOf referenceDate: Date = Date(),
+        calendar: Calendar = .current
+    ) -> SchengenSummary {
+        let stayInfos = stays.map {
+            StayInfo(
+                enteredOn: $0.enteredOn,
+                exitedOn: $0.exitedOn,
+                region: $0.region
+            )
+        }
+        let overrideInfos = overrides.map {
+            OverrideInfo(
+                date: $0.date,
+                region: $0.region
+            )
+        }
+
+        return summary(for: stayInfos, overrides: overrideInfos, asOf: referenceDate, calendar: calendar)
     }
 }
