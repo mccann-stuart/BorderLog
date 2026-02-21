@@ -580,6 +580,7 @@ A1B2C3D400000004 /* PermissionsRequestView.swift in Sources */,
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "BorderLog uses your location to infer your daily country presence.";
 				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "BorderLog reads photo location metadata to infer your daily country presence.";
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
@@ -623,6 +624,7 @@ A1B2C3D400000004 /* PermissionsRequestView.swift in Sources */,
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "BorderLog uses your location to infer your daily country presence.";
 				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "BorderLog reads photo location metadata to infer your daily country presence.";
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
