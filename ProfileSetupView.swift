@@ -19,46 +19,46 @@ struct ProfileSetupView: View {
     
     private var countryRegions: [CountryRegion] {
         [
-            CountryRegion(name: "North America", countryCodes: ["CA", "MX", "US"]),
-            CountryRegion(name: "Central America", countryCodes: ["BZ", "CR", "SV", "GT", "HN", "NI", "PA"]),
-            CountryRegion(name: "Caribbean", countryCodes: ["AG", "BS", "BB", "CU", "DM", "DO", "GD", "HT", "JM", "KN", "LC", "VC", "TT"]),
-            CountryRegion(name: "South America", countryCodes: ["AR", "BO", "BR", "CL", "CO", "EC", "GY", "PY", "PE", "SR", "UY", "VE"]),
+            CountryRegion(name: "North America", countryCodes: ["US", "MX", "CA"]),
+            CountryRegion(name: "Central America", countryCodes: ["GT", "HN", "SV", "NI", "CR", "BZ", "PA"]),
+            CountryRegion(name: "Caribbean", countryCodes: ["CU", "DO", "HT", "JM", "TT", "AG", "BS", "BB", "DM", "GD", "KN", "LC", "VC"]),
+            CountryRegion(name: "South America", countryCodes: ["BR", "CO", "AR", "PE", "VE", "BO", "CL", "EC", "GY", "PY", "SR", "UY"]),
             CountryRegion(
                 name: "Europe",
                 countryCodes: [
-                    "AD", "AL", "AT", "BA", "BE", "BG", "BY", "CH", "CY", "CZ", "DE", "DK", "EE",
-                    "ES", "FI", "FR", "GB", "GR", "HR", "HU", "IE", "IS", "IT", "LI", "LT", "LU",
-                    "LV", "MC", "MD", "ME", "MK", "MT", "NL", "NO", "PL", "PT", "RO", "RS", "RU",
-                    "SE", "SI", "SK", "SM", "UA", "VA"
+                    "RU", "DE", "GB", "FR", "IT", "AL", "AD", "AT", "BY", "BE", "BA", "BG", "HR",
+                    "CY", "CZ", "DK", "EE", "FI", "GR", "HU", "IS", "IE", "LV", "LI", "LT", "LU",
+                    "MT", "MD", "MC", "ME", "NL", "MK", "NO", "PL", "PT", "RO", "SM", "RS", "SK",
+                    "SI", "ES", "SE", "CH", "UA", "VA"
                 ]
             ),
             CountryRegion(
                 name: "Africa",
                 countryCodes: [
-                    "DZ", "AO", "BJ", "BW", "BF", "BI", "CM", "CV", "CF", "TD", "KM", "CG", "CD",
-                    "CI", "DJ", "EG", "GQ", "ER", "SZ", "ET", "GA", "GM", "GH", "GN", "GW", "KE",
-                    "LS", "LR", "LY", "MG", "MW", "ML", "MR", "MU", "MA", "MZ", "NA", "NE", "NG",
-                    "RW", "ST", "SN", "SC", "SL", "SO", "ZA", "SS", "SD", "TZ", "TG", "TN", "UG",
+                    "NG", "ET", "EG", "CD", "TZ", "DZ", "AO", "BJ", "BW", "BF", "BI", "CV", "CM",
+                    "CF", "TD", "KM", "CG", "CI", "DJ", "GQ", "ER", "SZ", "GA", "GM", "GH", "GN",
+                    "GW", "KE", "LS", "LR", "LY", "MG", "MW", "ML", "MR", "MU", "MA", "MZ", "NA",
+                    "NE", "RW", "ST", "SN", "SC", "SL", "SO", "ZA", "SS", "SD", "TG", "TN", "UG",
                     "ZM", "ZW"
                 ]
             ),
             CountryRegion(
                 name: "Middle East",
-                countryCodes: ["AE", "BH", "IL", "IQ", "IR", "JO", "KW", "LB", "OM", "PS", "QA", "SA", "SY", "TR", "YE"]
+                countryCodes: ["IR", "IQ", "SA", "YE", "SY", "BH", "IL", "JO", "KW", "LB", "OM", "PS", "QA", "TR", "AE"]
             ),
             CountryRegion(
                 name: "Asia",
                 countryCodes: [
-                    "AF", "AM", "AZ", "BD", "BN", "BT", "CN", "GE", "HK", "ID", "IN", "JP", "KG",
-                    "KH", "KP", "KR", "KZ", "LA", "LK", "MM", "MN", "MO", "MV", "MY", "NP", "PH",
-                    "PK", "SG", "TH", "TJ", "TM", "TW", "UZ", "VN", "TL"
+                    "IN", "CN", "ID", "PK", "BD", "AF", "AM", "AZ", "BT", "BN", "KH", "GE", "HK",
+                    "JP", "KZ", "KG", "LA", "MO", "MY", "MV", "MN", "MM", "NP", "KP", "PH", "SG",
+                    "KR", "LK", "TW", "TJ", "TH", "TL", "TM", "UZ", "VN"
                 ]
             ),
             CountryRegion(
                 name: "Oceania",
                 countryCodes: [
-                    "AU", "NZ", "FJ", "PG", "SB", "VU", "WS", "TO", "TV", "KI", "NR", "PW", "FM",
-                    "MH", "CK", "NU"
+                    "AU", "PG", "NZ", "FJ", "SB", "CK", "FM", "KI", "MH", "NR", "NU", "PW", "WS",
+                    "TO", "TV", "VU"
                 ]
             )
         ]

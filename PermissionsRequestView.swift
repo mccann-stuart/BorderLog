@@ -39,6 +39,7 @@ struct PermissionsRequestView: View {
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, 32)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             
             // Permission Cards
@@ -137,10 +138,14 @@ private struct PermissionCard: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(title)
                         .font(.headline)
+                        .multilineTextAlignment(.leading)
+                        .fixedSize(horizontal: false, vertical: true)
                     
                     Text(description)
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.leading)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
             }
             
