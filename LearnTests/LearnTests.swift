@@ -7,6 +7,7 @@
 
 import XCTest
 @testable import Learn
+@MainActor
 final class SchengenCalculatorWindowTests: XCTestCase {
     private var calendar: Calendar {
         var calendar = Calendar(identifier: .gregorian)
@@ -33,9 +34,12 @@ final class SchengenCalculatorWindowTests: XCTestCase {
             calendar: calendar
         )
 
-        XCTAssertTrue(summary.usedDays == 6)
-        XCTAssertTrue(summary.remainingDays == 84)
-        XCTAssertTrue(summary.overstayDays == 0)
+        let usedDays = summary.usedDays
+        let remainingDays = summary.remainingDays
+        let overstayDays = summary.overstayDays
+        XCTAssertEqual(usedDays, 6)
+        XCTAssertEqual(remainingDays, 84)
+        XCTAssertEqual(overstayDays, 0)
     }
 
     func testOverridesRemoveSchengenDays() async throws {
@@ -53,8 +57,10 @@ final class SchengenCalculatorWindowTests: XCTestCase {
             calendar: calendar
         )
 
-        XCTAssertTrue(summary.usedDays == 2)
-        XCTAssertTrue(summary.remainingDays == 88)
+        let usedDays = summary.usedDays
+        let remainingDays = summary.remainingDays
+        XCTAssertEqual(usedDays, 2)
+        XCTAssertEqual(remainingDays, 88)
     }
 
     func testOverridesAddSchengenDays() async throws {
@@ -71,8 +77,10 @@ final class SchengenCalculatorWindowTests: XCTestCase {
             calendar: calendar
         )
 
-        XCTAssertTrue(summary.usedDays == 2)
-        XCTAssertTrue(summary.remainingDays == 88)
+        let usedDays = summary.usedDays
+        let remainingDays = summary.remainingDays
+        XCTAssertEqual(usedDays, 2)
+        XCTAssertEqual(remainingDays, 88)
     }
 
     func testIgnoresStaysCompletelyBeforeWindow() async throws {
@@ -88,7 +96,8 @@ final class SchengenCalculatorWindowTests: XCTestCase {
             calendar: calendar
         )
 
-        XCTAssertTrue(summary.usedDays == 0)
+        let usedDays = summary.usedDays
+        XCTAssertEqual(usedDays, 0)
     }
 
     func testClampsStaysPartiallyBeforeWindow() async throws {
@@ -105,7 +114,8 @@ final class SchengenCalculatorWindowTests: XCTestCase {
         )
 
         // Should count Jan 3, 4, 5
-        XCTAssertTrue(summary.usedDays == 3)
+        let usedDays = summary.usedDays
+        XCTAssertEqual(usedDays, 3)
     }
 
     func testIgnoresStaysCompletelyAfterWindow() async throws {
@@ -121,7 +131,8 @@ final class SchengenCalculatorWindowTests: XCTestCase {
             calendar: calendar
         )
 
-        XCTAssertTrue(summary.usedDays == 0)
+        let usedDays = summary.usedDays
+        XCTAssertEqual(usedDays, 0)
     }
 
     func testClampsStaysPartiallyAfterWindow() async throws {
@@ -138,7 +149,8 @@ final class SchengenCalculatorWindowTests: XCTestCase {
         )
 
         // Should count June 30, July 1
-        XCTAssertTrue(summary.usedDays == 2)
+        let usedDays = summary.usedDays
+        XCTAssertEqual(usedDays, 2)
     }
 
     func testHandleEmptyStaysList() async throws {
@@ -152,8 +164,11 @@ final class SchengenCalculatorWindowTests: XCTestCase {
             calendar: calendar
         )
 
-        XCTAssertTrue(summary.usedDays == 0)
-        XCTAssertTrue(summary.remainingDays == 90)
-        XCTAssertTrue(summary.overstayDays == 0)
+        let usedDays = summary.usedDays
+        let remainingDays = summary.remainingDays
+        let overstayDays = summary.overstayDays
+        XCTAssertEqual(usedDays, 0)
+        XCTAssertEqual(remainingDays, 90)
+        XCTAssertEqual(overstayDays, 0)
     }
 }

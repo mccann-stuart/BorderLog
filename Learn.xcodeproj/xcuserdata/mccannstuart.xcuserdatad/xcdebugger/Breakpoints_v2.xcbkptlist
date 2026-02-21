@@ -18,36 +18,6 @@
             endingLineNumber = "5"
             landmarkName = "AuthenticationManager"
             landmarkType = "3">
-            <Locations>
-               <Location
-                  uuid = "EAF8C43C-6A58-4276-9D82-89DDC0B25E1D - b97dbcf3fe80723c"
-                  shouldBeEnabled = "Yes"
-                  ignoreCount = "0"
-                  continueAfterRunningActions = "No"
-                  symbolName = "one-time initialization function for isAppleSignInEnabled"
-                  moduleName = "Learn.debug.dylib"
-                  usesParentBreakpointCondition = "Yes"
-                  urlString = "file:///Users/mccannstuart/Library/CloudStorage/OneDrive-TheBostonConsultingGroup,Inc/Documents/GitHub/BorderLog/Learn/AuthenticationManager.swift"
-                  startingColumnNumber = "9223372036854775807"
-                  endingColumnNumber = "9223372036854775807"
-                  startingLineNumber = "6"
-                  endingLineNumber = "6">
-               </Location>
-               <Location
-                  uuid = "EAF8C43C-6A58-4276-9D82-89DDC0B25E1D - e37ac3bc16dce251"
-                  shouldBeEnabled = "Yes"
-                  ignoreCount = "0"
-                  continueAfterRunningActions = "No"
-                  symbolName = "Learn.AuthenticationManager.isAppleSignInEnabled.unsafeMutableAddressor : Swift.Bool"
-                  moduleName = "Learn.debug.dylib"
-                  usesParentBreakpointCondition = "Yes"
-                  urlString = "file:///Users/mccannstuart/Library/CloudStorage/OneDrive-TheBostonConsultingGroup,Inc/Documents/GitHub/BorderLog/Learn/AuthenticationManager.swift"
-                  startingColumnNumber = "9223372036854775807"
-                  endingColumnNumber = "9223372036854775807"
-                  startingLineNumber = "6"
-                  endingLineNumber = "6">
-               </Location>
-            </Locations>
          </BreakpointContent>
       </BreakpointProxy>
    </Breakpoints>

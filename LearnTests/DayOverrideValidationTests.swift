@@ -3,6 +3,7 @@ import XCTest
 import Foundation
 import SwiftData
 @testable import Learn
+@MainActor
 final class DayOverrideValidationTests: XCTestCase {
     private var calendar: Calendar {
         var calendar = Calendar(identifier: .gregorian)
@@ -20,7 +21,7 @@ final class DayOverrideValidationTests: XCTestCase {
             in: [],
             calendar: calendar
         )
-        XCTAssertTrue(result == nil)
+        XCTAssertNil(result)
     }
 
     func testConflictingOverride_NoConflict_ReturnsNil() {
@@ -30,7 +31,7 @@ final class DayOverrideValidationTests: XCTestCase {
             in: [override1],
             calendar: calendar
         )
-        XCTAssertTrue(result == nil)
+        XCTAssertNil(result)
     }
 
     func testConflictingOverride_ConflictFound_ReturnsOverride() {
@@ -53,7 +54,7 @@ final class DayOverrideValidationTests: XCTestCase {
             excluding: override1,
             calendar: calendar
         )
-        XCTAssertTrue(result == nil)
+        XCTAssertNil(result)
     }
 
     func testConflictingOverride_MultipleOverrides_FindsFirstConflict() {

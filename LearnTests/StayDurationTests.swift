@@ -9,6 +9,7 @@ import XCTest
 import Foundation
 import SwiftData
 @testable import Learn
+@MainActor
 final class StayDurationTests: XCTestCase {
     private var calendar: Calendar {
         var calendar = Calendar(identifier: .gregorian)
@@ -28,7 +29,8 @@ final class StayDurationTests: XCTestCase {
             exitedOn: date(2024, 1, 1)
         )
         // Jan 1 to Jan 1 is 1 day
-        XCTAssertTrue(stay.durationInDays(calendar: calendar) == 1)
+        let days = stay.durationInDays(calendar: calendar)
+        XCTAssertEqual(days, 1)
     }
 
     func testBasicDuration() {
@@ -39,7 +41,8 @@ final class StayDurationTests: XCTestCase {
             exitedOn: date(2024, 1, 5)
         )
         // Jan 1, 2, 3, 4, 5 -> 5 days
-        XCTAssertTrue(stay.durationInDays(calendar: calendar) == 5)
+        let days = stay.durationInDays(calendar: calendar)
+        XCTAssertEqual(days, 5)
     }
 
     func testCrossMonth() {
@@ -50,7 +53,8 @@ final class StayDurationTests: XCTestCase {
             exitedOn: date(2024, 2, 1)
         )
         // Jan 31, Feb 1 -> 2 days
-        XCTAssertTrue(stay.durationInDays(calendar: calendar) == 2)
+        let days = stay.durationInDays(calendar: calendar)
+        XCTAssertEqual(days, 2)
     }
 
     func testCrossYear() {
@@ -61,7 +65,8 @@ final class StayDurationTests: XCTestCase {
             exitedOn: date(2024, 1, 1)
         )
         // Dec 31, Jan 1 -> 2 days
-        XCTAssertTrue(stay.durationInDays(calendar: calendar) == 2)
+        let days = stay.durationInDays(calendar: calendar)
+        XCTAssertEqual(days, 2)
     }
 
     func testLeapYear() {
@@ -72,7 +77,8 @@ final class StayDurationTests: XCTestCase {
             exitedOn: date(2024, 3, 1)
         )
         // Feb 28, Feb 29 (leap), Mar 1 -> 3 days
-        XCTAssertTrue(stay.durationInDays(calendar: calendar) == 3)
+        let days = stay.durationInDays(calendar: calendar)
+        XCTAssertEqual(days, 3)
     }
 
     func testNonLeapYear() {
@@ -83,7 +89,8 @@ final class StayDurationTests: XCTestCase {
             exitedOn: date(2023, 3, 1)
         )
         // Feb 28, Mar 1 -> 2 days
-        XCTAssertTrue(stay.durationInDays(calendar: calendar) == 2)
+        let days = stay.durationInDays(calendar: calendar)
+        XCTAssertEqual(days, 2)
     }
 
     func testOngoingStayUsesReferenceDate() {
@@ -95,7 +102,8 @@ final class StayDurationTests: XCTestCase {
         )
         let referenceDate = date(2024, 6, 5)
         // June 1, 2, 3, 4, 5 -> 5 days
-        XCTAssertTrue(stay.durationInDays(asOf: referenceDate, calendar: calendar) == 5)
+        let days = stay.durationInDays(asOf: referenceDate, calendar: calendar)
+        XCTAssertEqual(days, 5)
     }
 
     func testOngoingStayWithReferenceDateSameAsStart() {
@@ -107,7 +115,8 @@ final class StayDurationTests: XCTestCase {
         )
         let referenceDate = date(2024, 6, 1)
         // June 1 -> 1 day
-        XCTAssertTrue(stay.durationInDays(asOf: referenceDate, calendar: calendar) == 1)
+        let days = stay.durationInDays(asOf: referenceDate, calendar: calendar)
+        XCTAssertEqual(days, 1)
     }
 
     func testInvalidStayReturnsZero() {
@@ -118,7 +127,8 @@ final class StayDurationTests: XCTestCase {
             enteredOn: date(2024, 1, 5),
             exitedOn: date(2024, 1, 1)
         )
-        XCTAssertTrue(stay.durationInDays(calendar: calendar) == 0)
+        let days = stay.durationInDays(calendar: calendar)
+        XCTAssertEqual(days, 0)
     }
 
     func testDurationIgnoresTimeComponents() {
@@ -130,6 +140,7 @@ final class StayDurationTests: XCTestCase {
             enteredOn: date(2024, 1, 1, hour: 23, minute: 59),
             exitedOn: date(2024, 1, 2, hour: 0, minute: 1)
         )
-        XCTAssertTrue(stay.durationInDays(calendar: calendar) == 2)
+        let days = stay.durationInDays(calendar: calendar)
+        XCTAssertEqual(days, 2)
     }
 }

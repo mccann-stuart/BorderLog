@@ -2,6 +2,7 @@
 import XCTest
 import Foundation
 @testable import Learn
+@MainActor
 final class SchengenCalculatorTests: XCTestCase {
 
     private var calendar: Calendar {
@@ -21,9 +22,12 @@ final class SchengenCalculatorTests: XCTestCase {
         let overrides: [DayOverride] = []
         let ref = day(2026, 2, 15)
         let summary = SchengenCalculator.summary(for: stays, overrides: overrides, asOf: ref, calendar: calendar)
-        XCTAssertTrue(summary.usedDays == 0)
-        XCTAssertTrue(summary.remainingDays == 90)
-        XCTAssertTrue(summary.overstayDays == 0)
+        let usedDays = summary.usedDays
+        let remainingDays = summary.remainingDays
+        let overstayDays = summary.overstayDays
+        XCTAssertEqual(usedDays, 0)
+        XCTAssertEqual(remainingDays, 90)
+        XCTAssertEqual(overstayDays, 0)
     }
 
     func testExactly90DaysUsed_inWindow() {
@@ -31,30 +35,39 @@ final class SchengenCalculatorTests: XCTestCase {
         let ref = day(2026, 2, 15)
         let start = calendar.date(byAdding: .day, value: -89, to: ref)!
         let stay = Stay(countryName: "Spain", countryCode: "ES", region: .schengen, enteredOn: start, exitedOn: ref)
-        let summary = SchengenCalculator.summary(for: [stay], overrides: [], asOf: ref, calendar: calendar)
-        XCTAssertTrue(summary.usedDays == 90)
-        XCTAssertTrue(summary.remainingDays == 0)
-        XCTAssertTrue(summary.overstayDays == 0)
+        let summary = SchengenCalculator.summary(for: [stay], overrides: [DayOverride](), asOf: ref, calendar: calendar)
+        let usedDays = summary.usedDays
+        let remainingDays = summary.remainingDays
+        let overstayDays = summary.overstayDays
+        XCTAssertEqual(usedDays, 90)
+        XCTAssertEqual(remainingDays, 0)
+        XCTAssertEqual(overstayDays, 0)
     }
 
     func testOverstay_whenMoreThan90Days() {
         let ref = day(2026, 2, 15)
         let start = calendar.date(byAdding: .day, value: -100, to: ref)!
         let stay = Stay(countryName: "Italy", countryCode: "IT", region: .schengen, enteredOn: start, exitedOn: ref)
-        let summary = SchengenCalculator.summary(for: [stay], overrides: [], asOf: ref, calendar: calendar)
-        XCTAssertTrue(summary.usedDays == 101) // inclusive of start and end
-        XCTAssertTrue(summary.overstayDays == 11)
-        XCTAssertTrue(summary.remainingDays == 0)
+        let summary = SchengenCalculator.summary(for: [stay], overrides: [DayOverride](), asOf: ref, calendar: calendar)
+        let usedDays = summary.usedDays
+        let remainingDays = summary.remainingDays
+        let overstayDays = summary.overstayDays
+        XCTAssertEqual(usedDays, 101) // inclusive of start and end
+        XCTAssertEqual(overstayDays, 11)
+        XCTAssertEqual(remainingDays, 0)
     }
 
     func testNonSchengen_stay_doesNotCount() {
         let ref = day(2026, 2, 15)
         let start = calendar.date(byAdding: .day, value: -30, to: ref)!
         let stay = Stay(countryName: "United Kingdom", countryCode: "GB", region: .nonSchengen, enteredOn: start, exitedOn: ref)
-        let summary = SchengenCalculator.summary(for: [stay], overrides: [], asOf: ref, calendar: calendar)
-        XCTAssertTrue(summary.usedDays == 0)
-        XCTAssertTrue(summary.remainingDays == 90)
-        XCTAssertTrue(summary.overstayDays == 0)
+        let summary = SchengenCalculator.summary(for: [stay], overrides: [DayOverride](), asOf: ref, calendar: calendar)
+        let usedDays = summary.usedDays
+        let remainingDays = summary.remainingDays
+        let overstayDays = summary.overstayDays
+        XCTAssertEqual(usedDays, 0)
+        XCTAssertEqual(remainingDays, 90)
+        XCTAssertEqual(overstayDays, 0)
     }
 
     func testOverrides_addAndRemoveDays() {
@@ -70,9 +83,12 @@ final class SchengenCalculatorTests: XCTestCase {
 
         let summary = SchengenCalculator.summary(for: [stay], overrides: [removeDay, addDay], asOf: ref, calendar: calendar)
         // Base used = 10, minus 1 (removed), plus 1 (added) => 10
-        XCTAssertTrue(summary.usedDays == 10)
-        XCTAssertTrue(summary.remainingDays == 80)
-        XCTAssertTrue(summary.overstayDays == 0)
+        let usedDays = summary.usedDays
+        let remainingDays = summary.remainingDays
+        let overstayDays = summary.overstayDays
+        XCTAssertEqual(usedDays, 10)
+        XCTAssertEqual(remainingDays, 80)
+        XCTAssertEqual(overstayDays, 0)
     }
 }
 #endif

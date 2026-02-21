@@ -2,6 +2,7 @@ import XCTest
 import Foundation
 import SwiftData
 @testable import Learn
+@MainActor
 final class StayTests: XCTestCase {
     func testDisplayTitleFormatting() {
         let entryWithCode = Stay(
@@ -9,34 +10,39 @@ final class StayTests: XCTestCase {
             countryCode: "fr",
             enteredOn: Date()
         )
-        XCTAssertTrue(entryWithCode.displayTitle == "France (FR)")
+        let codeTitle = entryWithCode.displayTitle
+        XCTAssertEqual(codeTitle, "France (FR)")
 
         let entryWithEmptyCode = Stay(
             countryName: "France",
             countryCode: "",
             enteredOn: Date()
         )
-        XCTAssertTrue(entryWithEmptyCode.displayTitle == "France")
+        let emptyTitle = entryWithEmptyCode.displayTitle
+        XCTAssertEqual(emptyTitle, "France")
 
         let entryWithWhitespaceCode = Stay(
             countryName: "France",
             countryCode: "  ",
             enteredOn: Date()
         )
-        XCTAssertTrue(entryWithWhitespaceCode.displayTitle == "France")
+        let whitespaceTitle = entryWithWhitespaceCode.displayTitle
+        XCTAssertEqual(whitespaceTitle, "France")
 
         let entryWithNilCode = Stay(
             countryName: "France",
             countryCode: nil,
             enteredOn: Date()
         )
-        XCTAssertTrue(entryWithNilCode.displayTitle == "France")
+        let nilTitle = entryWithNilCode.displayTitle
+        XCTAssertEqual(nilTitle, "France")
 
         let entryWithMixedCaseCode = Stay(
             countryName: "France",
             countryCode: "fR",
             enteredOn: Date()
         )
-        XCTAssertTrue(entryWithMixedCaseCode.displayTitle == "France (FR)")
+        let mixedTitle = entryWithMixedCaseCode.displayTitle
+        XCTAssertEqual(mixedTitle, "France (FR)")
     }
 }

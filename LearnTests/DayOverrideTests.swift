@@ -8,6 +8,7 @@
 import XCTest
 import Foundation
 @testable import Learn
+@MainActor
 final class DayOverrideTests: XCTestCase {
 
     private func date(_ year: Int, _ month: Int, _ day: Int) -> Date {
@@ -23,7 +24,8 @@ final class DayOverrideTests: XCTestCase {
             countryCode: nil
         )
 
-        XCTAssertTrue(override.displayTitle == "France")
+        let title = override.displayTitle
+        XCTAssertEqual(title, "France")
     }
 
     func testDisplayTitle_withEmptyCountryCode_returnsCountryName() {
@@ -33,7 +35,8 @@ final class DayOverrideTests: XCTestCase {
             countryCode: ""
         )
 
-        XCTAssertTrue(override.displayTitle == "Spain")
+        let title = override.displayTitle
+        XCTAssertEqual(title, "Spain")
     }
 
     func testDisplayTitle_withWhitespaceCountryCode_returnsCountryName() {
@@ -43,7 +46,8 @@ final class DayOverrideTests: XCTestCase {
             countryCode: "   "
         )
 
-        XCTAssertTrue(override.displayTitle == "Italy")
+        let title = override.displayTitle
+        XCTAssertEqual(title, "Italy")
     }
 
     func testDisplayTitle_withValidCountryCode_returnsFormattedTitle() {
@@ -53,7 +57,8 @@ final class DayOverrideTests: XCTestCase {
             countryCode: "DE"
         )
 
-        XCTAssertTrue(override.displayTitle == "Germany (DE)")
+        let title = override.displayTitle
+        XCTAssertEqual(title, "Germany (DE)")
     }
 
     func testDisplayTitle_withLowercaseCountryCode_returnsUppercasedCodeInTitle() {
@@ -63,7 +68,8 @@ final class DayOverrideTests: XCTestCase {
             countryCode: "pt"
         )
 
-        XCTAssertTrue(override.displayTitle == "Portugal (PT)")
+        let title = override.displayTitle
+        XCTAssertEqual(title, "Portugal (PT)")
     }
 
     func testDisplayTitle_withWhitespaceAroundCode_trimsAndFormats() {
@@ -73,6 +79,7 @@ final class DayOverrideTests: XCTestCase {
              countryCode: " be "
          )
 
-         XCTAssertTrue(override.displayTitle == "Belgium (BE)")
+         let title = override.displayTitle
+         XCTAssertEqual(title, "Belgium (BE)")
      }
 }
