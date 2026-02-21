@@ -111,6 +111,14 @@ struct ContentView: View {
                     }
                 }
             }
+            .scrollContentBackground(.hidden)
+            .background {
+                ZStack {
+                    Color(UIColor.systemGroupedBackground)
+                    LinearGradient(colors: [.blue.opacity(0.05), .purple.opacity(0.05)], startPoint: .topLeading, endPoint: .bottomTrailing)
+                }
+                .ignoresSafeArea()
+            }
             .navigationTitle("BorderLog")
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
@@ -222,11 +230,11 @@ private struct StayRow: View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 8) {
                 Text(stay.displayTitle)
-                    .font(.headline)
+                    .font(.system(.headline, design: .rounded))
 
                 if stay.isOngoing {
                     Text("Ongoing")
-                        .font(.caption)
+                        .font(.system(.caption, design: .rounded))
                         .padding(.horizontal, 6)
                         .padding(.vertical, 2)
                         .background(Color.accentColor.opacity(0.15))
@@ -236,13 +244,13 @@ private struct StayRow: View {
 
             HStack {
                 Text(dateRangeText)
-                    .font(.subheadline)
+                    .font(.system(.subheadline, design: .rounded))
                     .foregroundStyle(.secondary)
 
                 Spacer()
 
                 Text(stay.region.rawValue)
-                    .font(.caption)
+                    .font(.system(.caption, design: .rounded))
                     .foregroundStyle(.secondary)
             }
         }
@@ -265,17 +273,17 @@ private struct DayOverrideRow: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             Text(overrideDay.displayTitle)
-                .font(.headline)
+                .font(.system(.headline, design: .rounded))
 
             HStack {
                 Text(dateText)
-                    .font(.subheadline)
+                    .font(.system(.subheadline, design: .rounded))
                     .foregroundStyle(.secondary)
 
                 Spacer()
 
                 Text(overrideDay.region.rawValue)
-                    .font(.caption)
+                    .font(.system(.caption, design: .rounded))
                     .foregroundStyle(.secondary)
             }
         }
@@ -314,11 +322,11 @@ private struct PresenceDayRow: View {
         VStack(alignment: .leading, spacing: 6) {
             HStack {
                 Text(countryText)
-                    .font(.headline)
+                    .font(.system(.headline, design: .rounded))
 
                 if day.isOverride {
                     Text("Override")
-                        .font(.caption)
+                        .font(.system(.caption, design: .rounded))
                         .padding(.horizontal, 6)
                         .padding(.vertical, 2)
                         .background(Color.accentColor.opacity(0.15))
@@ -328,13 +336,13 @@ private struct PresenceDayRow: View {
 
             HStack {
                 Text(dayText)
-                    .font(.subheadline)
+                    .font(.system(.subheadline, design: .rounded))
                     .foregroundStyle(.secondary)
 
                 Spacer()
 
                 Text(day.confidenceLabel.rawValue.capitalized)
-                    .font(.caption)
+                    .font(.system(.caption, design: .rounded))
                     .foregroundStyle(confidenceColor)
             }
         }
@@ -348,7 +356,7 @@ private struct SchengenSummaryRow: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("Schengen 90/180")
-                .font(.headline)
+                .font(.system(.headline, design: .rounded))
 
             HStack(spacing: 12) {
                 StatPill(title: "Used", value: "\(summary.usedDays)d")
@@ -357,7 +365,7 @@ private struct SchengenSummaryRow: View {
             }
 
             Text(windowText)
-                .font(.caption)
+                .font(.system(.caption, design: .rounded))
                 .foregroundStyle(.secondary)
         }
         .padding(.vertical, 6)
@@ -379,15 +387,20 @@ private struct StatPill: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
             Text(title)
-                .font(.caption)
+                .font(.system(.caption, design: .rounded))
                 .foregroundStyle(.secondary)
             Text(value)
-                .font(.headline)
+                .font(.system(.headline, design: .rounded))
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 6)
-        .background(tint.opacity(0.12))
+        .background(.ultraThinMaterial)
+        .overlay(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .stroke(.white.opacity(0.2), lineWidth: 1)
+        )
         .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .shadow(color: .black.opacity(0.05), radius: 4, y: 2)
     }
 }
 

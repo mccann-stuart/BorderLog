@@ -60,23 +60,26 @@ struct BorderLogWidgetEntryView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             Text("BorderLog")
-                .font(.headline)
+                .font(.system(.headline, design: .rounded))
 
             Text(entry.country)
-                .font(.title2.bold())
+                .font(.system(.title2, design: .rounded).bold())
 
             if let timestamp = entry.timestamp {
                 Text(timestamp, style: .time)
-                    .font(.caption)
+                    .font(.system(.caption, design: .rounded))
                     .foregroundStyle(.secondary)
             } else {
                 Text("No recent sample")
-                    .font(.caption)
+                    .font(.system(.caption, design: .rounded))
                     .foregroundStyle(.secondary)
             }
         }
         .containerBackground(for: .widget) {
-            Color.clear
+            ZStack {
+                LinearGradient(colors: [.blue.opacity(0.3), .purple.opacity(0.3)], startPoint: .topLeading, endPoint: .bottomTrailing)
+                Rectangle().fill(.ultraThinMaterial)
+            }
         }
     }
 }

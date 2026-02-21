@@ -50,14 +50,19 @@ struct DashboardView: View {
                 // World Map Section
                 WorldMapView(visitedCountries: Set(countryDaysSummary.compactMap { $0.countryCode }))
                     .frame(height: 250)
-                    .background(Color(UIColor.secondarySystemBackground))
+                    .background(.ultraThinMaterial)
                     .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12)
+                            .stroke(.white.opacity(0.2), lineWidth: 1)
+                    )
+                    .shadow(color: .black.opacity(0.1), radius: 12, y: 6)
                     .padding(.horizontal)
                 
                 // Schengen Summary Card
                 VStack(alignment: .leading, spacing: 12) {
                     Text("Schengen 90/180")
-                        .font(.title2.bold())
+                        .font(.system(.title2, design: .rounded).bold())
                     
                     HStack(spacing: 16) {
                         StatCard(
@@ -91,15 +96,19 @@ struct DashboardView: View {
                     }
                 }
                 .padding()
-                .background(Color(UIColor.systemBackground))
+                .background(.ultraThinMaterial)
                 .clipShape(RoundedRectangle(cornerRadius: 12))
-                .shadow(color: .black.opacity(0.05), radius: 4, y: 2)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12)
+                        .stroke(.white.opacity(0.2), lineWidth: 1)
+                )
+                .shadow(color: .black.opacity(0.1), radius: 12, y: 6)
                 .padding(.horizontal)
                 
                 // Countries List
                 VStack(alignment: .leading, spacing: 12) {
                     Text("Visited Countries")
-                        .font(.title2.bold())
+                        .font(.system(.title2, design: .rounded).bold())
                         .padding(.horizontal)
                     
                     if countryDaysSummary.isEmpty {
@@ -122,16 +131,26 @@ struct DashboardView: View {
                                 }
                             }
                         }
-                        .background(Color(UIColor.systemBackground))
+                        .background(.ultraThinMaterial)
                         .clipShape(RoundedRectangle(cornerRadius: 12))
-                        .shadow(color: .black.opacity(0.05), radius: 4, y: 2)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12)
+                                .stroke(.white.opacity(0.2), lineWidth: 1)
+                        )
+                        .shadow(color: .black.opacity(0.1), radius: 12, y: 6)
                         .padding(.horizontal)
                     }
                 }
             }
             .padding(.vertical)
         }
-        .background(Color(UIColor.secondarySystemBackground))
+        .background {
+            ZStack {
+                Color(UIColor.systemGroupedBackground)
+                LinearGradient(colors: [.blue.opacity(0.05), .purple.opacity(0.05)], startPoint: .topLeading, endPoint: .bottomTrailing)
+            }
+            .ignoresSafeArea()
+        }
     }
 }
 
@@ -192,10 +211,10 @@ private struct CountryDaysRow: View {
             
             VStack(alignment: .leading, spacing: 4) {
                 Text(info.countryName)
-                    .font(.headline)
+                    .font(.system(.headline, design: .rounded))
                 
                 Text(info.region.rawValue)
-                    .font(.caption)
+                    .font(.system(.caption, design: .rounded))
                     .foregroundStyle(.secondary)
             }
             
@@ -203,11 +222,11 @@ private struct CountryDaysRow: View {
             
             VStack(alignment: .trailing, spacing: 2) {
                 Text("\(info.totalDays)")
-                    .font(.title2.bold())
+                    .font(.system(.title2, design: .rounded).bold())
                     .foregroundStyle(badgeColor)
                 
                 Text("days")
-                    .font(.caption)
+                    .font(.system(.caption, design: .rounded))
                     .foregroundStyle(.secondary)
             }
         }
@@ -227,15 +246,15 @@ private struct StatCard: View {
     var body: some View {
         VStack(spacing: 4) {
             Text(title)
-                .font(.caption)
+                .font(.system(.caption, design: .rounded))
                 .foregroundStyle(.secondary)
             
             Text(value)
-                .font(.title.bold())
+                .font(.system(.title, design: .rounded).bold())
                 .foregroundStyle(color)
             
             Text(subtitle)
-                .font(.caption2)
+                .font(.system(.caption2, design: .rounded))
                 .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity)
