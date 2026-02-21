@@ -17,8 +17,11 @@ struct MainNavigationView: View {
     
     var body: some View {
         ZStack {
-            Color(UIColor.systemBackground)
-                .ignoresSafeArea()
+            ZStack {
+                Color(UIColor.systemGroupedBackground)
+                LinearGradient(colors: [.blue.opacity(0.05), .purple.opacity(0.05)], startPoint: .topLeading, endPoint: .bottomTrailing)
+            }
+            .ignoresSafeArea()
             // Main content with tab view
             TabView(selection: $selectedTab) {
                 NavigationStack {
@@ -97,7 +100,14 @@ struct MainNavigationView: View {
                         selectedTab: $selectedTab
                     )
                     .frame(width: 280)
-                    .background(Color(UIColor.systemBackground))
+                    .background(.ultraThinMaterial)
+                    .overlay(
+                        Rectangle()
+                            .frame(width: 1)
+                            .foregroundColor(.white.opacity(0.2)),
+                        alignment: .trailing
+                    )
+                    .shadow(color: .black.opacity(0.1), radius: 10, x: 5)
                     .transition(.move(edge: .leading))
                     
                     Spacer()
@@ -153,10 +163,10 @@ private struct SideMenuView: View {
                     .foregroundStyle(.blue)
                 
                 Text("BorderLog")
-                    .font(.title.bold())
+                    .font(.system(.title, design: .rounded).bold())
                 
                 Text("Track your travels")
-                    .font(.caption)
+                    .font(.system(.caption, design: .rounded))
                     .foregroundStyle(.secondary)
             }
             .padding(.horizontal, 20)
@@ -260,7 +270,7 @@ private struct MenuButton: View {
                     .frame(width: 24)
                 
                 Text(title)
-                    .font(.body)
+                    .font(.system(.body, design: .rounded))
                 
                 Spacer()
             }

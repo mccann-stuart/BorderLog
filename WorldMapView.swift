@@ -45,11 +45,16 @@ struct WorldMapView: View {
                 HStack {
                     Spacer()
                     Text("\(visitedCountries.count) countries")
-                        .font(.caption.bold())
+                        .font(.system(.caption, design: .rounded).bold())
                         .padding(.horizontal, 12)
                         .padding(.vertical, 6)
                         .background(.ultraThinMaterial)
                         .clipShape(Capsule())
+                        .overlay(
+                            Capsule()
+                                .stroke(.white.opacity(0.3), lineWidth: 1)
+                        )
+                        .shadow(color: .black.opacity(0.15), radius: 6, y: 3)
                         .padding(8)
                 }
             }

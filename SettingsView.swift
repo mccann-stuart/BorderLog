@@ -93,12 +93,20 @@ struct SettingsView: View {
                 Section("Privacy") {
                     VStack(alignment: .leading, spacing: 8) {
                         Text("Local-First Storage")
-                            .font(.headline)
+                            .font(.system(.headline, design: .rounded))
                         Text("All your travel data is stored locally on this device. No data is sent to external servers unless you enable iCloud sync.")
-                            .font(.caption)
+                            .font(.system(.caption, design: .rounded))
                             .foregroundStyle(.secondary)
                     }
                 }
+            }
+            .scrollContentBackground(.hidden)
+            .background {
+                ZStack {
+                    Color(UIColor.systemGroupedBackground)
+                    LinearGradient(colors: [.blue.opacity(0.05), .purple.opacity(0.05)], startPoint: .topLeading, endPoint: .bottomTrailing)
+                }
+                .ignoresSafeArea()
             }
             .navigationTitle("Settings")
             .navigationBarTitleDisplayMode(.inline)
