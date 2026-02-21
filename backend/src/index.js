@@ -23,7 +23,13 @@ export default {
     }
 
     // Helper to validate version string (alphanumeric, dot, dash, underscore)
-    const isValidVersion = (v) => /^[a-zA-Z0-9.\-_]+$/.test(v);
+    const isValidVersion = (v) => {
+        // Enforce max length and prevent path traversal sequences
+        if (v.length > 50 || v.includes("..")) {
+            return false;
+        }
+        return /^[a-zA-Z0-9.\-_]+$/.test(v);
+    };
 
     // Helper to fetch from R2
     const fetchFromR2 = async (key) => {
@@ -37,7 +43,11 @@ export default {
       }
 
       try {
-        const object = await env.CONFIG_BUCKET.get(key);
+        // Optimize: use onlyIf to avoid downloading body if ETag matches
+        const ifNoneMatch = request.headers.get("If-None-Match");
+        const options = ifNoneMatch ? { onlyIf: { etagDoesNotMatch: ifNoneMatch } } : {};
+
+        const object = await env.CONFIG_BUCKET.get(key, options);
 
         if (object === null) {
           return new Response("Not Found", {
@@ -55,8 +65,8 @@ export default {
         const securityHeaders = getSecurityHeaders(headers);
 
         // Handle conditional requests (If-None-Match)
-        const ifNoneMatch = request.headers.get("If-None-Match");
-        if (ifNoneMatch && ifNoneMatch === object.httpEtag) {
+        // If onlyIf condition matched (ETag matches), body is null
+        if (ifNoneMatch && (object.body === null || ifNoneMatch === object.httpEtag)) {
             return new Response(null, { status: 304, headers: securityHeaders });
         }
 
