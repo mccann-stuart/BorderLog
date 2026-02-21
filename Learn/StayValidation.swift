@@ -8,11 +8,11 @@
 import Foundation
 
 enum StayValidation {
-    nonisolated static func validate<S: SchengenStay>(stays: [S], calendar: Calendar) -> (overlapCount: Int, gapDays: Int) {
+    nonisolated static func validate(stays: [StayInfo], calendar: Calendar) -> (overlapCount: Int, gapDays: Int) {
         return calculateValidationMetrics(chronologicalStays: stays.sorted { $0.enteredOn < $1.enteredOn }, calendar: calendar)
     }
 
-    nonisolated static func validate<S: SchengenStay>(reverseSortedStays stays: [S], calendar: Calendar) -> (overlapCount: Int, gapDays: Int) {
+    nonisolated static func validate(reverseSortedStays stays: [StayInfo], calendar: Calendar) -> (overlapCount: Int, gapDays: Int) {
         // Optimization: Stays are reverse-sorted by enteredOn (descending).
         // We iterate in reverse to process them in chronological order (ascending),
         // allowing us to merge intervals on-the-fly without an intermediate array or sort.
@@ -22,23 +22,55 @@ enum StayValidation {
         return calculateValidationMetrics(chronologicalStays: stays.reversed(), calendar: calendar)
     }
 
-    nonisolated static func overlapCount<S: SchengenStay>(stays: [S], calendar: Calendar) -> Int {
+    nonisolated static func overlapCount(stays: [StayInfo], calendar: Calendar) -> Int {
         return validate(stays: stays, calendar: calendar).overlapCount
     }
 
-    nonisolated static func overlapCount<S: SchengenStay>(reverseSortedStays stays: [S], calendar: Calendar) -> Int {
+    nonisolated static func overlapCount(reverseSortedStays stays: [StayInfo], calendar: Calendar) -> Int {
         return validate(reverseSortedStays: stays, calendar: calendar).overlapCount
     }
 
-    nonisolated static func gapDays<S: SchengenStay>(stays: [S], calendar: Calendar) -> Int {
+    nonisolated static func gapDays(stays: [StayInfo], calendar: Calendar) -> Int {
         return validate(stays: stays, calendar: calendar).gapDays
     }
 
-    nonisolated static func gapDays<S: SchengenStay>(reverseSortedStays stays: [S], calendar: Calendar) -> Int {
+    nonisolated static func gapDays(reverseSortedStays stays: [StayInfo], calendar: Calendar) -> Int {
         return validate(reverseSortedStays: stays, calendar: calendar).gapDays
     }
 
-    nonisolated private static func calculateValidationMetrics<S: Sequence>(chronologicalStays: S, calendar: Calendar) -> (overlapCount: Int, gapDays: Int) where S.Element: SchengenStay {
+    @MainActor
+    static func validate(stays: [Stay], calendar: Calendar) -> (overlapCount: Int, gapDays: Int) {
+        let stayInfos = snapshot(stays: stays)
+        return validate(stays: stayInfos, calendar: calendar)
+    }
+
+    @MainActor
+    static func validate(reverseSortedStays stays: [Stay], calendar: Calendar) -> (overlapCount: Int, gapDays: Int) {
+        let stayInfos = snapshot(stays: stays)
+        return validate(reverseSortedStays: stayInfos, calendar: calendar)
+    }
+
+    @MainActor
+    static func overlapCount(stays: [Stay], calendar: Calendar) -> Int {
+        return validate(stays: stays, calendar: calendar).overlapCount
+    }
+
+    @MainActor
+    static func overlapCount(reverseSortedStays stays: [Stay], calendar: Calendar) -> Int {
+        return validate(reverseSortedStays: stays, calendar: calendar).overlapCount
+    }
+
+    @MainActor
+    static func gapDays(stays: [Stay], calendar: Calendar) -> Int {
+        return validate(stays: stays, calendar: calendar).gapDays
+    }
+
+    @MainActor
+    static func gapDays(reverseSortedStays stays: [Stay], calendar: Calendar) -> Int {
+        return validate(reverseSortedStays: stays, calendar: calendar).gapDays
+    }
+
+    nonisolated private static func calculateValidationMetrics<S: Sequence>(chronologicalStays: S, calendar: Calendar) -> (overlapCount: Int, gapDays: Int) where S.Element == StayInfo {
         var overlapCount = 0
         var gapDays = 0
         var currentEnd: Date?
@@ -74,6 +106,7 @@ enum StayValidation {
         return (overlapCount, gapDays)
     }
 
+    @MainActor
     static func overlappingStays(
         enteredOn: Date,
         exitedOn: Date?,
@@ -93,6 +126,17 @@ enum StayValidation {
             let stayEnd = calendar.startOfDay(for: stay.exitedOn ?? Date.distantFuture)
             let stayRange = stayStart...stayEnd
             return stayRange.overlaps(newRange)
+        }
+    }
+
+    @MainActor
+    private static func snapshot(stays: [Stay]) -> [StayInfo] {
+        stays.map {
+            StayInfo(
+                enteredOn: $0.enteredOn,
+                exitedOn: $0.exitedOn,
+                region: $0.region
+            )
         }
     }
 }
