@@ -16,15 +16,15 @@ struct SchengenSummary: Sendable {
 }
 
 enum SchengenCalculator {
-    private static let windowSize = 180
-    private static let maxAllowedDays = 90
+    nonisolated private static let windowSize = 180
+    nonisolated private static let maxAllowedDays = 90
 
     private struct Interval {
         let start: Date
         var end: Date
     }
 
-    static func summary<S: SchengenStay, O: SchengenOverride>(
+    nonisolated static func summary<S: SchengenStay, O: SchengenOverride>(
         for stays: [S],
         overrides: [O] = [],
         asOf referenceDate: Date = Date(),

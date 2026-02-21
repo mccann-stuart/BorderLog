@@ -8,11 +8,11 @@
 import Foundation
 
 enum StayValidation {
-    static func validate<S: SchengenStay>(stays: [S], calendar: Calendar) -> (overlapCount: Int, gapDays: Int) {
+    nonisolated static func validate<S: SchengenStay>(stays: [S], calendar: Calendar) -> (overlapCount: Int, gapDays: Int) {
         return calculateValidationMetrics(chronologicalStays: stays.sorted { $0.enteredOn < $1.enteredOn }, calendar: calendar)
     }
 
-    static func validate<S: SchengenStay>(reverseSortedStays stays: [S], calendar: Calendar) -> (overlapCount: Int, gapDays: Int) {
+    nonisolated static func validate<S: SchengenStay>(reverseSortedStays stays: [S], calendar: Calendar) -> (overlapCount: Int, gapDays: Int) {
         // Optimization: Stays are reverse-sorted by enteredOn (descending).
         // We iterate in reverse to process them in chronological order (ascending),
         // allowing us to merge intervals on-the-fly without an intermediate array or sort.
@@ -22,23 +22,23 @@ enum StayValidation {
         return calculateValidationMetrics(chronologicalStays: stays.reversed(), calendar: calendar)
     }
 
-    static func overlapCount<S: SchengenStay>(stays: [S], calendar: Calendar) -> Int {
+    nonisolated static func overlapCount<S: SchengenStay>(stays: [S], calendar: Calendar) -> Int {
         return validate(stays: stays, calendar: calendar).overlapCount
     }
 
-    static func overlapCount<S: SchengenStay>(reverseSortedStays stays: [S], calendar: Calendar) -> Int {
+    nonisolated static func overlapCount<S: SchengenStay>(reverseSortedStays stays: [S], calendar: Calendar) -> Int {
         return validate(reverseSortedStays: stays, calendar: calendar).overlapCount
     }
 
-    static func gapDays<S: SchengenStay>(stays: [S], calendar: Calendar) -> Int {
+    nonisolated static func gapDays<S: SchengenStay>(stays: [S], calendar: Calendar) -> Int {
         return validate(stays: stays, calendar: calendar).gapDays
     }
 
-    static func gapDays<S: SchengenStay>(reverseSortedStays stays: [S], calendar: Calendar) -> Int {
+    nonisolated static func gapDays<S: SchengenStay>(reverseSortedStays stays: [S], calendar: Calendar) -> Int {
         return validate(reverseSortedStays: stays, calendar: calendar).gapDays
     }
 
-    private static func calculateValidationMetrics<S: Sequence>(chronologicalStays: S, calendar: Calendar) -> (overlapCount: Int, gapDays: Int) where S.Element: SchengenStay {
+    nonisolated private static func calculateValidationMetrics<S: Sequence>(chronologicalStays: S, calendar: Calendar) -> (overlapCount: Int, gapDays: Int) where S.Element: SchengenStay {
         var overlapCount = 0
         var gapDays = 0
         var currentEnd: Date?
