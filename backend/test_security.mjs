@@ -120,7 +120,7 @@ async function runTest(name, fn) {
     assertSecurityHeaders(res);
   });
 
-  await runTest("Successful Fetch includes Security Headers", async () => {
+  await runTest("Successful Fetch includes Security Headers and Cache-Control", async () => {
     const req = new Request("http://localhost/config/manifest");
     const env = {
       CONFIG_BUCKET: {
@@ -136,6 +136,28 @@ async function runTest(name, fn) {
 
     assert.strictEqual(res.status, 200);
     assertSecurityHeaders(res);
+    assert.strictEqual(res.headers.get("Cache-Control"), "public, max-age=300", "Missing Cache-Control");
+  });
+
+  await runTest("Not Modified includes Cache-Control", async () => {
+    const req = new Request("http://localhost/config/manifest", {
+      headers: { "If-None-Match": "123" }
+    });
+    const env = {
+      CONFIG_BUCKET: {
+        get: async () => ({
+          body: "{}",
+          httpEtag: "123",
+          writeHttpMetadata: (headers) => {}
+        })
+      }
+    };
+
+    const res = await worker.fetch(req, env, ctx);
+
+    assert.strictEqual(res.status, 304);
+    assertSecurityHeaders(res);
+    assert.strictEqual(res.headers.get("Cache-Control"), "public, max-age=300", "Missing Cache-Control");
   });
 
   console.log("All tests passed!");

@@ -49,6 +49,7 @@ export default {
         const headers = new Headers();
         object.writeHttpMetadata(headers);
         headers.set("etag", object.httpEtag);
+        headers.set("Cache-Control", "public, max-age=300");
 
         // Add security headers
         const securityHeaders = getSecurityHeaders(headers);

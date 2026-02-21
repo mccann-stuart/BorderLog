@@ -23,3 +23,29 @@ Instead of re-sorting, we leverage the fact that the array is already sorted in 
 ## Verification
 - Theoretical analysis confirms O(N) time and O(1) extra space (for the view) vs O(N log N) time and O(N) extra space for `sorted()`.
 - Functional correctness is maintained as long as the input is sorted (ascending or descending). Given the app's structure, the input is consistently sorted by `enteredOn`.
+
+# Performance Optimization Rationale: Database-Level Filtering in LedgerRecomputeService
+
+## Current State
+`LedgerRecomputeService` functions (`earliestSignalDate`, `fetchStays`, `fetchOverrides`, `fetchLocations`, `fetchPhotos`) previously fetched all records from the database into memory and then filtered them using Swift's `filter` or `min()`:
+```swift
+let stays = (try? modelContext.fetch(FetchDescriptor<Stay>())) ?? []
+return stays.filter { ... }
+```
+
+## Problem
+1. **Memory Scalability**: Fetching all records (especially high-frequency `LocationSample` data) loads the entire dataset into memory, leading to O(N) memory usage where N is the total history size.
+2. **Computational Overhead**: Iterating over all records in memory for filtering or finding min/max values is O(N) CPU time.
+3. **Database Efficiency**: The database engine (CoreData/SQLite) is optimized for filtering and sorting, but these capabilities are bypassed.
+
+## Optimization
+Replace in-memory operations with `FetchDescriptor` configurations:
+1. **Predicates for Range Queries**: Use `#Predicate` to filter records at the database level.
+   - Reduces memory usage from O(Total Records) to O(Result Set Size).
+   - Leverages database indexing (if available) for faster lookups (O(log N)).
+2. **Sort + Limit for Aggregations**: Use `sortBy` and `fetchLimit: 1` per model to find the earliest date, then take the minimum across types.
+   - Reduces finding the minimum date from O(N) (scan all) to O(1) (index scan/first record).
+
+## Verification
+- Theoretical analysis confirms O(1) memory and time for finding earliest dates (vs O(N)).
+- Theoretical analysis confirms O(K) memory for range queries where K is the number of items in range (vs O(N) total items).
