@@ -399,6 +399,7 @@ A1B2C3D400000004 /* PermissionsRequestView.swift in Sources */,
 		4BEE3D052F4C2F9A00D6F0F1 /* Debug configuration for PBXNativeTarget "BorderLogWidget" */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				APP_GROUP_ID = group.com.MCCANN.Learn;
 				CODE_SIGN_ENTITLEMENTS = BorderLogWidget/BorderLogWidget.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
@@ -424,6 +425,7 @@ A1B2C3D400000004 /* PermissionsRequestView.swift in Sources */,
 		4BEE3D062F4C2F9A00D6F0F1 /* Release configuration for PBXNativeTarget "BorderLogWidget" */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				APP_GROUP_ID = group.com.MCCANN.Learn;
 				CODE_SIGN_ENTITLEMENTS = BorderLogWidget/BorderLogWidget.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
