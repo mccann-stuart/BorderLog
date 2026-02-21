@@ -58,28 +58,7 @@ struct PresenceDayDetailView: View {
                 }
             }
 
-            Section("Evidence") {
-                HStack {
-                    Text("Stay days")
-                    Spacer()
-                    Text("\(day.stayCount)")
-                        .foregroundStyle(.secondary)
-                }
-
-                HStack {
-                    Text("Photos")
-                    Spacer()
-                    Text("\(day.photoCount)")
-                        .foregroundStyle(.secondary)
-                }
-
-                HStack {
-                    Text("Location samples")
-                    Spacer()
-                    Text("\(day.locationCount)")
-                        .foregroundStyle(.secondary)
-                }
-            }
+            EvidenceSection(dayKey: day.dayKey, date: day.date)
 
             Section("Actions") {
                 Button("Override Day") {
@@ -99,6 +78,131 @@ struct PresenceDayDetailView: View {
                 )
             }
         }
+    }
+}
+
+}
+
+private struct EvidenceSection: View {
+    let dayKey: String
+    let date: Date
+    
+    @Query private var locations: [LocationSample]
+    @Query private var photos: [PhotoSignal]
+    @Query private var stays: [Stay]
+    
+    init(dayKey: String, date: Date) {
+        self.dayKey = dayKey
+        self.date = date
+        
+        let locPredicate = #Predicate<LocationSample> { target in
+            target.dayKey == dayKey
+        }
+        _locations = Query(filter: locPredicate, sort: \.timestamp)
+        
+        let photoPredicate = #Predicate<PhotoSignal> { target in
+            target.dayKey == dayKey
+        }
+        _photos = Query(filter: photoPredicate, sort: \.timestamp)
+        
+        _stays = Query(sort: \.enteredOn, order: .reverse)
+    }
+    
+    var overlappingStays: [Stay] {
+        let calendar = Calendar.current
+        let startOfDay = calendar.startOfDay(for: date)
+        guard let endOfDay = calendar.date(byAdding: DateComponents(day: 1, second: -1), to: startOfDay) else { return [] }
+        
+        return stays.filter { stay in
+            let stayStart = calendar.startOfDay(for: stay.enteredOn)
+            let stayEnd = stay.exitedOn.map { calendar.startOfDay(for: $0) } ?? Date.distantFuture
+            return startOfDay <= stayEnd && endOfDay >= stayStart
+        }
+    }
+    
+    var body: some View {
+        let overlapping = overlappingStays
+        
+        Section("Stays (\(overlapping.count))") {
+            if overlapping.isEmpty {
+                Text("No matching stays")
+                    .foregroundStyle(.secondary)
+            } else {
+                ForEach(overlapping) { stay in
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(stay.countryName)
+                            .font(.headline)
+                        Text(dateRangeText(for: stay))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+        }
+        
+        Section("Photos (\(photos.count))") {
+            if photos.isEmpty {
+                Text("No photo evidence")
+                    .foregroundStyle(.secondary)
+            } else {
+                ForEach(photos) { photo in
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(photo.countryName ?? photo.countryCode ?? "Unknown Location")
+                            .font(.subheadline)
+                        HStack {
+                            Text(photo.timestamp.formatted(date: .omitted, time: .shortened))
+                            Spacer()
+                            Text(String(format: "%.4f, %.4f", photo.latitude, photo.longitude))
+                                .font(.caption2)
+                                .monospacedDigit()
+                        }
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    }
+                }
+            }
+        }
+        
+        Section("Location Samples (\(locations.count))") {
+            if locations.isEmpty {
+                Text("No location samples")
+                    .foregroundStyle(.secondary)
+            } else {
+                ForEach(locations) { loc in
+                    VStack(alignment: .leading, spacing: 4) {
+                        HStack {
+                            Text(loc.countryName ?? loc.countryCode ?? "Unknown Location")
+                                .font(.subheadline)
+                            Spacer()
+                            Text(loc.source.rawValue.capitalized)
+                                .font(.caption2)
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 2)
+                                .background(Color.accentColor.opacity(0.15))
+                                .clipShape(Capsule())
+                        }
+                        HStack {
+                            Text(loc.timestamp.formatted(date: .omitted, time: .shortened))
+                            Spacer()
+                            Text(String(format: "%.4f, %.4f (±%.0fm)", loc.latitude, loc.longitude, loc.accuracyMeters))
+                                .font(.caption2)
+                                .monospacedDigit()
+                        }
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    }
+                }
+            }
+        }
+    }
+    
+    private func dateRangeText(for stay: Stay) -> String {
+        let formatter = Date.FormatStyle(date: .abbreviated, time: .omitted)
+        let start = stay.enteredOn.formatted(formatter)
+        if let exit = stay.exitedOn {
+            return "\(start) - \(exit.formatted(formatter))"
+        }
+        return "\(start) - Present"
     }
 }
 
