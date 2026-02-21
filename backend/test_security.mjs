@@ -110,6 +110,27 @@ async function runTest(name, fn) {
     assertSecurityHeaders(res);
   });
 
+  await runTest("Invalid Version (too long) returns 400", async () => {
+    const longVersion = "a".repeat(51);
+    const req = new Request(`http://localhost/config/zones/${longVersion}`);
+    const env = {};
+
+    const res = await worker.fetch(req, env, ctx);
+
+    assert.strictEqual(res.status, 400);
+    assertSecurityHeaders(res);
+  });
+
+  await runTest("Invalid Version (contains ..) returns 400", async () => {
+    const req = new Request("http://localhost/config/zones/v1..2");
+    const env = {};
+
+    const res = await worker.fetch(req, env, ctx);
+
+    assert.strictEqual(res.status, 400);
+    assertSecurityHeaders(res);
+  });
+
   await runTest("Unknown Route returns 404 + Security Headers", async () => {
     const req = new Request("http://localhost/unknown/route");
     const env = {};
@@ -143,13 +164,26 @@ async function runTest(name, fn) {
     const req = new Request("http://localhost/config/manifest", {
       headers: { "If-None-Match": "123" }
     });
+
+    let optionsPassed = null;
     const env = {
       CONFIG_BUCKET: {
-        get: async () => ({
-          body: "{}",
-          httpEtag: "123",
-          writeHttpMetadata: (headers) => {}
-        })
+        get: async (key, options) => {
+          optionsPassed = options;
+          // Simulate R2 behavior: if etagDoesNotMatch matches, return null body
+          if (options && options.onlyIf && options.onlyIf.etagDoesNotMatch === "123") {
+               return {
+                  body: null,
+                  httpEtag: "123",
+                  writeHttpMetadata: (headers) => {}
+               };
+          }
+          return {
+            body: "{}",
+            httpEtag: "123",
+            writeHttpMetadata: (headers) => {}
+          };
+        }
       }
     };
 
@@ -158,6 +192,10 @@ async function runTest(name, fn) {
     assert.strictEqual(res.status, 304);
     assertSecurityHeaders(res);
     assert.strictEqual(res.headers.get("Cache-Control"), "public, max-age=300", "Missing Cache-Control");
+
+    // Verify onlyIf was passed
+    assert.ok(optionsPassed, "Options should be passed to get()");
+    assert.deepStrictEqual(optionsPassed, { onlyIf: { etagDoesNotMatch: "123" } }, "onlyIf options mismatch");
   });
 
   console.log("All tests passed!");
