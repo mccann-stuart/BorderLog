@@ -1,16 +1,11 @@
-//
-//  MainNavigationView.swift
-//  Learn
-//
-//  Created by Mccann Stuart on 15/02/2026.
-//
-
 import SwiftUI
 import SwiftData
 
 struct MainNavigationView: View {
     @EnvironmentObject private var authManager: AuthenticationManager
     @Environment(\.modelContext) private var modelContext
+    
+    @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
     
     @State private var selectedTab = 0
     @State private var isShowingMenu = false
@@ -110,6 +105,10 @@ struct MainNavigationView: View {
             }
         }
         .animation(.easeInOut(duration: 0.3), value: isShowingMenu)
+        .fullScreenCover(isPresented: .init(get: { !hasCompletedOnboarding }, set: { _ in })) {
+            OnboardingView()
+                .environmentObject(authManager)
+        }
         .sheet(isPresented: $isShowingSettings) {
             SettingsView()
         }
@@ -126,8 +125,9 @@ struct MainNavigationView: View {
                 DayOverrideEditorView()
             }
         }
-        .task {
-            guard !didBootstrapInference else { return }
+        .task(id: hasCompletedOnboarding) {
+            // Only bootstrap after onboarding completes
+            guard hasCompletedOnboarding, !didBootstrapInference else { return }
             didBootstrapInference = true
             await LedgerRecomputeService.recomputeAll(modelContext: modelContext)
             let ingestor = PhotoSignalIngestor(modelContext: modelContext)

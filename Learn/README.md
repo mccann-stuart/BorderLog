@@ -82,7 +82,7 @@ Existing solutions often require heavy manual entry. People also have fragmented
 
 Journey A — First Launch & Setup
 	1.	Welcome → value prop + privacy stance
-	2.	Sign in with Apple (required)
+	2.	Sign in with Apple (disabled until production ready)
 	3.	Optional profile setup (passport nationality, home country, etc.)
 	4.	Permission requests (optional, staged):
 	•	Location permissions (for widget + app inference)
