@@ -54,7 +54,7 @@ struct PhotoSignalIngestor {
         }
 
         let options = PHFetchOptions()
-        options.predicate = NSPredicate(format: "creationDate >= %@ AND location != nil", startDate as NSDate)
+        options.predicate = NSPredicate(format: "creationDate >= %@", startDate as NSDate)
         options.sortDescriptors = [NSSortDescriptor(key: "creationDate", ascending: true)]
 
         let assets = PHAsset.fetchAssets(with: .image, options: options)
