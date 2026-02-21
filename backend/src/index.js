@@ -37,7 +37,14 @@ export default {
       }
 
       try {
-        const object = await env.CONFIG_BUCKET.get(key);
+        // Optimize: Use `onlyIf` to avoid fetching body if ETag matches
+        const ifNoneMatch = request.headers.get("If-None-Match");
+        const options = {};
+        if (ifNoneMatch) {
+            options.onlyIf = { etagDoesNotMatch: ifNoneMatch };
+        }
+
+        const object = await env.CONFIG_BUCKET.get(key, options);
 
         if (object === null) {
           return new Response("Not Found", {
@@ -54,10 +61,14 @@ export default {
         // Add security headers
         const securityHeaders = getSecurityHeaders(headers);
 
-        // Handle conditional requests (If-None-Match)
-        const ifNoneMatch = request.headers.get("If-None-Match");
-        if (ifNoneMatch && ifNoneMatch === object.httpEtag) {
+        // If body is missing, it means `onlyIf` condition failed (ETag matched), so return 304
+        if (!object.body) {
             return new Response(null, { status: 304, headers: securityHeaders });
+        }
+
+        // Check for manual match in case `onlyIf` wasn't used but logic requires it (unlikely here but safe)
+        if (ifNoneMatch && ifNoneMatch === object.httpEtag) {
+             return new Response(null, { status: 304, headers: securityHeaders });
         }
 
         return new Response(object.body, {
