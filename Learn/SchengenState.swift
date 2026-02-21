@@ -49,8 +49,9 @@ final class SchengenState {
 
         let calendar = Calendar.current
         let result = await Task.detached(priority: .userInitiated) {
-            let overlapCount = await StayValidation.overlapCount(stays: stayInfos, calendar: calendar)
-            let gapDays = await StayValidation.gapDays(stays: stayInfos, calendar: calendar)
+            // Optimized: Use reverseSortedStays variants as stayInfos is derived from reverse-sorted @Query
+            let overlapCount = await StayValidation.overlapCount(reverseSortedStays: stayInfos, calendar: calendar)
+            let gapDays = await StayValidation.gapDays(reverseSortedStays: stayInfos, calendar: calendar)
             let summary = await SchengenCalculator.summary(for: stayInfos, overrides: overrideInfos, calendar: calendar)
 
             return (summary, overlapCount, gapDays)
