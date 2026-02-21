@@ -58,12 +58,13 @@ struct PhotoSignalIngestor {
         options.sortDescriptors = [NSSortDescriptor(key: "creationDate", ascending: true)]
 
         let assets = PHAsset.fetchAssets(with: .image, options: options)
+        let assetCount = assets.count
 
         var processed = 0
         var touchedDayKeys: Set<String> = []
 
-        if assets.count > 0 {
-            for index in 0..<assets.count {
+        if assetCount > 0 {
+            for index in 0..<assetCount {
                 let asset = assets.object(at: index)
                 guard let creationDate = asset.creationDate,
                       let location = asset.location else {
