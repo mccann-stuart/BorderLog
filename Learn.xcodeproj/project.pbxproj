@@ -85,6 +85,13 @@ A1B2C3D500000004 /* PermissionsRequestView.swift */ = {isa = PBXFileReference; l
 			);
 			target = 4BF474C92F3FAB7B0026C07A /* LearnTests */;
 		};
+		9B55513F4C9F4EF08C51A401 /* Exceptions for "BorderLogWidget" folder in "BorderLogWidget" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 4BEE3D032F4C2F9A00D6F0F1 /* BorderLogWidget */;
+		};
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -95,6 +102,9 @@ A1B2C3D500000004 /* PermissionsRequestView.swift */ = {isa = PBXFileReference; l
 		};
 		4BEE3D0B2F4C2F9A00D6F0F1 /* BorderLogWidget */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				9B55513F4C9F4EF08C51A401 /* Exceptions for "BorderLogWidget" folder in "BorderLogWidget" target */,
+			);
 			path = BorderLogWidget;
 			sourceTree = "<group>";
 		};
