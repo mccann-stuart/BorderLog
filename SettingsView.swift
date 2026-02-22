@@ -168,10 +168,13 @@ struct SettingsView: View {
 
     private func rescanPhotos() {
         isIngestingPhotos = true
-        Task { @MainActor in
-            let ingestor = PhotoSignalIngestor(modelContext: modelContext)
+        let container = modelContext.container
+        Task {
+            let ingestor = PhotoSignalIngestor(modelContainer: container)
             _ = await ingestor.ingest(mode: .manualFullScan)
-            isIngestingPhotos = false
+            await MainActor.run {
+                isIngestingPhotos = false
+            }
         }
     }
 

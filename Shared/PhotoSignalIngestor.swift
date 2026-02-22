@@ -11,23 +11,20 @@ import CryptoKit
 import SwiftData
 import CoreLocation
 
-@MainActor
-struct PhotoSignalIngestor {
+@ModelActor
+actor PhotoSignalIngestor {
     enum IngestMode {
         case auto
         case manualFullScan
     }
 
-    let modelContext: ModelContext
-    let resolver: CountryResolving
+    private let resolver: CountryResolving
 
-    init(modelContext: ModelContext, resolver: CountryResolving) {
-        self.modelContext = modelContext
+    init(modelContainer: ModelContainer, resolver: CountryResolving = CLGeocoderCountryResolver()) {
+        self.modelContainer = modelContainer
+        let context = ModelContext(modelContainer)
+        self.modelExecutor = DefaultSerialModelExecutor(modelContext: context)
         self.resolver = resolver
-    }
-
-    init(modelContext: ModelContext) {
-        self.init(modelContext: modelContext, resolver: CLGeocoderCountryResolver())
     }
 
     func ingest(mode: IngestMode) async -> Int {
@@ -105,7 +102,8 @@ struct PhotoSignalIngestor {
         }
 
         if !touchedDayKeys.isEmpty {
-            await LedgerRecomputeService.recompute(dayKeys: Array(touchedDayKeys), modelContext: modelContext)
+            let recomputeService = LedgerRecomputeService(modelContainer: self.modelContainer)
+            await recomputeService.recompute(dayKeys: Array(touchedDayKeys))
         }
 
         return processed

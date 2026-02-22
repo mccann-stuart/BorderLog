@@ -64,7 +64,9 @@ final class LocationSampleService: NSObject, CLLocationManagerDelegate {
         )
         modelContext.insert(sample)
 
-        await LedgerRecomputeService.recompute(dayKeys: [dayKey], modelContext: modelContext)
+        let container = modelContext.container
+        let recomputeService = LedgerRecomputeService(modelContainer: container)
+        await recomputeService.recompute(dayKeys: [dayKey])
 
         return sample
     }
@@ -128,7 +130,9 @@ final class LocationSampleService: NSObject, CLLocationManagerDelegate {
         }
 
         if !dayKeys.isEmpty {
-            await LedgerRecomputeService.recompute(dayKeys: Array(dayKeys), modelContext: modelContext)
+            let container = modelContext.container
+            let recomputeService = LedgerRecomputeService(modelContainer: container)
+            await recomputeService.recompute(dayKeys: Array(dayKeys))
         }
 
         return storedSamples.first

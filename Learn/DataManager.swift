@@ -121,8 +121,10 @@ struct DataManager {
         )
         modelContext.insert(samplePhoto)
 
-        Task { @MainActor in
-            await LedgerRecomputeService.recomputeAll(modelContext: modelContext)
+        let container = modelContext.container
+        Task {
+            let recomputeService = LedgerRecomputeService(modelContainer: container)
+            await recomputeService.recomputeAll()
         }
 
         Self.logger.info("Sample data seeded.")
