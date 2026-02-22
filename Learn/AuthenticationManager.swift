@@ -9,9 +9,11 @@ class AuthenticationManager: ObservableObject {
     
     private let service = "com.MCCANN.Learn"
     private let account = "appleUserId"
+    private let keychain: KeychainHelperProtocol
 
-    init() {
-        if let data = KeychainHelper.standard.read(service: service, account: account),
+    init(keychain: KeychainHelperProtocol = KeychainHelper.standard) {
+        self.keychain = keychain
+        if let data = keychain.read(service: service, account: account),
            let id = String(data: data, encoding: .utf8) {
             self.appleUserId = id
         }
@@ -20,12 +22,12 @@ class AuthenticationManager: ObservableObject {
     func signIn(userId: String) {
         self.appleUserId = userId
         if let data = userId.data(using: .utf8) {
-            KeychainHelper.standard.save(data, service: service, account: account)
+            keychain.save(data, service: service, account: account)
         }
     }
 
     func signOut() {
         self.appleUserId = ""
-        KeychainHelper.standard.delete(service: service, account: account)
+        keychain.delete(service: service, account: account)
     }
 }
