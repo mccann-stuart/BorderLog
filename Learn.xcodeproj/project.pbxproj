@@ -80,6 +80,13 @@
 			);
 			target = 4BF474C92F3FAB7B0026C07A /* LearnTests */;
 		};
+		1F1A3DC1C455376EBF45721F /* Exceptions for "BorderLogWidget" folder in "BorderLogWidget" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 4BEE3D032F4C2F9A00D6F0F1 /* BorderLogWidget */;
+		};
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -90,6 +97,9 @@
 		};
 		4BEE3D0B2F4C2F9A00D6F0F1 /* BorderLogWidget */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				1F1A3DC1C455376EBF45721F /* Exceptions for "BorderLogWidget" folder in "BorderLogWidget" target */,
+			);
 			path = BorderLogWidget;
 			sourceTree = "<group>";
 		};
@@ -381,9 +391,9 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = JZ834V3GDM;
-				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_CFBundleDisplayName = BorderLogWidget;
-				INFOPLIST_KEY_NSExtension = { NSExtensionPointIdentifier = com.apple.widgetkit-extension; NSExtensionPrincipalClass = "$(PRODUCT_MODULE_NAME).BorderLogWidgetBundle"; };
+				EXCLUDED_RESOURCE_FILE_NAMES = Info.plist;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = BorderLogWidget/Info.plist;
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = borderless1001.BorderLogWidget;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -408,9 +418,9 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = JZ834V3GDM;
-				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_CFBundleDisplayName = BorderLogWidget;
-				INFOPLIST_KEY_NSExtension = { NSExtensionPointIdentifier = com.apple.widgetkit-extension; NSExtensionPrincipalClass = "$(PRODUCT_MODULE_NAME).BorderLogWidgetBundle"; };
+				EXCLUDED_RESOURCE_FILE_NAMES = Info.plist;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = BorderLogWidget/Info.plist;
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = borderless1001.BorderLogWidget;
 				PRODUCT_NAME = "$(TARGET_NAME)";
