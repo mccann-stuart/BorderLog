@@ -99,8 +99,10 @@ public final class LedgerRecomputeService {
 
     private func upsertPresenceDays(_ results: [PresenceDayResult]) {
         let keys = results.map { $0.dayKey }
-        let descriptor = FetchDescriptor<PresenceDay>()
-        let existing = (try? self.modelContext.fetch(descriptor))?.filter { keys.contains($0.dayKey) } ?? []
+        let descriptor = FetchDescriptor<PresenceDay>(
+            predicate: #Predicate { keys.contains($0.dayKey) }
+        )
+        let existing = (try? self.modelContext.fetch(descriptor)) ?? []
         var existingMap: [String: PresenceDay] = [:]
         for item in existing {
             existingMap[item.dayKey] = item
