@@ -12,7 +12,7 @@ import SwiftData
 @MainActor
 final class LocationSampleService: NSObject, CLLocationManagerDelegate {
     private let manager = CLLocationManager()
-    private var continuation: CheckedContinuation<CLLocation?, Never>?
+    private var continuations: [CheckedContinuation<CLLocation?, Never>] = []
     private var batchContinuation: CheckedContinuation<[CLLocation], Never>?
     private var batchLocations: [CLLocation] = []
     private var batchTargetCount: Int = 0
@@ -140,8 +140,11 @@ final class LocationSampleService: NSObject, CLLocationManagerDelegate {
 
     private func captureLocation() async -> CLLocation? {
         await withCheckedContinuation { continuation in
-            self.continuation = continuation
-            manager.requestLocation()
+            let isIdle = continuations.isEmpty && batchContinuation == nil
+            continuations.append(continuation)
+            if isIdle {
+                manager.requestLocation()
+            }
         }
     }
 
@@ -176,6 +179,14 @@ final class LocationSampleService: NSObject, CLLocationManagerDelegate {
         batchLocations = []
         batchContinuation = nil
         continuation.resume(returning: locations)
+
+        if !continuations.isEmpty {
+            let bestLocation = locations.first
+            for cont in continuations {
+                cont.resume(returning: bestLocation)
+            }
+            continuations.removeAll()
+        }
     }
 
     func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
@@ -192,15 +203,15 @@ final class LocationSampleService: NSObject, CLLocationManagerDelegate {
             if batchLocations.count >= batchTargetCount {
                 finishBatchCapture()
             }
-            return
         }
 
-        if let location = locations.first {
-            continuation?.resume(returning: location)
-        } else {
-            continuation?.resume(returning: nil)
+        if !continuations.isEmpty {
+            let location = locations.first
+            for cont in continuations {
+                cont.resume(returning: location)
+            }
+            continuations.removeAll()
         }
-        continuation = nil
     }
 
     func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
@@ -208,7 +219,10 @@ final class LocationSampleService: NSObject, CLLocationManagerDelegate {
             finishBatchCapture()
             return
         }
-        continuation?.resume(returning: nil)
-        continuation = nil
+
+        for cont in continuations {
+            cont.resume(returning: nil)
+        }
+        continuations.removeAll()
     }
 }

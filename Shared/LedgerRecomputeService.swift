@@ -99,8 +99,12 @@ public final class LedgerRecomputeService {
 
     private func upsertPresenceDays(_ results: [PresenceDayResult]) {
         let keys = results.map { $0.dayKey }
-        let descriptor = FetchDescriptor<PresenceDay>()
-        let existing = (try? self.modelContext.fetch(descriptor))?.filter { keys.contains($0.dayKey) } ?? []
+        let descriptor = FetchDescriptor<PresenceDay>(
+            predicate: #Predicate { day in
+                keys.contains(day.dayKey)
+            }
+        )
+        let existing = (try? self.modelContext.fetch(descriptor)) ?? []
         var existingMap: [String: PresenceDay] = [:]
         for item in existing {
             existingMap[item.dayKey] = item
@@ -181,9 +185,12 @@ public final class LedgerRecomputeService {
     }
 
     private func fetchOverrides(from start: Date, to end: Date) -> [DayOverride] {
-        let descriptor = FetchDescriptor<DayOverride>()
-        let overrides = (try? self.modelContext.fetch(descriptor)) ?? []
-        return overrides.filter { $0.date >= start && $0.date <= end }
+        let descriptor = FetchDescriptor<DayOverride>(
+            predicate: #Predicate { override in
+                override.date >= start && override.date <= end
+            }
+        )
+        return (try? self.modelContext.fetch(descriptor)) ?? []
     }
 
     private func fetchLocations(from start: Date, to end: Date) -> [LocationSample] {
@@ -204,16 +211,16 @@ public final class LedgerRecomputeService {
         return (try? self.modelContext.fetch(descriptor)) ?? []
     }
 
-    private func fetchEarliestStayDate() -> Date? {
-        let descriptor = FetchDescriptor<Stay>()
-        let stays = (try? self.modelContext.fetch(descriptor)) ?? []
-        return stays.map { $0.enteredOn }.min()
+    func fetchEarliestStayDate() -> Date? {
+        var descriptor = FetchDescriptor<Stay>(sortBy: [SortDescriptor(\.enteredOn, order: .forward)])
+        descriptor.fetchLimit = 1
+        return (try? self.modelContext.fetch(descriptor))?.first?.enteredOn
     }
 
-    private func fetchEarliestOverrideDate() -> Date? {
-        let descriptor = FetchDescriptor<DayOverride>()
-        let overrides = (try? self.modelContext.fetch(descriptor)) ?? []
-        return overrides.map { $0.date }.min()
+    func fetchEarliestOverrideDate() -> Date? {
+        var descriptor = FetchDescriptor<DayOverride>(sortBy: [SortDescriptor(\.date, order: .forward)])
+        descriptor.fetchLimit = 1
+        return (try? self.modelContext.fetch(descriptor))?.first?.date
     }
 
     private func fetchEarliestLocationDate() -> Date? {
