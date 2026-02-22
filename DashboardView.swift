@@ -131,7 +131,7 @@ private struct SchengenSummarySection: View {
                 } label: {
                     Text("Unknown days in window: \(summary.unknownDays)")
                         .font(.caption)
-                        .foregroundStyle(.accentColor)
+                        .foregroundColor(.accentColor)
                 }
                 .buttonStyle(.plain)
             }
