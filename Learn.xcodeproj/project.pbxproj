@@ -383,8 +383,7 @@
 				DEVELOPMENT_TEAM = JZ834V3GDM;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = BorderLogWidget;
-				INFOPLIST_KEY_NSExtension_NSExtensionPointIdentifier = "com.apple.widgetkit-extension";
-				INFOPLIST_KEY_NSExtension_NSExtensionPrincipalClass = "$(PRODUCT_MODULE_NAME).BorderLogWidgetBundle";
+				INFOPLIST_KEY_NSExtension = { NSExtensionPointIdentifier = com.apple.widgetkit-extension; NSExtensionPrincipalClass = "$(PRODUCT_MODULE_NAME).BorderLogWidgetBundle"; };
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = borderless1001.BorderLogWidget;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -411,8 +410,7 @@
 				DEVELOPMENT_TEAM = JZ834V3GDM;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = BorderLogWidget;
-				INFOPLIST_KEY_NSExtension_NSExtensionPointIdentifier = "com.apple.widgetkit-extension";
-				INFOPLIST_KEY_NSExtension_NSExtensionPrincipalClass = "$(PRODUCT_MODULE_NAME).BorderLogWidgetBundle";
+				INFOPLIST_KEY_NSExtension = { NSExtensionPointIdentifier = com.apple.widgetkit-extension; NSExtensionPrincipalClass = "$(PRODUCT_MODULE_NAME).BorderLogWidgetBundle"; };
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = borderless1001.BorderLogWidget;
 				PRODUCT_NAME = "$(TARGET_NAME)";
