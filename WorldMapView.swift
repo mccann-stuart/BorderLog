@@ -20,24 +20,30 @@ struct WorldMapView: View {
     
     var body: some View {
         ZStack {
-            // Base map
-            Map(position: $cameraPosition, interactionModes: .all) {
-                // Add annotations for visited countries
-                ForEach(Array(visitedCountries), id: \.self) { code in
-                    if let coordinate = countryCoordinate(for: code) {
-                        Annotation(code, coordinate: coordinate) {
-                            Circle()
-                                .fill(.blue)
-                                .frame(width: 10, height: 10)
-                                .overlay(
+            GeometryReader { proxy in
+                if proxy.size.width > 0 && proxy.size.height > 0 {
+                    // Base map
+                    Map(position: $cameraPosition, interactionModes: .all) {
+                        // Add annotations for visited countries
+                        ForEach(Array(visitedCountries), id: \.self) { code in
+                            if let coordinate = countryCoordinate(for: code) {
+                                Annotation(code, coordinate: coordinate) {
                                     Circle()
-                                        .stroke(.white, lineWidth: 2)
-                                )
+                                        .fill(.blue)
+                                        .frame(width: 10, height: 10)
+                                        .overlay(
+                                            Circle()
+                                                .stroke(.white, lineWidth: 2)
+                                        )
+                                }
+                            }
                         }
                     }
+                    .mapStyle(.standard(elevation: .flat))
+                } else {
+                    Color.clear
                 }
             }
-            .mapStyle(.standard(elevation: .flat))
             
             // Overlay with visited countries count
             VStack {

@@ -149,10 +149,18 @@ actor PhotoSignalIngestor {
                             processed += 1
                         }
                     }
+
+                    if modelContext.hasChanges {
+                        try? modelContext.save()
+                    }
                 }
 
                 index = end
             }
+        }
+
+        if modelContext.hasChanges {
+            try? modelContext.save()
         }
 
         if !touchedDayKeys.isEmpty {
