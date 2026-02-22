@@ -79,7 +79,7 @@ struct ContentView: View {
                             description: Text("Enable location or photo access to infer daily presence.")
                         )
                     } else {
-                        ForEach(presenceDays.prefix(30)) { day in
+                        ForEach(presenceDays.prefix(5)) { day in
                             NavigationLink {
                                 PresenceDayDetailView(day: day)
                             } label: {
