@@ -110,7 +110,7 @@ actor PhotoSignalIngestor {
         }
 
         if !touchedDayKeys.isEmpty {
-            let recomputeService = LedgerRecomputeService(modelContainer: self.modelContainer)
+            let recomputeService = LedgerRecomputeService(modelContainer: modelContainer)
             await recomputeService.recompute(dayKeys: Array(touchedDayKeys))
         }
 

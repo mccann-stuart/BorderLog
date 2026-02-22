@@ -10,12 +10,6 @@ import SwiftData
 
 @ModelActor
 public actor LedgerRecomputeService {
-    public init(modelContainer: ModelContainer) {
-        self.modelContainer = modelContainer
-        let context = ModelContext(modelContainer)
-        self.modelExecutor = DefaultSerialModelExecutor(modelContext: context)
-    }
-
     public func recompute(dayKeys: [String]) async {
         let calendar = Calendar.current
         let timeZone = calendar.timeZone
