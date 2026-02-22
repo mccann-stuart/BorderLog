@@ -167,6 +167,8 @@ public actor LedgerRecomputeService {
         return [s, o, l, p].compactMap { $0 }.min()
     }
 
+    // Optimization: Use a predicate to filter stays at the database level.
+    // This avoids fetching all records into memory.
     private func fetchStays(from start: Date, to end: Date) -> [Stay] {
         let distantFuture = Date.distantFuture
         let descriptor = FetchDescriptor<Stay>(
