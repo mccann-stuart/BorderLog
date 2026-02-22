@@ -15,6 +15,15 @@ struct DashboardView: View {
         SchengenLedgerCalculator.summary(for: presenceDays, asOf: Date())
     }
     
+    private var unknownSchengenDays: [PresenceDay] {
+        let start = schengenSummary.windowStart
+        let end = schengenSummary.windowEnd
+        return presenceDays.filter { day in
+            day.date >= start && day.date <= end &&
+            (day.countryCode == nil && day.countryName == nil)
+        }
+    }
+    
     // Group stays by country and calculate total days
     private var countryDaysSummary: [CountryDaysInfo] {
         var countryDict: [String: CountryDaysInfo] = [:]
@@ -90,9 +99,14 @@ struct DashboardView: View {
                     }
 
                     if schengenSummary.unknownDays > 0 {
-                        Text("Unknown days in window: \(schengenSummary.unknownDays)")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+                        NavigationLink {
+                            FilteredLedgerView(days: unknownSchengenDays, title: "Unknown Days")
+                        } label: {
+                            Text("Unknown days in window: \(schengenSummary.unknownDays)")
+                                .font(.caption)
+                                .foregroundStyle(.accentColor)
+                        }
+                        .buttonStyle(.plain)
                     }
                 }
                 .padding()

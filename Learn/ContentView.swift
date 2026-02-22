@@ -302,7 +302,7 @@ private struct DayOverrideRow: View {
     }
 }
 
-private struct PresenceDayRow: View {
+struct PresenceDayRow: View {
     let day: PresenceDay
 
     private var dayText: String {
