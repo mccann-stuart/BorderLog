@@ -19,11 +19,20 @@ enum DayKey {
     }
 
     private static func formatter(for timeZone: TimeZone) -> DateFormatter {
+        let key = "DayKeyFormatter_" + timeZone.identifier
+        let dictionary = Thread.current.threadDictionary
+
+        if let formatter = dictionary[key] as? DateFormatter {
+            return formatter
+        }
+
         let formatter = DateFormatter()
         formatter.calendar = Calendar(identifier: .gregorian)
         formatter.locale = Locale(identifier: "en_US_POSIX")
         formatter.timeZone = timeZone
         formatter.dateFormat = format
+
+        dictionary[key] = formatter
         return formatter
     }
 }
