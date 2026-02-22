@@ -49,3 +49,30 @@ Replace in-memory operations with `FetchDescriptor` configurations:
 ## Verification
 - Theoretical analysis confirms O(1) memory and time for finding earliest dates (vs O(N)).
 - Theoretical analysis confirms O(K) memory for range queries where K is the number of items in range (vs O(N) total items).
+
+## Optimization: Targeted Fetching in upsertPresenceDays
+
+## Current State
+`LedgerRecomputeService.upsertPresenceDays` previously fetched all `PresenceDay` records from the database and filtered them in memory to find existing records for updates:
+```swift
+let descriptor = FetchDescriptor<PresenceDay>()
+let existing = (try? self.modelContext.fetch(descriptor))?.filter { keys.contains($0.dayKey) } ?? []
+```
+
+## Problem
+1. **Inefficient Data Loading**: Fetching the entire `PresenceDay` table is O(N) in terms of I/O and memory, where N is the total number of tracked days. This is wasteful when updating only a small subset of days.
+2. **Scalability Risk**: As the app usage grows, the number of `PresenceDay` records increases, making this operation progressively slower and more memory-intensive.
+
+## Optimization
+Replace the full fetch with a `FetchDescriptor` using a `#Predicate` to filter by `dayKey`:
+```swift
+let descriptor = FetchDescriptor<PresenceDay>(
+    predicate: #Predicate { day in
+        keys.contains(day.dayKey)
+    }
+)
+```
+
+## Verification
+- **Reduced I/O and Memory**: The database query now retrieves only the records matching the keys in the `results` array. Complexity drops from O(N) to O(K), where K is the number of days being updated.
+- **Improved Performance**: Leveraging the database's indexing (on `dayKey`) avoids a full table scan and in-memory filtering.
