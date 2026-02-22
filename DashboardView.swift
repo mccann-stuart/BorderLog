@@ -212,6 +212,21 @@ private struct CountryDaysRow: View {
         return .secondary
     }
     
+    private func makeCountText(totalDays: Int, maxDays: Int) -> AttributedString {
+        var countText = AttributedString("\(totalDays) of \(maxDays)")
+        countText.font = .system(.title2, design: .rounded).bold()
+
+        if let totalRange = countText.range(of: "\(totalDays)") {
+            countText[totalRange].foregroundColor = badgeColor
+        }
+
+        if let remainingRange = countText.range(of: " of \(maxDays)") {
+            countText[remainingRange].foregroundColor = .secondary
+        }
+
+        return countText
+    }
+    
     var body: some View {
         HStack(spacing: 12) {
             Text(info.flagEmoji)
@@ -230,12 +245,8 @@ private struct CountryDaysRow: View {
             
             VStack(alignment: .trailing, spacing: 2) {
                 if let maxDays = info.maxAllowedDays {
-                    Text("\(info.totalDays)")
-                        .font(.system(.title2, design: .rounded).bold())
-                        .foregroundStyle(badgeColor)
-                        + Text(" of \(maxDays)")
-                            .font(.system(.title2, design: .rounded).bold())
-                            .foregroundStyle(.secondary)
+                    let countText = makeCountText(totalDays: info.totalDays, maxDays: maxDays)
+                    Text(countText)
                     
                     Text("allowed days".uppercased())
                         .font(.system(.caption, design: .rounded))
