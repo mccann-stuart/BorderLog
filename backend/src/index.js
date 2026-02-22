@@ -1,19 +1,30 @@
+const SECURITY_HEADERS = {
+  "X-Content-Type-Options": "nosniff",
+  "Strict-Transport-Security": "max-age=31536000; includeSubDomains",
+  "Content-Security-Policy": "default-src 'none'; frame-ancestors 'none'; sandbox",
+  "X-Frame-Options": "DENY",
+  "Referrer-Policy": "strict-origin-when-cross-origin"
+};
+
+const DEFAULT_SECURITY_HEADERS = new Headers(SECURITY_HEADERS);
+
+// Helper to get security headers
+const getSecurityHeaders = (baseHeaders) => {
+  if (!baseHeaders) {
+    return new Headers(DEFAULT_SECURITY_HEADERS);
+  }
+  const headers = new Headers(baseHeaders);
+  for (const [key, value] of DEFAULT_SECURITY_HEADERS.entries()) {
+    headers.set(key, value);
+  }
+  return headers;
+};
+
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
     const path = url.pathname;
     const method = request.method;
-
-    // Helper to get security headers
-    const getSecurityHeaders = (baseHeaders = {}) => {
-        const headers = new Headers(baseHeaders);
-        headers.set("X-Content-Type-Options", "nosniff");
-        headers.set("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
-        headers.set("Content-Security-Policy", "default-src 'none'; frame-ancestors 'none'; sandbox");
-        headers.set("X-Frame-Options", "DENY");
-        headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
-        return headers;
-    };
 
     if (method !== "GET" && method !== "HEAD") {
       return new Response("Method Not Allowed", {
