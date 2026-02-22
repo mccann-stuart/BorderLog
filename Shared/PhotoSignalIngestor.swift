@@ -59,6 +59,7 @@ actor PhotoSignalIngestor {
 
         var processed = 0
         var touchedDayKeys: Set<String> = []
+        let saveEvery = 25
 
         if assetCount > 0 {
             for index in 0..<assetCount {
@@ -106,7 +107,15 @@ actor PhotoSignalIngestor {
                     state.lastFullScanAt = Date()
                 }
                 processed += 1
+
+                if processed % saveEvery == 0, modelContext.hasChanges {
+                    try? modelContext.save()
+                }
             }
+        }
+
+        if modelContext.hasChanges {
+            try? modelContext.save()
         }
 
         if !touchedDayKeys.isEmpty {
