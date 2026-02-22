@@ -142,7 +142,7 @@ struct MainNavigationView: View {
             let container = modelContext.container
             let recomputeService = LedgerRecomputeService(modelContainer: container)
             await recomputeService.recomputeAll()
-            let ingestor = PhotoSignalIngestor(modelContainer: container)
+            let ingestor = PhotoSignalIngestor(modelContainer: container, resolver: CLGeocoderCountryResolver())
             _ = await ingestor.ingest(mode: .auto)
         }
     }

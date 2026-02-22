@@ -18,9 +18,9 @@ actor PhotoSignalIngestor {
         case manualFullScan
     }
 
-    private let resolver: CountryResolving
+    private var resolver: CountryResolving?
 
-    init(modelContainer: ModelContainer, resolver: CountryResolving = CLGeocoderCountryResolver()) {
+    init(modelContainer: ModelContainer, resolver: CountryResolving) {
         self.modelContainer = modelContainer
         let context = ModelContext(modelContainer)
         self.modelExecutor = DefaultSerialModelExecutor(modelContext: context)
@@ -73,9 +73,17 @@ actor PhotoSignalIngestor {
                     continue
                 }
 
-                let resolution = await resolver.resolveCountry(for: location)
+                let activeResolver: CountryResolving
+                if let storedResolver = self.resolver {
+                    activeResolver = storedResolver
+                } else {
+                    let createdResolver = await MainActor.run { CLGeocoderCountryResolver() }
+                    activeResolver = createdResolver
+                    self.resolver = createdResolver
+                }
+                let resolution = await activeResolver.resolveCountry(for: location)
                 let timeZone = resolution?.timeZone ?? TimeZone.current
-                let dayKey = DayKey.make(from: creationDate, timeZone: timeZone)
+                let dayKey = await DayKey.make(from: creationDate, timeZone: timeZone)
 
                 let signal = PhotoSignal(
                     timestamp: creationDate,
@@ -102,7 +110,7 @@ actor PhotoSignalIngestor {
         }
 
         if !touchedDayKeys.isEmpty {
-            let recomputeService = LedgerRecomputeService(modelContainer: self.modelContainer)
+            let recomputeService = await LedgerRecomputeService(modelContainer: self.modelContainer)
             await recomputeService.recompute(dayKeys: Array(touchedDayKeys))
         }
 
@@ -131,3 +139,4 @@ actor PhotoSignalIngestor {
         return digest.map { String(format: "%02x", $0) }.joined()
     }
 }
+

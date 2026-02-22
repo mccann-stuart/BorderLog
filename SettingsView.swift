@@ -170,7 +170,7 @@ struct SettingsView: View {
         isIngestingPhotos = true
         let container = modelContext.container
         Task {
-            let ingestor = PhotoSignalIngestor(modelContainer: container)
+            let ingestor = PhotoSignalIngestor(modelContainer: container, resolver: CLGeocoderCountryResolver())
             _ = await ingestor.ingest(mode: .manualFullScan)
             await MainActor.run {
                 isIngestingPhotos = false

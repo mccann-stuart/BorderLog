@@ -8,8 +8,14 @@
 import Foundation
 import SwiftData
 
-@ModelActor
-public actor LedgerRecomputeService {
+@MainActor
+public final class LedgerRecomputeService {
+    private let modelContext: ModelContext
+
+    public init(modelContainer: ModelContainer) {
+        self.modelContext = ModelContext(modelContainer)
+    }
+
     public func recompute(dayKeys: [String]) async {
         let calendar = Calendar.current
         let timeZone = calendar.timeZone
@@ -166,21 +172,15 @@ public actor LedgerRecomputeService {
 
     private func fetchStays(from start: Date, to end: Date) -> [Stay] {
         let distantFuture = Date.distantFuture
-        let descriptor = FetchDescriptor<Stay>(
-            predicate: #Predicate { stay in
-                stay.enteredOn <= end && (stay.exitedOn ?? distantFuture) >= start
-            }
-        )
-        return (try? self.modelContext.fetch(descriptor)) ?? []
+        let descriptor = FetchDescriptor<Stay>()
+        let stays = (try? self.modelContext.fetch(descriptor)) ?? []
+        return stays.filter { $0.enteredOn <= end && ($0.exitedOn ?? distantFuture) >= start }
     }
 
     private func fetchOverrides(from start: Date, to end: Date) -> [DayOverride] {
-        let descriptor = FetchDescriptor<DayOverride>(
-            predicate: #Predicate { override in
-                override.date >= start && override.date <= end
-            }
-        )
-        return (try? self.modelContext.fetch(descriptor)) ?? []
+        let descriptor = FetchDescriptor<DayOverride>()
+        let overrides = (try? self.modelContext.fetch(descriptor)) ?? []
+        return overrides.filter { $0.date >= start && $0.date <= end }
     }
 
     private func fetchLocations(from start: Date, to end: Date) -> [LocationSample] {
@@ -202,15 +202,15 @@ public actor LedgerRecomputeService {
     }
 
     private func fetchEarliestStayDate() -> Date? {
-        var descriptor = FetchDescriptor<Stay>(sortBy: [SortDescriptor(\.enteredOn, order: .forward)])
-        descriptor.fetchLimit = 1
-        return (try? self.modelContext.fetch(descriptor))?.first?.enteredOn
+        let descriptor = FetchDescriptor<Stay>()
+        let stays = (try? self.modelContext.fetch(descriptor)) ?? []
+        return stays.map { $0.enteredOn }.min()
     }
 
     private func fetchEarliestOverrideDate() -> Date? {
-        var descriptor = FetchDescriptor<DayOverride>(sortBy: [SortDescriptor(\.date, order: .forward)])
-        descriptor.fetchLimit = 1
-        return (try? self.modelContext.fetch(descriptor))?.first?.date
+        let descriptor = FetchDescriptor<DayOverride>()
+        let overrides = (try? self.modelContext.fetch(descriptor)) ?? []
+        return overrides.map { $0.date }.min()
     }
 
     private func fetchEarliestLocationDate() -> Date? {
