@@ -8,16 +8,12 @@
 import SwiftUI
 import SwiftData
 import Foundation
-import os
 
 struct ContentView: View {
-    private static let logger = Logger(subsystem: "com.MCCANN.Learn", category: "ContentView")
-
     @Environment(\.modelContext) private var modelContext
     @Query(sort: [SortDescriptor(\Stay.enteredOn, order: .reverse)]) private var stays: [Stay]
     @Query(sort: [SortDescriptor(\DayOverride.date, order: .reverse)]) private var overrides: [DayOverride]
     @Query(sort: [SortDescriptor(\PresenceDay.date, order: .reverse)]) private var presenceDays: [PresenceDay]
-    @EnvironmentObject private var authManager: AuthenticationManager
 
     private var dataManager: DataManager {
         DataManager(modelContext: modelContext)
@@ -25,8 +21,6 @@ struct ContentView: View {
 
     @State private var isPresentingAddStay = false
     @State private var isPresentingAddOverride = false
-    @State private var isConfirmingReset = false
-    @State private var isShowingSeedAlert = false
     @State private var schengenState = SchengenState()
 
     var body: some View {
@@ -137,43 +131,6 @@ struct ContentView: View {
                     }
                 }
 
-                ToolbarItem(placement: .automatic) {
-                    Menu {
-                        NavigationLink("About / Setup") {
-                            AboutSetupView()
-                        }
-
-                        Button("Seed Sample Data") {
-                            seedSampleData()
-                        }
-
-                        Button("Reset All Data", role: .destructive) {
-                            isConfirmingReset = true
-                        }
-
-                        if AuthenticationManager.isAppleSignInEnabled {
-                            Divider()
-
-                            Button("Sign Out") {
-                                authManager.signOut()
-                            }
-                        }
-                    } label: {
-                        Image(systemName: "ellipsis.circle")
-                    }
-                }
-            }
-            .confirmationDialog("Delete all local data?", isPresented: $isConfirmingReset) {
-                Button("Delete All", role: .destructive) {
-                    resetAllData()
-                }
-            } message: {
-                Text("This will remove all stays and day overrides from this device.")
-            }
-            .alert("Sample data unavailable", isPresented: $isShowingSeedAlert) {
-                Button("OK", role: .cancel) {}
-            } message: {
-                Text("Reset all data before seeding the sample dataset.")
             }
             .sheet(isPresented: $isPresentingAddStay) {
                 NavigationStack {
@@ -208,24 +165,6 @@ struct ContentView: View {
 
     private func deleteOverrides(offsets: IndexSet) {
         dataManager.delete(offsets: offsets, from: overrides)
-    }
-
-    private func resetAllData() {
-        do {
-            try dataManager.resetAllData()
-        } catch {
-            Self.logger.error("Failed to reset data: \(error, privacy: .public)")
-        }
-    }
-
-    private func seedSampleData() {
-        do {
-            if try !dataManager.seedSampleData() {
-                isShowingSeedAlert = true
-            }
-        } catch {
-            Self.logger.error("Failed to seed data: \(error, privacy: .public)")
-        }
     }
 }
 
