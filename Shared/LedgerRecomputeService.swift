@@ -178,9 +178,12 @@ public final class LedgerRecomputeService {
     }
 
     private func fetchOverrides(from start: Date, to end: Date) -> [DayOverride] {
-        let descriptor = FetchDescriptor<DayOverride>()
-        let overrides = (try? self.modelContext.fetch(descriptor)) ?? []
-        return overrides.filter { $0.date >= start && $0.date <= end }
+        let descriptor = FetchDescriptor<DayOverride>(
+            predicate: #Predicate { override in
+                override.date >= start && override.date <= end
+            }
+        )
+        return (try? self.modelContext.fetch(descriptor)) ?? []
     }
 
     private func fetchLocations(from start: Date, to end: Date) -> [LocationSample] {
