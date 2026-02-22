@@ -10,6 +10,7 @@ import SwiftData
 
 struct DashboardView: View {
     @Query(sort: [SortDescriptor(\PresenceDay.date, order: .reverse)]) private var presenceDays: [PresenceDay]
+    @Query private var countryConfigs: [CountryConfig]
     
     private var schengenSummary: SchengenLedgerSummary {
         SchengenLedgerCalculator.summary(for: presenceDays, asOf: Date())
@@ -29,14 +30,17 @@ struct DashboardView: View {
                     countryName: info.countryName,
                     countryCode: info.countryCode,
                     totalDays: info.totalDays + 1,
-                    region: info.region
+                    region: info.region,
+                    maxAllowedDays: info.maxAllowedDays
                 )
             } else {
+                let maxDays = countryConfigs.first(where: { $0.countryCode == (normalizedCode ?? "") })?.maxAllowedDays
                 countryDict[key] = CountryDaysInfo(
                     countryName: countryName,
                     countryCode: normalizedCode,
                     totalDays: 1,
-                    region: normalizedCode.flatMap { SchengenMembers.isMember($0) ? .schengen : .nonSchengen } ?? .other
+                    region: normalizedCode.flatMap { SchengenMembers.isMember($0) ? .schengen : .nonSchengen } ?? .other,
+                    maxAllowedDays: maxDays
                 )
             }
         }
@@ -121,9 +125,12 @@ struct DashboardView: View {
                     } else {
                         LazyVStack(spacing: 0) {
                             ForEach(countryDaysSummary) { info in
-                                CountryDaysRow(info: info, warningThreshold: 80)
-                                    .padding(.horizontal)
-                                    .padding(.vertical, 8)
+                                NavigationLink(destination: CountryDetailView(countryName: info.countryName, countryCode: info.countryCode)) {
+                                    CountryDaysRow(info: info, warningThreshold: 80)
+                                        .padding(.horizontal)
+                                        .padding(.vertical, 8)
+                                }
+                                .buttonStyle(.plain)
                                 
                                 if info.id != countryDaysSummary.last?.id {
                                     Divider()
@@ -161,6 +168,7 @@ struct CountryDaysInfo: Identifiable {
     let countryCode: String?
     var totalDays: Int
     let region: Region
+    var maxAllowedDays: Int?
     
     var flagEmoji: String {
         guard let code = countryCode?.uppercased() else { return "🌍" }
@@ -221,13 +229,26 @@ private struct CountryDaysRow: View {
             Spacer()
             
             VStack(alignment: .trailing, spacing: 2) {
-                Text("\(info.totalDays)")
-                    .font(.system(.title2, design: .rounded).bold())
-                    .foregroundStyle(badgeColor)
-                
-                Text("days")
-                    .font(.system(.caption, design: .rounded))
-                    .foregroundStyle(.secondary)
+                if let maxDays = info.maxAllowedDays {
+                    Text("\(info.totalDays)")
+                        .font(.system(.title2, design: .rounded).bold())
+                        .foregroundStyle(badgeColor)
+                        + Text(" of \(maxDays)")
+                            .font(.system(.title2, design: .rounded).bold())
+                            .foregroundStyle(.secondary)
+                    
+                    Text("allowed days".uppercased())
+                        .font(.system(.caption, design: .rounded))
+                        .foregroundStyle(.secondary)
+                } else {
+                    Text("\(info.totalDays)")
+                        .font(.system(.title2, design: .rounded).bold())
+                        .foregroundStyle(badgeColor)
+                    
+                    Text("days".uppercased())
+                        .font(.system(.caption, design: .rounded))
+                        .foregroundStyle(.secondary)
+                }
             }
         }
         .padding(.vertical, 4)
@@ -265,6 +286,8 @@ private struct StatCard: View {
 }
 
 #Preview {
-    DashboardView()
-        .modelContainer(for: [Stay.self, DayOverride.self, LocationSample.self, PhotoSignal.self, PresenceDay.self, PhotoIngestState.self], inMemory: true)
+    NavigationStack {
+        DashboardView()
+            .modelContainer(for: [Stay.self, DayOverride.self, LocationSample.self, PhotoSignal.self, PresenceDay.self, PhotoIngestState.self, CountryConfig.self], inMemory: true)
+    }
 }

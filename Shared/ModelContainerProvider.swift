@@ -36,10 +36,24 @@ enum BorderLogSchemaV2: VersionedSchema {
     ]
 }
 
+enum BorderLogSchemaV3: VersionedSchema {
+    static var versionIdentifier: Schema.Version = .init(3, 0, 0)
+    static var models: [any PersistentModel.Type] = [
+        Stay.self,
+        DayOverride.self,
+        LocationSample.self,
+        PhotoSignal.self,
+        PresenceDay.self,
+        PhotoIngestState.self,
+        CountryConfig.self
+    ]
+}
+
 enum BorderLogMigrationPlan: SchemaMigrationPlan {
-    static var schemas: [any VersionedSchema.Type] = [BorderLogSchemaV1.self, BorderLogSchemaV2.self]
+    static var schemas: [any VersionedSchema.Type] = [BorderLogSchemaV1.self, BorderLogSchemaV2.self, BorderLogSchemaV3.self]
     static var stages: [MigrationStage] = [
-        .lightweight(fromVersion: BorderLogSchemaV1.self, toVersion: BorderLogSchemaV2.self)
+        .lightweight(fromVersion: BorderLogSchemaV1.self, toVersion: BorderLogSchemaV2.self),
+        .lightweight(fromVersion: BorderLogSchemaV2.self, toVersion: BorderLogSchemaV3.self)
     ]
 }
 
@@ -47,7 +61,7 @@ enum ModelContainerProvider {
     private static let logger = Logger(subsystem: "com.MCCANN.Learn", category: "Persistence")
 
     static func makeContainer() -> ModelContainer {
-        let schema = Schema(versionedSchema: BorderLogSchemaV2.self)
+        let schema = Schema(versionedSchema: BorderLogSchemaV3.self)
         let fallbackConfig = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
         let memoryConfig = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
 
