@@ -213,6 +213,35 @@ nonisolated struct PresenceInferenceEngine {
             results.append(result)
         }
 
-        return results.sorted { $0.date < $1.date }
+        var sortedResults = results.sorted { $0.date < $1.date }
+        
+        if sortedResults.count >= 3 {
+            for i in 1..<(sortedResults.count - 1) {
+                let current = sortedResults[i]
+                if current.countryCode == nil {
+                    let prev = sortedResults[i - 1]
+                    let next = sortedResults[i + 1]
+                    
+                    if let prevCode = prev.countryCode, let nextCode = next.countryCode, prevCode == nextCode {
+                        sortedResults[i] = PresenceDayResult(
+                            dayKey: current.dayKey,
+                            date: current.date,
+                            timeZoneId: current.timeZoneId ?? prev.timeZoneId,
+                            countryCode: prevCode,
+                            countryName: prev.countryName,
+                            confidence: 0.5,
+                            confidenceLabel: .medium,
+                            sources: .none,
+                            isOverride: false,
+                            stayCount: 0,
+                            photoCount: 0,
+                            locationCount: 0
+                        )
+                    }
+                }
+            }
+        }
+
+        return sortedResults
     }
 }
