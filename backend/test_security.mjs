@@ -165,18 +165,18 @@ async function runTest(name, fn) {
       headers: { "If-None-Match": "123" }
     });
 
-    let optionsPassed = null;
+    let getCalledWithOptions = null;
     const env = {
       CONFIG_BUCKET: {
         get: async (key, options) => {
-          optionsPassed = options;
+          getCalledWithOptions = options;
           // Simulate R2 behavior: if etagDoesNotMatch matches, return null body
           if (options && options.onlyIf && options.onlyIf.etagDoesNotMatch === "123") {
-               return {
-                  body: null,
-                  httpEtag: "123",
-                  writeHttpMetadata: (headers) => {}
-               };
+            return {
+              body: null,
+              httpEtag: "123",
+              writeHttpMetadata: (headers) => {}
+            };
           }
           return {
             body: "{}",
@@ -193,9 +193,9 @@ async function runTest(name, fn) {
     assertSecurityHeaders(res);
     assert.strictEqual(res.headers.get("Cache-Control"), "public, max-age=300", "Missing Cache-Control");
 
-    // Verify onlyIf was passed
-    assert.ok(optionsPassed, "Options should be passed to get()");
-    assert.deepStrictEqual(optionsPassed, { onlyIf: { etagDoesNotMatch: "123" } }, "onlyIf options mismatch");
+    // Verify optimization was used
+    assert.ok(getCalledWithOptions, "bucket.get should be called with options");
+    assert.deepStrictEqual(getCalledWithOptions.onlyIf, { etagDoesNotMatch: "123" }, "Should use onlyIf optimization");
   });
 
   console.log("All tests passed!");

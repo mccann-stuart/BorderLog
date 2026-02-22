@@ -66,8 +66,13 @@ export default {
 
         // Handle conditional requests (If-None-Match)
         // If onlyIf condition matched (ETag matches), body is null
-        if (ifNoneMatch && (object.body === null || ifNoneMatch === object.httpEtag)) {
+        if (ifNoneMatch && object.body === null) {
             return new Response(null, { status: 304, headers: securityHeaders });
+        }
+
+        // Check for manual match in case `onlyIf` wasn't used but logic requires it (unlikely here but safe)
+        if (ifNoneMatch && ifNoneMatch === object.httpEtag) {
+             return new Response(null, { status: 304, headers: securityHeaders });
         }
 
         return new Response(object.body, {
