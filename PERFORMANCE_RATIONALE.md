@@ -102,3 +102,19 @@ Replace the input array mapping with a targeted `FetchDescriptor` directly insid
 ## Verification
 - **Benchmark**: Python simulation confirmed a ~4x speedup in raw query time for filtering 10 years of data down to a 2-year window.
 - **Real-world Impact**: The elimination of O(N) object faulting on the main thread provides a much larger perceptual performance improvement (avoiding frame drops).
+
+## Optimization: Thread-Local DateFormatter Caching in DayKey
+
+## Current State
+`DayKey` conversion (date -> string) happens frequently during inference and UI rendering. Creating `DateFormatter` is expensive.
+
+## Problem
+Creating a new `DateFormatter` for every date conversion is costly (CPU + Memory). In a loop of 1000s of location samples, this becomes a bottleneck.
+
+## Optimization
+Cache `DateFormatter` instances in `Thread.current.threadDictionary`, keyed by TimeZone identifier.
+1. **Thread Safety**: `DateFormatter` is not thread-safe. Using thread-local storage ensures each thread has its own instance, avoiding race conditions without locks.
+2. **Reuse**: Subsequent calls on the same thread reuse the existing formatter.
+
+## Verification
+- **Benchmark**: `DayKeyPerformanceTests` confirm significant speedup compared to creating new formatters.

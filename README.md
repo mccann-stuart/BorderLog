@@ -512,43 +512,57 @@ If you want, I can also provide:
 # BorderLog
 Enable expatriates, digital nomads, and frequent international travelers to accurately track physical presence across countries and visa zones (e.g., Schengen Area) to ensure compliance with visa, residency, and tax regulations.
 
-## M1 foundations
+## M1 foundations (Completed)
 - Log stays with country, region, entry date, optional exit date, and notes
 - Rolling Schengen 90/180 summary with used, remaining, and overstay days
 - Local persistence using SwiftData
 
 ## M1 plan
-1. Define the SwiftData schema for stays, day overrides, and Schengen rollups.
-2. Wire the App Group SwiftData store and basic data migrations.
-3. Implement required Sign in with Apple flow and first-run gate.
-4. Build manual stay CRUD UI with validation for overlaps and missing exits.
-5. Build day-level override UI with a simple per-day editor.
-6. Implement the Schengen 90/180 rolling-window engine and unit tests.
-7. Add a summary dashboard for used/remaining/overstay days.
-8. Add seed/sample data and a reset path for QA.
-9. Run a smoke test pass on a clean device and document known gaps.
+- [x] Define the SwiftData schema for stays, day overrides, and Schengen rollups.
+- [x] Wire the App Group SwiftData store and basic data migrations.
+- [x] Implement required Sign in with Apple flow and first-run gate.
+- [x] Build manual stay CRUD UI with validation for overlaps and missing exits.
+- [x] Build day-level override UI with a simple per-day editor.
+- [x] Implement the Schengen 90/180 rolling-window engine and unit tests.
+- [x] Add a summary dashboard for used/remaining/overstay days.
+- [x] Add seed/sample data and a reset path for QA.
+- [x] Run a smoke test pass on a clean device and document known gaps.
 
-## M2 milestone — Inference v1
+## M2 milestone — Inference v1 (Completed)
 - Widget location capture + ingestion
 - Photo signal ingestion
 - Daily ledger generation + confidence + explainability UI
 
 ## M2 plan
-1. Add SwiftData schema v2 with `LocationSample`, `PhotoSignal`, `PresenceDay`, and `PhotoIngestState`, plus a lightweight migration.
-2. Define new model files with unique constraints on `PresenceDay.dayKey` and `PhotoSignal.assetIdHash`.
-3. Add shared utilities: `DayKey`, `CountryResolving` protocol, and `CLGeocoderCountryResolver` with caching.
-4. Implement `LocationSampleService` to capture a single fix, resolve country/timezone, store a sample, and trigger ledger recompute.
-5. Implement `PhotoSignalIngestor` to scan the last 12 months (incremental on subsequent runs), hash asset IDs, store signals, and trigger recompute.
-6. Create a WidgetKit extension that captures location on refresh and displays the last sample.
-7. Build `PresenceInferenceEngine` scoring logic with weights (override > stay > photo > location).
-8. Add `LedgerRecomputeService` to upsert `PresenceDay` by dayKey and handle unknowns.
-9. Add a Daily Ledger section in Details with confidence pills, evidence, and an override action.
-10. Switch Dashboard metrics to use `PresenceDay` with unknown-day reporting.
-11. Add permission status/actions for location and photos + manual rescan in Settings.
-12. Update Info.plist keys and App Group entitlements for app + widget.
-13. Extend data reset/seed to include new models and optional sample ledger.
-14. Add unit tests for inference scoring, day-key bucketing, unknown-day behavior, and Schengen ledger summary.
-15. Keep README and in-app setup copy aligned with M2 inference capabilities.
+- [x] Add SwiftData schema v2 with `LocationSample`, `PhotoSignal`, `PresenceDay`, and `PhotoIngestState`, plus a lightweight migration.
+- [x] Define new model files with unique constraints on `PresenceDay.dayKey` and `PhotoSignal.assetIdHash`.
+- [x] Add shared utilities: `DayKey`, `CountryResolving` protocol, and `CLGeocoderCountryResolver` with caching.
+- [x] Implement `LocationSampleService` to capture a single fix, resolve country/timezone, store a sample, and trigger ledger recompute.
+- [x] Implement `PhotoSignalIngestor` to scan the last 12 months (incremental on subsequent runs), hash asset IDs, store signals, and trigger recompute.
+- [x] Create a WidgetKit extension that captures location on refresh and displays the last sample.
+- [x] Build `PresenceInferenceEngine` scoring logic with weights (override > stay > photo > location).
+- [x] Add `LedgerRecomputeService` to upsert `PresenceDay` by dayKey and handle unknowns.
+- [x] Add a Daily Ledger section in Details with confidence pills, evidence, and an override action.
+- [x] Switch Dashboard metrics to use `PresenceDay` with unknown-day reporting.
+- [x] Add permission status/actions for location and photos + manual rescan in Settings.
+- [x] Update Info.plist keys and App Group entitlements for app + widget.
+- [x] Extend data reset/seed to include new models and optional sample ledger.
+- [x] Add unit tests for inference scoring, day-key bucketing, unknown-day behavior, and Schengen ledger summary.
+- [x] Keep README and in-app setup copy aligned with M2 inference capabilities.
+
+## M4 milestone — Minimal backend (Completed)
+- Cloudflare Pages + Worker + R2
+- Versioned config downloads with caching
+
+## M4 plan
+- [x] Implement Cloudflare Worker for config endpoints.
+- [x] Implement R2 fetching with ETag/If-None-Match support.
+- [x] Add security headers and input validation.
+
+## Next Steps: M3 — Forecast + Export
+- Forecast mode
+- CSV/PDF export
+- Local notifications for thresholds
 
 ## Run
 Open `Learn.xcodeproj` in Xcode and run the iOS app target.
