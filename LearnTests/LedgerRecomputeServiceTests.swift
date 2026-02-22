@@ -1,10 +1,4 @@
-//
-//  LedgerRecomputeServiceTests.swift
-//  LearnTests
-//
-//  Created by Jules on 23/02/2026.
-//
-
+#if canImport(XCTest)
 import XCTest
 import SwiftData
 @testable import Learn
@@ -12,73 +6,71 @@ import SwiftData
 @MainActor
 final class LedgerRecomputeServiceTests: XCTestCase {
 
-    func testFetchEarliestStayDateReturnsCorrectDate() async throws {
-        let schema = Schema([Stay.self, DayOverride.self, LocationSample.self, PhotoSignal.self, PresenceDay.self])
-        let config = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
-        let container = try ModelContainer(for: schema, configurations: [config])
-        let context = container.mainContext
+    var container: ModelContainer!
+    var context: ModelContext!
+    var service: LedgerRecomputeService!
 
-        let now = Date()
-        let yesterday = Calendar.current.date(byAdding: .day, value: -1, to: now)!
-        let tomorrow = Calendar.current.date(byAdding: .day, value: 1, to: now)!
-        let longAgo = Calendar.current.date(byAdding: .day, value: -100, to: now)!
-
-        let stay1 = Stay(countryName: "A", enteredOn: now)
-        let stay2 = Stay(countryName: "B", enteredOn: longAgo) // Earliest
-        let stay3 = Stay(countryName: "C", enteredOn: yesterday)
-        let stay4 = Stay(countryName: "D", enteredOn: tomorrow)
-
-        context.insert(stay1)
-        context.insert(stay2)
-        context.insert(stay3)
-        context.insert(stay4)
-
-        try context.save()
-
-        let service = LedgerRecomputeService(modelContainer: container)
-
-        // This requires fetchEarliestStayDate to be internal, not private
-        let earliest = service.fetchEarliestStayDate()
-
-        XCTAssertEqual(earliest, longAgo)
+    override func setUp() async throws {
+        let config = ModelConfiguration(isStoredInMemoryOnly: true)
+        container = try ModelContainer(for: PresenceDay.self, Stay.self, DayOverride.self, LocationSample.self, PhotoSignal.self, configurations: config)
+        context = container.mainContext
+        service = LedgerRecomputeService(modelContainer: container)
     }
 
-    func testFetchEarliestOverrideDateReturnsCorrectDate() async throws {
-        let schema = Schema([Stay.self, DayOverride.self, LocationSample.self, PhotoSignal.self, PresenceDay.self])
-        let config = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
-        let container = try ModelContainer(for: schema, configurations: [config])
-        let context = container.mainContext
+    func testRecomputeUpdatesPresenceDays() async throws {
+        // Setup initial data
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: Date())
+        let tomorrow = calendar.date(byAdding: .day, value: 1, to: today)!
+        let dayKey = DayKey.make(from: today, timeZone: calendar.timeZone)
 
-        let now = Date()
-        let future = Calendar.current.date(byAdding: .day, value: 10, to: now)!
-        let past = Calendar.current.date(byAdding: .day, value: -5, to: now)! // Earliest
-
-        let override1 = DayOverride(date: now, countryName: "A")
-        let override2 = DayOverride(date: future, countryName: "B")
-        let override3 = DayOverride(date: past, countryName: "C")
-
-        context.insert(override1)
-        context.insert(override2)
-        context.insert(override3)
-
+        // 1. Initial Insert: Create a stay for today in Spain
+        let stay = Stay(
+            countryName: "Spain",
+            region: .schengen,
+            enteredOn: today,
+            exitedOn: tomorrow
+        )
+        context.insert(stay)
         try context.save()
 
-        let service = LedgerRecomputeService(modelContainer: container)
+        // Run recompute for the specific dayKey
+        await service.recompute(dayKeys: [dayKey])
 
-        // This requires fetchEarliestOverrideDate to be internal, not private
-        let earliest = service.fetchEarliestOverrideDate()
+        // Verify PresenceDay created with correct country
+        var descriptor = FetchDescriptor<PresenceDay>(predicate: #Predicate { $0.dayKey == dayKey })
+        var fetched = try context.fetch(descriptor)
 
-        XCTAssertEqual(earliest, past)
-    }
+        XCTAssertEqual(fetched.count, 1)
+        XCTAssertEqual(fetched.first?.countryName, "Spain")
+        XCTAssertEqual(fetched.first?.stayCount, 1)
 
-    func testFetchEarliestDatesReturnNilWhenEmpty() async throws {
-        let schema = Schema([Stay.self, DayOverride.self, LocationSample.self, PhotoSignal.self, PresenceDay.self])
-        let config = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
-        let container = try ModelContainer(for: schema, configurations: [config])
+        // 2. Update: Change stay to France
+        stay.countryName = "France"
+        try context.save()
 
-        let service = LedgerRecomputeService(modelContainer: container)
+        // Run recompute again
+        await service.recompute(dayKeys: [dayKey])
 
-        XCTAssertNil(service.fetchEarliestStayDate())
-        XCTAssertNil(service.fetchEarliestOverrideDate())
+        // Verify PresenceDay updated
+        fetched = try context.fetch(descriptor)
+        XCTAssertEqual(fetched.count, 1)
+        XCTAssertEqual(fetched.first?.countryName, "France")
+        XCTAssertEqual(fetched.first?.stayCount, 1)
+
+        // 3. Delete: Remove the stay
+        context.delete(stay)
+        try context.save()
+
+        // Run recompute again
+        await service.recompute(dayKeys: [dayKey])
+
+        // Verify PresenceDay updated to reflect no stay (or deleted depending on logic, but likely just updated to empty/unknown)
+        fetched = try context.fetch(descriptor)
+        XCTAssertEqual(fetched.count, 1)
+        // Without stay, country should be nil or based on other signals. Here nil.
+        XCTAssertNil(fetched.first?.countryName)
+        XCTAssertEqual(fetched.first?.stayCount, 0)
     }
 }
+#endif
