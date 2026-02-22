@@ -8,9 +8,11 @@ import SwiftUI
 struct ProfileSetupView: View {
     @Binding var currentStep: Int
     
-    @AppStorage("userPassportNationality") private var passportNationality = ""
-    @AppStorage("userHomeCountry") private var homeCountry = ""
+    @State private var passportNationality = ""
+    @State private var homeCountry = ""
     
+    private let keychainService = "com.MCCANN.Learn"
+
     private struct CountryRegion: Identifiable {
         let id = UUID()
         let name: String
@@ -79,6 +81,25 @@ struct ProfileSetupView: View {
         return countryLabel(for: code)
     }
     
+    private func loadFromKeychain() {
+        if let data = KeychainHelper.standard.read(service: keychainService, account: "userPassportNationality"),
+           let value = String(data: data, encoding: .utf8) {
+            passportNationality = value
+        }
+        if let data = KeychainHelper.standard.read(service: keychainService, account: "userHomeCountry"),
+           let value = String(data: data, encoding: .utf8) {
+            homeCountry = value
+        }
+    }
+
+    private func saveToKeychain(key: String, value: String) {
+        if value.isEmpty {
+            KeychainHelper.standard.delete(service: keychainService, account: key)
+        } else if let data = value.data(using: .utf8) {
+            KeychainHelper.standard.save(data, service: keychainService, account: key)
+        }
+    }
+
     var body: some View {
         VStack(spacing: 32) {
             Spacer()
@@ -207,6 +228,15 @@ struct ProfileSetupView: View {
             }
             .padding(.horizontal, 32)
             .padding(.bottom, 40)
+        }
+        .onAppear {
+            loadFromKeychain()
+        }
+        .onChange(of: passportNationality) { _, newValue in
+            saveToKeychain(key: "userPassportNationality", value: newValue)
+        }
+        .onChange(of: homeCountry) { _, newValue in
+            saveToKeychain(key: "userHomeCountry", value: newValue)
         }
     }
 }
