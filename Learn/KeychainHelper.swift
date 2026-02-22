@@ -1,7 +1,13 @@
 import Foundation
 import Security
 
-final class KeychainHelper {
+protocol KeychainHelperProtocol {
+    func save(_ data: Data, service: String, account: String)
+    func read(service: String, account: String) -> Data?
+    func delete(service: String, account: String)
+}
+
+final class KeychainHelper: KeychainHelperProtocol {
     static let standard = KeychainHelper()
     private init() {}
 
