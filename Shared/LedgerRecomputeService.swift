@@ -10,6 +10,16 @@ import SwiftData
 
 @ModelActor
 public actor LedgerRecomputeService {
+    internal var _dataFetcher: LedgerDataFetching?
+    internal var onRecomputeError: ((Error) -> Void)?
+
+    private var dataFetcher: LedgerDataFetching {
+        if let _dataFetcher { return _dataFetcher }
+        let fetcher = RealLedgerDataFetcher(modelContext: modelContext)
+        _dataFetcher = fetcher
+        return fetcher
+    }
+
     public func recompute(dayKeys: [String]) async {
         let calendar = Calendar.current
         let timeZone = calendar.timeZone
@@ -19,10 +29,21 @@ public actor LedgerRecomputeService {
         let rangeStart = calendar.date(byAdding: .day, value: -1, to: dateRange.start) ?? dateRange.start
         let rangeEnd = calendar.date(byAdding: .day, value: 1, to: dateRange.end) ?? dateRange.end
 
-        let stays = self.fetchStays(from: rangeStart, to: rangeEnd)
-        let overrides = self.fetchOverrides(from: rangeStart, to: rangeEnd)
-        let locations = self.fetchLocations(from: rangeStart, to: rangeEnd)
-        let photos = self.fetchPhotos(from: rangeStart, to: rangeEnd)
+        let stays: [Stay]
+        let overrides: [DayOverride]
+        let locations: [LocationSample]
+        let photos: [PhotoSignal]
+
+        do {
+            stays = try dataFetcher.fetchStays(from: rangeStart, to: rangeEnd)
+            overrides = try dataFetcher.fetchOverrides(from: rangeStart, to: rangeEnd)
+            locations = try dataFetcher.fetchLocations(from: rangeStart, to: rangeEnd)
+            photos = try dataFetcher.fetchPhotos(from: rangeStart, to: rangeEnd)
+        } catch {
+            print("LedgerRecomputeService fetch error: \(error)")
+            onRecomputeError?(error)
+            return
+        }
 
         let stayInfos = stays.map {
             StayPresenceInfo(
@@ -80,24 +101,26 @@ public actor LedgerRecomputeService {
             calendar: calendar
         )
 
-        self.upsertPresenceDays(results)
-        try? modelContext.save()
+        do {
+            try self.upsertPresenceDays(results)
+            try dataFetcher.save()
+        } catch {
+            print("LedgerRecomputeService save error: \(error)")
+            onRecomputeError?(error)
+        }
     }
 
     public func recomputeAll() async {
         let calendar = Calendar.current
         let today = calendar.startOfDay(for: Date())
-        let earliest = self.earliestSignalDate() ?? calendar.date(byAdding: .day, value: -30, to: today) ?? today
+        let earliest = (try? self.earliestSignalDate()) ?? calendar.date(byAdding: .day, value: -30, to: today) ?? today
         let dayKeys = self.makeDayKeys(from: earliest, to: today, calendar: calendar)
         await self.recompute(dayKeys: dayKeys)
     }
 
-    private func upsertPresenceDays(_ results: [PresenceDayResult]) {
+    private func upsertPresenceDays(_ results: [PresenceDayResult]) throws {
         let keys = results.map { $0.dayKey }
-        let descriptor = FetchDescriptor<PresenceDay>(
-            predicate: #Predicate { keys.contains($0.dayKey) }
-        )
-        let existing = (try? modelContext.fetch(descriptor)) ?? []
+        let existing = try dataFetcher.fetchPresenceDays(keys: keys)
         var existingMap: [String: PresenceDay] = [:]
         for item in existing {
             existingMap[item.dayKey] = item
@@ -131,7 +154,7 @@ public actor LedgerRecomputeService {
                     photoCount: result.photoCount,
                     locationCount: result.locationCount
                 )
-                modelContext.insert(newDay)
+                dataFetcher.insertPresenceDay(newDay)
             }
         }
     }
@@ -159,72 +182,11 @@ public actor LedgerRecomputeService {
         return (start, end)
     }
 
-    private func earliestSignalDate() -> Date? {
-        let s = self.fetchEarliestStayDate()
-        let o = self.fetchEarliestOverrideDate()
-        let l = self.fetchEarliestLocationDate()
-        let p = self.fetchEarliestPhotoDate()
+    private func earliestSignalDate() throws -> Date? {
+        let s = try dataFetcher.fetchEarliestStayDate()
+        let o = try dataFetcher.fetchEarliestOverrideDate()
+        let l = try dataFetcher.fetchEarliestLocationDate()
+        let p = try dataFetcher.fetchEarliestPhotoDate()
         return [s, o, l, p].compactMap { $0 }.min()
-    }
-
-    private func fetchStays(from start: Date, to end: Date) -> [Stay] {
-        let distantFuture = Date.distantFuture
-        let descriptor = FetchDescriptor<Stay>(
-            predicate: #Predicate { stay in
-                stay.enteredOn <= end && (stay.exitedOn ?? distantFuture) >= start
-            }
-        )
-        return (try? modelContext.fetch(descriptor)) ?? []
-    }
-
-    private func fetchOverrides(from start: Date, to end: Date) -> [DayOverride] {
-        let descriptor = FetchDescriptor<DayOverride>(
-            predicate: #Predicate { override in
-                override.date >= start && override.date <= end
-            }
-        )
-        return (try? modelContext.fetch(descriptor)) ?? []
-    }
-
-    private func fetchLocations(from start: Date, to end: Date) -> [LocationSample] {
-        let descriptor = FetchDescriptor<LocationSample>(
-            predicate: #Predicate { sample in
-                sample.timestamp >= start && sample.timestamp <= end
-            }
-        )
-        return (try? modelContext.fetch(descriptor)) ?? []
-    }
-
-    private func fetchPhotos(from start: Date, to end: Date) -> [PhotoSignal] {
-        let descriptor = FetchDescriptor<PhotoSignal>(
-            predicate: #Predicate { signal in
-                signal.timestamp >= start && signal.timestamp <= end
-            }
-        )
-        return (try? modelContext.fetch(descriptor)) ?? []
-    }
-
-    func fetchEarliestStayDate() -> Date? {
-        var descriptor = FetchDescriptor<Stay>(sortBy: [SortDescriptor(\.enteredOn, order: .forward)])
-        descriptor.fetchLimit = 1
-        return (try? modelContext.fetch(descriptor))?.first?.enteredOn
-    }
-
-    func fetchEarliestOverrideDate() -> Date? {
-        var descriptor = FetchDescriptor<DayOverride>(sortBy: [SortDescriptor(\.date, order: .forward)])
-        descriptor.fetchLimit = 1
-        return (try? modelContext.fetch(descriptor))?.first?.date
-    }
-
-    private func fetchEarliestLocationDate() -> Date? {
-        var descriptor = FetchDescriptor<LocationSample>(sortBy: [SortDescriptor(\.timestamp, order: .forward)])
-        descriptor.fetchLimit = 1
-        return (try? modelContext.fetch(descriptor))?.first?.timestamp
-    }
-
-    private func fetchEarliestPhotoDate() -> Date? {
-        var descriptor = FetchDescriptor<PhotoSignal>(sortBy: [SortDescriptor(\.timestamp, order: .forward)])
-        descriptor.fetchLimit = 1
-        return (try? modelContext.fetch(descriptor))?.first?.timestamp
     }
 }
