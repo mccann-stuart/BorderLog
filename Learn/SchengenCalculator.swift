@@ -32,6 +32,8 @@ enum SchengenCalculator {
     ) -> SchengenSummary {
         let windowEnd = calendar.startOfDay(for: referenceDate)
         let windowStart = calendar.date(byAdding: .day, value: -(windowSize - 1), to: windowEnd) ?? windowEnd
+        // Precompute cutoff for future stays to enable early exit
+        let windowEndNextDay = calendar.date(byAdding: .day, value: 1, to: windowEnd) ?? windowEnd
 
         // --- 1. Collect and Merge Intervals ---
         var mergedIntervals: [Interval] = []
@@ -43,13 +45,21 @@ enum SchengenCalculator {
                "SchengenCalculator.summary expects stays to be sorted descending by enteredOn")
 
         for stay in stays.reversed() where stay.region == .schengen {
-            let stayStart = calendar.startOfDay(for: stay.enteredOn)
-            let stayEnd = calendar.startOfDay(for: stay.exitedOn ?? referenceDate)
+            // Optimization: Fast check before expensive calendar calculations
 
-            // Skip if out of window
-            if stayEnd < windowStart || stayStart > windowEnd {
+            // 1. Past check: If the stay ended before the window starts, skip it.
+            if (stay.exitedOn ?? referenceDate) < windowStart {
                 continue
             }
+
+            // 2. Future check: If the stay starts after the window ends, stop processing.
+            // Since we iterate ascendingly by date, all subsequent stays will also be in the future.
+            if stay.enteredOn >= windowEndNextDay {
+                break
+            }
+
+            let stayStart = calendar.startOfDay(for: stay.enteredOn)
+            let stayEnd = calendar.startOfDay(for: stay.exitedOn ?? referenceDate)
 
             let clampedStart = max(stayStart, windowStart)
             let clampedEnd = min(stayEnd, windowEnd)
