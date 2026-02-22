@@ -143,13 +143,30 @@ async function runTest(name, fn) {
     const req = new Request("http://localhost/config/manifest", {
       headers: { "If-None-Match": "123" }
     });
+
+    let getCalledWithOptions = null;
+
     const env = {
       CONFIG_BUCKET: {
-        get: async () => ({
-          body: "{}",
-          httpEtag: "123",
-          writeHttpMetadata: (headers) => {}
-        })
+        get: async (key, options) => {
+          getCalledWithOptions = options;
+
+          // Mimic R2 behavior: if onlyIf.etagDoesNotMatch matches current ETag, return no body.
+          if (options && options.onlyIf && options.onlyIf.etagDoesNotMatch === "123") {
+             return {
+                 // No body property
+                 httpEtag: "123",
+                 writeHttpMetadata: (headers) => {}
+             };
+          }
+
+          // Fallback if optimization not used (or condition met)
+          return {
+            body: "{}",
+            httpEtag: "123",
+            writeHttpMetadata: (headers) => {}
+          };
+        }
       }
     };
 
@@ -158,6 +175,10 @@ async function runTest(name, fn) {
     assert.strictEqual(res.status, 304);
     assertSecurityHeaders(res);
     assert.strictEqual(res.headers.get("Cache-Control"), "public, max-age=300", "Missing Cache-Control");
+
+    // Verify optimization was used
+    assert.ok(getCalledWithOptions, "bucket.get should be called with options");
+    assert.deepStrictEqual(getCalledWithOptions.onlyIf, { etagDoesNotMatch: "123" }, "Should use onlyIf optimization");
   });
 
   console.log("All tests passed!");
