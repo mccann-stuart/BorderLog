@@ -110,6 +110,27 @@ async function runTest(name, fn) {
     assertSecurityHeaders(res);
   });
 
+  await runTest("Invalid Version (too long) returns 400", async () => {
+    const longVersion = "a".repeat(51);
+    const req = new Request(`http://localhost/config/zones/${longVersion}`);
+    const env = {};
+
+    const res = await worker.fetch(req, env, ctx);
+
+    assert.strictEqual(res.status, 400);
+    assertSecurityHeaders(res);
+  });
+
+  await runTest("Invalid Version (contains ..) returns 400", async () => {
+    const req = new Request("http://localhost/config/zones/v1..2");
+    const env = {};
+
+    const res = await worker.fetch(req, env, ctx);
+
+    assert.strictEqual(res.status, 400);
+    assertSecurityHeaders(res);
+  });
+
   await runTest("Unknown Route returns 404 + Security Headers", async () => {
     const req = new Request("http://localhost/unknown/route");
     const env = {};
@@ -145,22 +166,18 @@ async function runTest(name, fn) {
     });
 
     let getCalledWithOptions = null;
-
     const env = {
       CONFIG_BUCKET: {
         get: async (key, options) => {
           getCalledWithOptions = options;
-
-          // Mimic R2 behavior: if onlyIf.etagDoesNotMatch matches current ETag, return no body.
+          // Simulate R2 behavior: if etagDoesNotMatch matches, return null body
           if (options && options.onlyIf && options.onlyIf.etagDoesNotMatch === "123") {
-             return {
-                 // No body property
-                 httpEtag: "123",
-                 writeHttpMetadata: (headers) => {}
-             };
+            return {
+              body: null,
+              httpEtag: "123",
+              writeHttpMetadata: (headers) => {}
+            };
           }
-
-          // Fallback if optimization not used (or condition met)
           return {
             body: "{}",
             httpEtag: "123",

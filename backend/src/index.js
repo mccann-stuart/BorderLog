@@ -23,7 +23,13 @@ export default {
     }
 
     // Helper to validate version string (alphanumeric, dot, dash, underscore)
-    const isValidVersion = (v) => /^[a-zA-Z0-9.\-_]+$/.test(v);
+    const isValidVersion = (v) => {
+        // Enforce max length and prevent path traversal sequences
+        if (v.length > 50 || v.includes("..")) {
+            return false;
+        }
+        return /^[a-zA-Z0-9.\-_]+$/.test(v);
+    };
 
     // Helper to fetch from R2
     const fetchFromR2 = async (key) => {
@@ -37,12 +43,9 @@ export default {
       }
 
       try {
-        // Optimize: Use `onlyIf` to avoid fetching body if ETag matches
+        // Optimize: use onlyIf to avoid downloading body if ETag matches
         const ifNoneMatch = request.headers.get("If-None-Match");
-        const options = {};
-        if (ifNoneMatch) {
-            options.onlyIf = { etagDoesNotMatch: ifNoneMatch };
-        }
+        const options = ifNoneMatch ? { onlyIf: { etagDoesNotMatch: ifNoneMatch } } : {};
 
         const object = await env.CONFIG_BUCKET.get(key, options);
 
@@ -61,8 +64,9 @@ export default {
         // Add security headers
         const securityHeaders = getSecurityHeaders(headers);
 
-        // If body is missing, it means `onlyIf` condition failed (ETag matched), so return 304
-        if (!object.body) {
+        // Handle conditional requests (If-None-Match)
+        // If onlyIf condition matched (ETag matches), body is null
+        if (ifNoneMatch && object.body === null) {
             return new Response(null, { status: 304, headers: securityHeaders });
         }
 
