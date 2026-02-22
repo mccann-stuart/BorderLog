@@ -78,7 +78,7 @@ struct SampleData {
         )
         context.insert(samplePhoto)
 
-        Task { @MainActor in
+        Task {
             let container = context.container
             let recomputeService = LedgerRecomputeService(modelContainer: container)
             await recomputeService.recomputeAll()

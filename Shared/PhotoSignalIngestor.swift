@@ -110,7 +110,7 @@ actor PhotoSignalIngestor {
         }
 
         if !touchedDayKeys.isEmpty {
-            let recomputeService = await LedgerRecomputeService(modelContainer: self.modelContainer)
+            let recomputeService = LedgerRecomputeService(modelContainer: self.modelContainer)
             await recomputeService.recompute(dayKeys: Array(touchedDayKeys))
         }
 
@@ -139,4 +139,3 @@ actor PhotoSignalIngestor {
         return digest.map { String(format: "%02x", $0) }.joined()
     }
 }
-

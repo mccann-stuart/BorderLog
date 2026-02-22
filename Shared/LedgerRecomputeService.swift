@@ -8,12 +8,12 @@
 import Foundation
 import SwiftData
 
-@MainActor
-public final class LedgerRecomputeService {
-    private let modelContext: ModelContext
-
+@ModelActor
+public actor LedgerRecomputeService {
     public init(modelContainer: ModelContainer) {
-        self.modelContext = ModelContext(modelContainer)
+        self.modelContainer = modelContainer
+        let context = ModelContext(modelContainer)
+        self.modelExecutor = DefaultSerialModelExecutor(modelContext: context)
     }
 
     public func recompute(dayKeys: [String]) async {
@@ -87,6 +87,7 @@ public final class LedgerRecomputeService {
         )
 
         self.upsertPresenceDays(results)
+        try? modelContext.save()
     }
 
     public func recomputeAll() async {
@@ -102,7 +103,7 @@ public final class LedgerRecomputeService {
         let descriptor = FetchDescriptor<PresenceDay>(
             predicate: #Predicate { keys.contains($0.dayKey) }
         )
-        let existing = (try? self.modelContext.fetch(descriptor)) ?? []
+        let existing = (try? modelContext.fetch(descriptor)) ?? []
         var existingMap: [String: PresenceDay] = [:]
         for item in existing {
             existingMap[item.dayKey] = item
@@ -136,7 +137,7 @@ public final class LedgerRecomputeService {
                     photoCount: result.photoCount,
                     locationCount: result.locationCount
                 )
-                self.modelContext.insert(newDay)
+                modelContext.insert(newDay)
             }
         }
     }
@@ -179,7 +180,7 @@ public final class LedgerRecomputeService {
                 stay.enteredOn <= end && (stay.exitedOn ?? distantFuture) >= start
             }
         )
-        return (try? self.modelContext.fetch(descriptor)) ?? []
+        return (try? modelContext.fetch(descriptor)) ?? []
     }
 
     private func fetchOverrides(from start: Date, to end: Date) -> [DayOverride] {
@@ -188,7 +189,7 @@ public final class LedgerRecomputeService {
                 override.date >= start && override.date <= end
             }
         )
-        return (try? self.modelContext.fetch(descriptor)) ?? []
+        return (try? modelContext.fetch(descriptor)) ?? []
     }
 
     private func fetchLocations(from start: Date, to end: Date) -> [LocationSample] {
@@ -197,7 +198,7 @@ public final class LedgerRecomputeService {
                 sample.timestamp >= start && sample.timestamp <= end
             }
         )
-        return (try? self.modelContext.fetch(descriptor)) ?? []
+        return (try? modelContext.fetch(descriptor)) ?? []
     }
 
     private func fetchPhotos(from start: Date, to end: Date) -> [PhotoSignal] {
@@ -206,30 +207,30 @@ public final class LedgerRecomputeService {
                 signal.timestamp >= start && signal.timestamp <= end
             }
         )
-        return (try? self.modelContext.fetch(descriptor)) ?? []
+        return (try? modelContext.fetch(descriptor)) ?? []
     }
 
     func fetchEarliestStayDate() -> Date? {
         var descriptor = FetchDescriptor<Stay>(sortBy: [SortDescriptor(\.enteredOn, order: .forward)])
         descriptor.fetchLimit = 1
-        return (try? self.modelContext.fetch(descriptor))?.first?.enteredOn
+        return (try? modelContext.fetch(descriptor))?.first?.enteredOn
     }
 
     func fetchEarliestOverrideDate() -> Date? {
         var descriptor = FetchDescriptor<DayOverride>(sortBy: [SortDescriptor(\.date, order: .forward)])
         descriptor.fetchLimit = 1
-        return (try? self.modelContext.fetch(descriptor))?.first?.date
+        return (try? modelContext.fetch(descriptor))?.first?.date
     }
 
     private func fetchEarliestLocationDate() -> Date? {
         var descriptor = FetchDescriptor<LocationSample>(sortBy: [SortDescriptor(\.timestamp, order: .forward)])
         descriptor.fetchLimit = 1
-        return (try? self.modelContext.fetch(descriptor))?.first?.timestamp
+        return (try? modelContext.fetch(descriptor))?.first?.timestamp
     }
 
     private func fetchEarliestPhotoDate() -> Date? {
         var descriptor = FetchDescriptor<PhotoSignal>(sortBy: [SortDescriptor(\.timestamp, order: .forward)])
         descriptor.fetchLimit = 1
-        return (try? self.modelContext.fetch(descriptor))?.first?.timestamp
+        return (try? modelContext.fetch(descriptor))?.first?.timestamp
     }
 }

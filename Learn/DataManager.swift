@@ -122,7 +122,7 @@ struct DataManager {
         modelContext.insert(samplePhoto)
 
         let container = modelContext.container
-        Task { @MainActor in
+        Task {
             let recomputeService = LedgerRecomputeService(modelContainer: container)
             await recomputeService.recomputeAll()
         }
