@@ -7,6 +7,7 @@
 
 import Foundation
 import Observation
+import SwiftData
 
 @Observable
 final class SchengenState {
@@ -29,7 +30,36 @@ final class SchengenState {
     }
 
     @MainActor
-    func update(stays: [Stay], overrides: [DayOverride]) async {
+    func update(modelContext: ModelContext) async {
+        let calendar = Calendar.current
+        let now = Date()
+        // Window start is approximately 2 years ago (730 days) to cover recent history for validation
+        // and comfortably include the 180-day Schengen window.
+        let windowStart = calendar.date(byAdding: .day, value: -730, to: now) ?? now
+        let distantPast = Date.distantPast
+
+        // Fetch relevant stays:
+        // - Started on or before now
+        // - Ongoing (exitedOn == nil) OR ended after windowStart
+        // This avoids fetching and mapping the entire history (O(N)) on the main thread.
+        let stayDescriptor = FetchDescriptor<Stay>(
+            predicate: #Predicate { stay in
+                stay.enteredOn <= now && (stay.exitedOn == nil || (stay.exitedOn ?? distantPast) >= windowStart)
+            },
+            sortBy: [SortDescriptor(\.enteredOn, order: .reverse)]
+        )
+        let stays = (try? modelContext.fetch(stayDescriptor)) ?? []
+
+        // Fetch relevant overrides:
+        // - Date on or after windowStart
+        let overrideDescriptor = FetchDescriptor<DayOverride>(
+            predicate: #Predicate { override in
+                override.date >= windowStart
+            },
+            sortBy: [SortDescriptor(\.date, order: .reverse)]
+        )
+        let overrides = (try? modelContext.fetch(overrideDescriptor)) ?? []
+
         // Extract data on MainActor to avoid accessing SwiftData objects on background thread.
         // Accessing properties of @Model objects must happen on the context's thread (MainActor here).
         let stayInfos = stays.map {
@@ -47,7 +77,6 @@ final class SchengenState {
             )
         }
 
-        let calendar = Calendar.current
         let result = await Task.detached(priority: .userInitiated) {
             // Optimized: Use reverseSortedStays variants as stayInfos is derived from reverse-sorted @Query
             let (overlapCount, gapDays) = StayValidation.validate(reverseSortedStays: stayInfos, calendar: calendar)

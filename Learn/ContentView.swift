@@ -187,12 +187,12 @@ struct ContentView: View {
             }
         }
         .task(id: stays) {
-            await schengenState.update(stays: stays, overrides: overrides)
+            await schengenState.update(modelContext: modelContext)
             let recomputeService = LedgerRecomputeService(modelContainer: modelContext.container)
             await recomputeService.recomputeAll()
         }
         .task(id: overrides) {
-            await schengenState.update(stays: stays, overrides: overrides)
+            await schengenState.update(modelContext: modelContext)
             let recomputeService = LedgerRecomputeService(modelContainer: modelContext.container)
             await recomputeService.recomputeAll()
         }
