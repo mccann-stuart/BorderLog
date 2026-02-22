@@ -7,7 +7,7 @@
 
 import Foundation
 
-enum DayKey {
+nonisolated enum DayKey {
     static let format = "yyyy-MM-dd"
 
     static func make(from date: Date, timeZone: TimeZone) -> String {

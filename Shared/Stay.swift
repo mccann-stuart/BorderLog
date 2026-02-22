@@ -9,7 +9,7 @@ import Foundation
 import SwiftData
 
 @Model
-final class Stay: TravelEntry {
+nonisolated final class Stay: TravelEntry {
     var countryName: String
     var countryCode: String?
     var regionRaw: String

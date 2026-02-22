@@ -9,7 +9,7 @@ import Foundation
 import SwiftData
 
 @Model
-final class PresenceDay {
+nonisolated final class PresenceDay {
     @Attribute(.unique) var dayKey: String
     var date: Date
     var timeZoneId: String?

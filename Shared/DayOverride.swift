@@ -9,7 +9,7 @@ import Foundation
 import SwiftData
 
 @Model
-final class DayOverride: TravelEntry {
+nonisolated final class DayOverride: TravelEntry {
     var date: Date
     var countryName: String
     var countryCode: String?

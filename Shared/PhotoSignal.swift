@@ -9,7 +9,7 @@ import Foundation
 import SwiftData
 
 @Model
-final class PhotoSignal {
+nonisolated final class PhotoSignal {
     var timestamp: Date
     var latitude: Double
     var longitude: Double

@@ -14,7 +14,7 @@ enum LocationSampleSource: String, Codable, CaseIterable {
 }
 
 @Model
-final class LocationSample {
+nonisolated final class LocationSample {
     var timestamp: Date
     var latitude: Double
     var longitude: Double

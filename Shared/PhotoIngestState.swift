@@ -9,7 +9,7 @@ import Foundation
 import SwiftData
 
 @Model
-final class PhotoIngestState {
+nonisolated final class PhotoIngestState {
     var lastIngestedAt: Date?
     var lastAssetCreationDate: Date?
     var lastAssetIdHash: String?

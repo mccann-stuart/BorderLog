@@ -7,7 +7,7 @@
 
 import Foundation
 
-struct PresenceInferenceEngine {
+nonisolated struct PresenceInferenceEngine {
     private struct CountryKey: Hashable {
         let code: String?
         let name: String
