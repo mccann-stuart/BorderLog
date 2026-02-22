@@ -93,44 +93,20 @@ export default {
       return fetchFromR2("manifest.json");
     }
 
-    // Route: GET /config/zones/{version}
-    // Example: /config/zones/v1
-    const zonesMatch = path.match(/^\/config\/zones\/([^/]+)$/);
-    if (zonesMatch) {
-      const version = zonesMatch[1];
-      if (!isValidVersion(version)) {
-        return new Response("Invalid version format", {
-            status: 400,
-            headers: getSecurityHeaders()
-        });
-      }
-      return fetchFromR2(`zones/${version}.json`);
-    }
+    // Route: GET /config/{type}/{version}
+    // types: zones, rules, countries
+    const configMatch = path.match(/^\/config\/(zones|rules|countries)\/([^/]+)$/);
+    if (configMatch) {
+      const type = configMatch[1];
+      const version = configMatch[2];
 
-    // Route: GET /config/rules/{version}
-    const rulesMatch = path.match(/^\/config\/rules\/([^/]+)$/);
-    if (rulesMatch) {
-      const version = rulesMatch[1];
       if (!isValidVersion(version)) {
         return new Response("Invalid version format", {
             status: 400,
             headers: getSecurityHeaders()
         });
       }
-      return fetchFromR2(`rules/${version}.json`);
-    }
-
-    // Route: GET /config/countries/{version}
-    const countriesMatch = path.match(/^\/config\/countries\/([^/]+)$/);
-    if (countriesMatch) {
-      const version = countriesMatch[1];
-      if (!isValidVersion(version)) {
-        return new Response("Invalid version format", {
-            status: 400,
-            headers: getSecurityHeaders()
-        });
-      }
-      return fetchFromR2(`countries/${version}.json`);
+      return fetchFromR2(`${type}/${version}.json`);
     }
 
     // Default response
