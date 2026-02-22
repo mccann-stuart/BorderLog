@@ -15,6 +15,7 @@ struct CountryDetailView: View {
     @Query private var countryConfigs: [CountryConfig]
     
     @State private var maxAllowedDaysText: String = ""
+    @State private var showAllDays: Bool = false
     
     // Filter days for this country
     private var countryDays: [PresenceDay] {
@@ -58,11 +59,24 @@ struct CountryDetailView: View {
                         description: Text("No presence days found for this country.")
                     )
                 } else {
-                    ForEach(countryDays) { day in
+                    let displayDays = showAllDays ? countryDays : Array(countryDays.prefix(5))
+                    ForEach(displayDays) { day in
                         NavigationLink {
                             PresenceDayDetailView(day: day)
                         } label: {
                             PresenceDayRow(day: day)
+                        }
+                    }
+                    
+                    if !showAllDays && countryDays.count > 5 {
+                        Button {
+                            withAnimation {
+                                showAllDays = true
+                            }
+                        } label: {
+                            Text("See All")
+                                .frame(maxWidth: .infinity)
+                                .foregroundStyle(.blue)
                         }
                     }
                 }
