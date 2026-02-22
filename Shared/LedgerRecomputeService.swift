@@ -167,6 +167,8 @@ public actor LedgerRecomputeService {
         return [s, o, l, p].compactMap { $0 }.min()
     }
 
+    // Optimized fetch using predicate to avoid loading all records into memory.
+    // See PERFORMANCE_RATIONALE.md for details.
     private func fetchStays(from start: Date, to end: Date) -> [Stay] {
         let distantFuture = Date.distantFuture
         let descriptor = FetchDescriptor<Stay>(
@@ -177,6 +179,8 @@ public actor LedgerRecomputeService {
         return (try? modelContext.fetch(descriptor)) ?? []
     }
 
+    // Optimized fetch using predicate to avoid loading all records into memory.
+    // See PERFORMANCE_RATIONALE.md for details.
     private func fetchOverrides(from start: Date, to end: Date) -> [DayOverride] {
         let descriptor = FetchDescriptor<DayOverride>(
             predicate: #Predicate { override in
@@ -186,6 +190,8 @@ public actor LedgerRecomputeService {
         return (try? modelContext.fetch(descriptor)) ?? []
     }
 
+    // Optimized fetch using predicate to avoid loading all records into memory.
+    // See PERFORMANCE_RATIONALE.md for details.
     private func fetchLocations(from start: Date, to end: Date) -> [LocationSample] {
         let descriptor = FetchDescriptor<LocationSample>(
             predicate: #Predicate { sample in
@@ -195,6 +201,8 @@ public actor LedgerRecomputeService {
         return (try? modelContext.fetch(descriptor)) ?? []
     }
 
+    // Optimized fetch using predicate to avoid loading all records into memory.
+    // See PERFORMANCE_RATIONALE.md for details.
     private func fetchPhotos(from start: Date, to end: Date) -> [PhotoSignal] {
         let descriptor = FetchDescriptor<PhotoSignal>(
             predicate: #Predicate { signal in
