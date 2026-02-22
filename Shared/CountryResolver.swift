@@ -50,7 +50,7 @@ actor GeocodeCoordinator {
             return await task.value
         }
 
-        let task = Task { [self] in
+        let task = Task<CountryResolution?, Never> { [self] in
             defer {
                 Task { await self.clearInFlight(for: key) }
             }
