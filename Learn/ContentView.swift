@@ -8,8 +8,11 @@
 import SwiftUI
 import SwiftData
 import Foundation
+import os
 
 struct ContentView: View {
+    private static let logger = Logger(subsystem: "com.MCCANN.Learn", category: "ContentView")
+
     @Environment(\.modelContext) private var modelContext
     @Query(sort: [SortDescriptor(\Stay.enteredOn, order: .reverse)]) private var stays: [Stay]
     @Query(sort: [SortDescriptor(\DayOverride.date, order: .reverse)]) private var overrides: [DayOverride]
@@ -211,7 +214,7 @@ struct ContentView: View {
         do {
             try dataManager.resetAllData()
         } catch {
-            print("Failed to reset data: \(error)")
+            Self.logger.error("Failed to reset data: \(error, privacy: .public)")
         }
     }
 
@@ -221,7 +224,7 @@ struct ContentView: View {
                 isShowingSeedAlert = true
             }
         } catch {
-            print("Failed to seed data: \(error)")
+            Self.logger.error("Failed to seed data: \(error, privacy: .public)")
         }
     }
 }
