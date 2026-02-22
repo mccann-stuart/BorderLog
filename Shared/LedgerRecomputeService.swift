@@ -208,9 +208,9 @@ public final class LedgerRecomputeService {
     }
 
     private func fetchEarliestOverrideDate() -> Date? {
-        let descriptor = FetchDescriptor<DayOverride>()
-        let overrides = (try? self.modelContext.fetch(descriptor)) ?? []
-        return overrides.map { $0.date }.min()
+        var descriptor = FetchDescriptor<DayOverride>(sortBy: [SortDescriptor(\.date, order: .forward)])
+        descriptor.fetchLimit = 1
+        return (try? self.modelContext.fetch(descriptor))?.first?.date
     }
 
     private func fetchEarliestLocationDate() -> Date? {
