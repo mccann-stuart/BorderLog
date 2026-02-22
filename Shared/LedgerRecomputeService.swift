@@ -172,9 +172,12 @@ public final class LedgerRecomputeService {
 
     private func fetchStays(from start: Date, to end: Date) -> [Stay] {
         let distantFuture = Date.distantFuture
-        let descriptor = FetchDescriptor<Stay>()
-        let stays = (try? self.modelContext.fetch(descriptor)) ?? []
-        return stays.filter { $0.enteredOn <= end && ($0.exitedOn ?? distantFuture) >= start }
+        let descriptor = FetchDescriptor<Stay>(
+            predicate: #Predicate { stay in
+                stay.enteredOn <= end && (stay.exitedOn ?? distantFuture) >= start
+            }
+        )
+        return (try? self.modelContext.fetch(descriptor)) ?? []
     }
 
     private func fetchOverrides(from start: Date, to end: Date) -> [DayOverride] {
