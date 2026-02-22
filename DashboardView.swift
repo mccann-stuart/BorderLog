@@ -52,119 +52,154 @@ struct DashboardView: View {
         
         return countryDict.values.sorted { $0.totalDays > $1.totalDays }
     }
+
+    private var visitedCountryCodes: Set<String> {
+        Set(countryDaysSummary.compactMap(\.countryCode))
+    }
     
     var body: some View {
         ScrollView {
             VStack(spacing: 20) {
-                // World Map Section
-                WorldMapView(visitedCountries: Set(countryDaysSummary.compactMap { $0.countryCode }))
-                    .frame(height: 250)
-                    .background(.ultraThinMaterial)
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 12)
-                            .stroke(.white.opacity(0.2), lineWidth: 1)
-                    )
-                    .shadow(color: .black.opacity(0.1), radius: 12, y: 6)
-                    .padding(.horizontal)
-                
-                // Schengen Summary Card
-                VStack(alignment: .leading, spacing: 12) {
-                    Text("Schengen 90/180")
-                        .font(.system(.title2, design: .rounded).bold())
-                    
-                    HStack(spacing: 16) {
-                        StatCard(
-                            title: "Used",
-                            value: "\(schengenSummary.usedDays)",
-                            subtitle: "days",
-                            color: .blue
-                        )
-                        
-                        StatCard(
-                            title: "Remaining",
-                            value: "\(schengenSummary.remainingDays)",
-                            subtitle: "days",
-                            color: .green
-                        )
-                        
-                        if schengenSummary.overstayDays > 0 {
-                            StatCard(
-                                title: "Overstay",
-                                value: "\(schengenSummary.overstayDays)",
-                                subtitle: "days",
-                                color: .red
-                            )
-                        }
-                    }
-
-                    if schengenSummary.unknownDays > 0 {
-                        NavigationLink {
-                            FilteredLedgerView(days: unknownSchengenDays, title: "Unknown Days")
-                        } label: {
-                            Text("Unknown days in window: \(schengenSummary.unknownDays)")
-                                .font(.caption)
-                                .foregroundStyle(.accentColor)
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-                .padding()
-                .background(.ultraThinMaterial)
-                .clipShape(RoundedRectangle(cornerRadius: 12))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 12)
-                        .stroke(.white.opacity(0.2), lineWidth: 1)
-                )
-                .shadow(color: .black.opacity(0.1), radius: 12, y: 6)
-                .padding(.horizontal)
-                
-                // Countries List
-                VStack(alignment: .leading, spacing: 12) {
-                    Text("Visited Countries")
-                        .font(.system(.title2, design: .rounded).bold())
-                        .padding(.horizontal)
-                    
-                    if countryDaysSummary.isEmpty {
-                        ContentUnavailableView(
-                            "No countries yet",
-                            systemImage: "globe",
-                            description: Text("Add your first stay to start tracking countries.")
-                        )
-                        .frame(height: 200)
-                    } else {
-                        LazyVStack(spacing: 0) {
-                            ForEach(countryDaysSummary) { info in
-                                CountryDaysRow(info: info, warningThreshold: 80)
-                                    .padding(.horizontal)
-                                    .padding(.vertical, 8)
-                                
-                                if info.id != countryDaysSummary.last?.id {
-                                    Divider()
-                                        .padding(.leading, 60)
-                                }
-                            }
-                        }
-                        .background(.ultraThinMaterial)
-                        .clipShape(RoundedRectangle(cornerRadius: 12))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 12)
-                                .stroke(.white.opacity(0.2), lineWidth: 1)
-                        )
-                        .shadow(color: .black.opacity(0.1), radius: 12, y: 6)
-                        .padding(.horizontal)
-                    }
-                }
+                WorldMapSection(visitedCountries: visitedCountryCodes)
+                SchengenSummarySection(summary: schengenSummary, unknownDays: unknownSchengenDays)
+                CountriesListSection(countries: countryDaysSummary)
             }
             .padding(.vertical)
         }
-        .background {
-            ZStack {
-                Color(UIColor.systemGroupedBackground)
-                LinearGradient(colors: [.blue.opacity(0.05), .purple.opacity(0.05)], startPoint: .topLeading, endPoint: .bottomTrailing)
-            }
-            .ignoresSafeArea()
+        .background(DashboardBackground())
+    }
+}
+
+private struct DashboardBackground: View {
+    var body: some View {
+        ZStack {
+            Color(UIColor.systemGroupedBackground)
+            LinearGradient(colors: [.blue.opacity(0.05), .purple.opacity(0.05)], startPoint: .topLeading, endPoint: .bottomTrailing)
         }
+        .ignoresSafeArea()
+    }
+}
+
+private struct WorldMapSection: View {
+    let visitedCountries: Set<String>
+    
+    var body: some View {
+        WorldMapView(visitedCountries: visitedCountries)
+            .frame(height: 250)
+            .cardShell()
+            .padding(.horizontal)
+    }
+}
+
+private struct SchengenSummarySection: View {
+    let summary: SchengenLedgerSummary
+    let unknownDays: [PresenceDay]
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Schengen 90/180")
+                .font(.system(.title2, design: .rounded).bold())
+            
+            HStack(spacing: 16) {
+                StatCard(
+                    title: "Used",
+                    value: "\(summary.usedDays)",
+                    subtitle: "days",
+                    color: .blue
+                )
+                
+                StatCard(
+                    title: "Remaining",
+                    value: "\(summary.remainingDays)",
+                    subtitle: "days",
+                    color: .green
+                )
+                
+                if summary.overstayDays > 0 {
+                    StatCard(
+                        title: "Overstay",
+                        value: "\(summary.overstayDays)",
+                        subtitle: "days",
+                        color: .red
+                    )
+                }
+            }
+
+            if summary.unknownDays > 0 {
+                NavigationLink {
+                    FilteredLedgerView(days: unknownDays, title: "Unknown Days")
+                } label: {
+                    Text("Unknown days in window: \(summary.unknownDays)")
+                        .font(.caption)
+                        .foregroundStyle(.accentColor)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding()
+        .cardShell()
+        .padding(.horizontal)
+    }
+}
+
+private struct CountriesListSection: View {
+    let countries: [CountryDaysInfo]
+    let warningThreshold: Int
+    
+    init(countries: [CountryDaysInfo], warningThreshold: Int = 80) {
+        self.countries = countries
+        self.warningThreshold = warningThreshold
+    }
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Visited Countries")
+                .font(.system(.title2, design: .rounded).bold())
+                .padding(.horizontal)
+            
+            if countries.isEmpty {
+                ContentUnavailableView(
+                    "No countries yet",
+                    systemImage: "globe",
+                    description: Text("Add your first stay to start tracking countries.")
+                )
+                .frame(height: 200)
+            } else {
+                LazyVStack(spacing: 0) {
+                    ForEach(countries) { info in
+                        CountryDaysRow(info: info, warningThreshold: warningThreshold)
+                            .padding(.horizontal)
+                            .padding(.vertical, 8)
+                        
+                        if info.id != countries.last?.id {
+                            Divider()
+                                .padding(.leading, 60)
+                        }
+                    }
+                }
+                .cardShell()
+                .padding(.horizontal)
+            }
+        }
+    }
+}
+
+private struct CardShell: ViewModifier {
+    func body(content: Content) -> some View {
+        content
+            .background(.ultraThinMaterial)
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .overlay(
+                RoundedRectangle(cornerRadius: 12)
+                    .stroke(.white.opacity(0.2), lineWidth: 1)
+            )
+            .shadow(color: .black.opacity(0.1), radius: 12, y: 6)
+    }
+}
+
+private extension View {
+    func cardShell() -> some View {
+        modifier(CardShell())
     }
 }
 

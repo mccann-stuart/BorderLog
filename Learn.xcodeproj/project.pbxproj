@@ -49,7 +49,6 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
-		24F357C954C0459180599F51 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		4B98CC742F4A075D0095FA69 /* Learn.xctestplan */ = {isa = PBXFileReference; lastKnownFileType = text; path = Learn.xctestplan; sourceTree = "<group>"; };
 		4B9C85CC2F426E1000C510A8 /* DashboardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardView.swift; sourceTree = "<group>"; };
 		4B9C85CE2F426E3900C510A8 /* WorldMapView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorldMapView.swift; sourceTree = "<group>"; };
@@ -81,7 +80,7 @@
 			);
 			target = 4BF474C92F3FAB7B0026C07A /* LearnTests */;
 		};
-		9B55513F4C9F4EF08C51A401 /* Exceptions for "BorderLogWidget" folder in "BorderLogWidget" target */ = {
+		1F1A3DC1C455376EBF45721F /* Exceptions for "BorderLogWidget" folder in "BorderLogWidget" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				Info.plist,
@@ -99,7 +98,7 @@
 		4BEE3D0B2F4C2F9A00D6F0F1 /* BorderLogWidget */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
-				9B55513F4C9F4EF08C51A401 /* Exceptions for "BorderLogWidget" folder in "BorderLogWidget" target */,
+				1F1A3DC1C455376EBF45721F /* Exceptions for "BorderLogWidget" folder in "BorderLogWidget" target */,
 			);
 			path = BorderLogWidget;
 			sourceTree = "<group>";
@@ -149,14 +148,6 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
-		4B6610A42F43A5DF00186BEB /* Recovered References */ = {
-			isa = PBXGroup;
-			children = (
-				24F357C954C0459180599F51 /* Info.plist */,
-			);
-			name = "Recovered References";
-			sourceTree = "<group>";
-		};
 		4BF474B22F3FAB7A0026C07A = {
 			isa = PBXGroup;
 			children = (
@@ -176,7 +167,6 @@
 				4B9C85D02F426E4C00C510A8 /* SettingsView.swift */,
 				4B9C85D22F426E5C00C510A8 /* UserAccountView.swift */,
 				4B9C85D42F426E7A00C510A8 /* MainNavigationView.swift */,
-				4B6610A42F43A5DF00186BEB /* Recovered References */,
 			);
 			sourceTree = "<group>";
 			usesTabs = 0;
@@ -401,6 +391,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = JZ834V3GDM;
+				EXCLUDED_RESOURCE_FILE_NAMES = Info.plist;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = BorderLogWidget/Info.plist;
 				MARKETING_VERSION = 1.0;
@@ -427,6 +418,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = JZ834V3GDM;
+				EXCLUDED_RESOURCE_FILE_NAMES = Info.plist;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = BorderLogWidget/Info.plist;
 				MARKETING_VERSION = 1.0;
