@@ -98,28 +98,14 @@ private struct EvidenceSection: View {
         self.date = date
     }
     
-    var overlappingStays: [Stay] {
-        let calendar = Calendar.current
-        let startOfDay = calendar.startOfDay(for: date)
-        guard let endOfDay = calendar.date(byAdding: DateComponents(day: 1, second: -1), to: startOfDay) else { return [] }
-        
-        return stays.filter { stay in
-            let stayStart = calendar.startOfDay(for: stay.enteredOn)
-            let stayEnd = stay.exitedOn.map { calendar.startOfDay(for: $0) } ?? Date.distantFuture
-            return startOfDay <= stayEnd && endOfDay >= stayStart
-        }
-    }
-    
     var body: some View {
-        let overlapping = overlappingStays
-
         Group {
-            Section("Stays (\(overlapping.count))") {
-                if overlapping.isEmpty {
+            Section("Stays (\(stays.count))") {
+                if stays.isEmpty {
                     Text("No matching stays")
                         .foregroundStyle(.secondary)
                 } else {
-                    ForEach(overlapping) { stay in
+                    ForEach(stays) { stay in
                         VStack(alignment: .leading, spacing: 4) {
                             Text(stay.countryName)
                                 .font(.headline)
@@ -217,11 +203,21 @@ private struct EvidenceSection: View {
         }
 
         // Stays sorted by enteredOn, reverse order
-        do {
-            var stayFetch = FetchDescriptor<Stay>()
-            stayFetch.sortBy = [SortDescriptor(\.enteredOn, order: .reverse)]
-            stays = try modelContext.fetch(stayFetch)
-        } catch {
+        let calendar = Calendar.current
+        let startOfDay = calendar.startOfDay(for: date)
+        if let nextDayStart = calendar.date(byAdding: .day, value: 1, to: startOfDay) {
+            do {
+                let distantFuture = Date.distantFuture
+                let stayPredicate = #Predicate<Stay> { stay in
+                    stay.enteredOn < nextDayStart && (stay.exitedOn ?? distantFuture) >= startOfDay
+                }
+                var stayFetch = FetchDescriptor<Stay>(predicate: stayPredicate)
+                stayFetch.sortBy = [SortDescriptor(\.enteredOn, order: .reverse)]
+                stays = try modelContext.fetch(stayFetch)
+            } catch {
+                stays = []
+            }
+        } else {
             stays = []
         }
     }
