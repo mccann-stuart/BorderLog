@@ -215,30 +215,46 @@ nonisolated struct PresenceInferenceEngine {
 
         var sortedResults = results.sorted { $0.date < $1.date }
         
-        if sortedResults.count >= 3 {
-            for i in 1..<(sortedResults.count - 1) {
-                let current = sortedResults[i]
-                if current.countryCode == nil {
+        var i = 0
+        while i < sortedResults.count {
+            if sortedResults[i].countryCode == nil {
+                // Find the extent of the gap
+                var j = i
+                while j < sortedResults.count, sortedResults[j].countryCode == nil {
+                    j += 1
+                }
+                
+                let gapLength = j - i
+                
+                // Check if gap is bounded by same country and length is <= 7
+                if gapLength <= 7, i > 0, j < sortedResults.count {
                     let prev = sortedResults[i - 1]
-                    let next = sortedResults[i + 1]
+                    let next = sortedResults[j]
                     
                     if let prevCode = prev.countryCode, let nextCode = next.countryCode, prevCode == nextCode {
-                        sortedResults[i] = PresenceDayResult(
-                            dayKey: current.dayKey,
-                            date: current.date,
-                            timeZoneId: current.timeZoneId ?? prev.timeZoneId,
-                            countryCode: prevCode,
-                            countryName: prev.countryName,
-                            confidence: 0.5,
-                            confidenceLabel: .medium,
-                            sources: .none,
-                            isOverride: false,
-                            stayCount: 0,
-                            photoCount: 0,
-                            locationCount: 0
-                        )
+                        for k in i..<j {
+                            let current = sortedResults[k]
+                            sortedResults[k] = PresenceDayResult(
+                                dayKey: current.dayKey,
+                                date: current.date,
+                                timeZoneId: current.timeZoneId ?? prev.timeZoneId,
+                                countryCode: prevCode,
+                                countryName: prev.countryName,
+                                confidence: 0.5,
+                                confidenceLabel: .medium,
+                                sources: .none,
+                                isOverride: false,
+                                stayCount: 0,
+                                photoCount: 0,
+                                locationCount: 0
+                            )
+                        }
                     }
                 }
+                
+                i = j // Skip past the gap
+            } else {
+                i += 1
             }
         }
 

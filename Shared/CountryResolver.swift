@@ -52,7 +52,7 @@ actor GeocodeCoordinator {
 
         let task = Task<CountryResolution?, Never> { [self] in
             defer {
-                Task { await self.clearInFlight(for: key) }
+                self.clearInFlight(for: key)
             }
 
             await self.waitForPermit()
@@ -70,7 +70,7 @@ actor GeocodeCoordinator {
                     timeZone: mapItem?.timeZone
                 )
                 if resolution.countryCode != nil || resolution.countryName != nil {
-                    await self.store(resolution, for: key)
+                    self.store(resolution, for: key)
                 }
                 return resolution
             } catch {
