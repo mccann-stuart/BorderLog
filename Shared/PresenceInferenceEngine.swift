@@ -224,7 +224,10 @@ struct PresenceInferenceEngine {
 
             var isDisputed = false
             if sortedCountries.count > 1 && sortedCountries[1].value.score > 0 {
-                isDisputed = true
+                let scoreDelta = winner.value.score - sortedCountries[1].value.score
+                if scoreDelta <= 1.0 {
+                    isDisputed = true
+                }
             }
 
             var sources = SignalSourceMask()
