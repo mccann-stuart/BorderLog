@@ -133,7 +133,13 @@ public actor LedgerRecomputeService {
     public func recomputeAll() async {
         let calendar = Calendar.current
         let today = calendar.startOfDay(for: Date())
-        let earliest = (try? self.earliestSignalDate()) ?? calendar.date(byAdding: .day, value: -30, to: today) ?? today
+
+        let twoYearsAgo = calendar.date(byAdding: .year, value: -2, to: today) ?? today
+        let earliestSignal = try? self.earliestSignalDate()
+
+        // Ensure we cover at least the last 2 years, or earlier if data exists
+        let earliest = [earliestSignal, twoYearsAgo].compactMap { $0 }.min() ?? twoYearsAgo
+
         let dayKeys = self.makeDayKeys(from: earliest, to: today, calendar: calendar)
         await self.recompute(dayKeys: dayKeys)
     }
@@ -266,5 +272,56 @@ public actor LedgerRecomputeService {
         let p = try dataFetcher.fetchEarliestPhotoDate()
         let c = try dataFetcher.fetchEarliestCalendarSignalDate()
         return [s, o, l, p, c].compactMap { $0 }.min()
+    }
+
+    /// Ensures every calendar day from the earliest signal (or 2 years ago) to today
+    /// has a PresenceDay entry in the store. Missing days are inserted as unknown/empty.
+    public func fillMissingDays() async {
+        let calendar = Calendar.current
+        let timeZone = calendar.timeZone
+        let today = calendar.startOfDay(for: Date())
+
+        // Cover every day of the current year and the two preceding calendar years.
+        let currentYear = calendar.component(.year, from: today)
+        let startOfTwoYearsAgo = calendar.date(from: DateComponents(year: currentYear - 2, month: 1, day: 1)) ?? today
+
+        let allDayKeys = Set(self.makeDayKeys(from: startOfTwoYearsAgo, to: today, calendar: calendar))
+
+        let existingKeys: Set<String>
+        do {
+            existingKeys = try dataFetcher.fetchAllPresenceDayKeys()
+        } catch {
+            print("LedgerRecomputeService fillMissingDays fetch error: \(error)")
+            return
+        }
+
+        let missing = allDayKeys.subtracting(existingKeys)
+        guard !missing.isEmpty else { return }
+
+        for dayKey in missing {
+            let date = DayKey.date(for: dayKey, timeZone: timeZone)
+                ?? calendar.startOfDay(for: today)
+            let day = PresenceDay(
+                dayKey: dayKey,
+                date: date,
+                timeZoneId: timeZone.identifier,
+                countryCode: nil,
+                countryName: nil,
+                confidence: 0,
+                confidenceLabel: .low,
+                sources: .none,
+                isOverride: false,
+                stayCount: 0,
+                photoCount: 0,
+                locationCount: 0
+            )
+            dataFetcher.insertPresenceDay(day)
+        }
+
+        do {
+            try dataFetcher.save()
+        } catch {
+            print("LedgerRecomputeService fillMissingDays save error: \(error)")
+        }
     }
 }

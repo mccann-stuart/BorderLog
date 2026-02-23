@@ -9,6 +9,7 @@
     }
   ],
   "defaultOptions" : {
+    "diagnosticCollectionPolicy" : "Always",
     "performanceAntipatternCheckerEnabled" : true,
     "targetForVariableExpansion" : {
       "containerPath" : "container:Learn.xcodeproj",

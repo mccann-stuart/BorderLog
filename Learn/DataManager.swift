@@ -11,7 +11,7 @@ import os
 
 struct DataManager {
     let modelContext: ModelContext
-    private static let logger = Logger(subsystem: "com.MCCANN.Learn", category: "DataManager")
+    private static let logger = Logger(subsystem: "com.MCCANN.Border", category: "DataManager")
 
     init(modelContext: ModelContext) {
         self.modelContext = modelContext

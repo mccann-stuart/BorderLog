@@ -12,6 +12,7 @@ struct MainNavigationView: View {
     @State private var isShowingAccount = false
     @State private var isPresentingAddStay = false
     @State private var isPresentingAddOverride = false
+
     @AppStorage("didBootstrapInference") private var didBootstrapInference = false
     @State private var locationService = LocationSampleService()
     @State private var didAttemptLaunchLocationCapture = false
@@ -68,6 +69,14 @@ struct MainNavigationView: View {
                 .tabItem {
                     Label("Details", systemImage: "list.bullet")
                 }
+                
+                NavigationStack {
+                    SettingsView()
+                }
+                .tag(2)
+                .tabItem {
+                    Label("Settings", systemImage: "gearshape.fill")
+                }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
@@ -95,22 +104,22 @@ struct MainNavigationView: View {
             await captureTodayLocationIfNeeded()
         }
         .task(id: hasCompletedOnboarding) {
-            guard hasCompletedOnboarding, didBootstrapInference else { return }
+            guard hasCompletedOnboarding else { return }
             let container = modelContext.container
-            let ingestor = CalendarSignalIngestor(modelContainer: container, resolver: CLGeocoderCountryResolver())
-            _ = await ingestor.ingest(mode: .auto)
-        }
-        .task(id: hasCompletedOnboarding) {
-            // Only bootstrap after onboarding completes
-            guard hasCompletedOnboarding, !didBootstrapInference else { return }
-            didBootstrapInference = true
-            let container = modelContext.container
-            let recomputeService = LedgerRecomputeService(modelContainer: container)
-            await recomputeService.recomputeAll()
-            let ingestor = PhotoSignalIngestor(modelContainer: container, resolver: CLGeocoderCountryResolver())
-            _ = await ingestor.ingest(mode: .sequenced)
+
+            if !didBootstrapInference {
+                didBootstrapInference = true
+                let recomputeService = LedgerRecomputeService(modelContainer: container)
+                await recomputeService.recomputeAll()
+                let ingestor = PhotoSignalIngestor(modelContainer: container, resolver: CLGeocoderCountryResolver())
+                _ = await ingestor.ingest(mode: .sequenced)
+                let calendarIngestor = CalendarSignalIngestor(modelContainer: container, resolver: CLGeocoderCountryResolver())
+                _ = await calendarIngestor.ingest(mode: .manualFullScan)
+                return
+            }
+
             let calendarIngestor = CalendarSignalIngestor(modelContainer: container, resolver: CLGeocoderCountryResolver())
-            _ = await calendarIngestor.ingest(mode: .manualFullScan)
+            _ = await calendarIngestor.ingest(mode: .auto)
         }
     }
     
@@ -142,6 +151,7 @@ struct MainNavigationView: View {
                 .font(.title3)
         }
     }
+
 
     @MainActor
     private func captureTodayLocationIfNeeded() async {

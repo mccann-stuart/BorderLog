@@ -11,7 +11,12 @@ import SwiftData
 struct PresenceDayDetailView: View {
     let day: PresenceDay
 
+    @Query(sort: [SortDescriptor(\PresenceDay.date, order: .reverse)]) private var allPresenceDays: [PresenceDay]
+    @ObservedObject private var inferenceActivity = InferenceActivity.shared
+
     @State private var isShowingOverride = false
+    @State private var appliedSuggestion: String? = nil
+    @State private var isShowingDeleteAlert = false
 
     private var dayTitle: String {
         day.dayKey
@@ -28,11 +33,35 @@ struct PresenceDayDetailView: View {
         day.confidenceLabel.rawValue.capitalized
     }
 
+    private var dateRange: (start: Date, end: Date) {
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: Date())
+        let start = calendar.date(byAdding: .year, value: -2, to: today) ?? today
+        return (start, today)
+    }
+
+    private var recentDayCount: Int {
+        let range = dateRange
+        return allPresenceDays.filter { day in
+            day.date >= range.start && day.date <= range.end
+        }.count
+    }
+
     var body: some View {
         Form {
+            Section {
+                rangeSummary
+                activityStatus
+            }
+
             Section("Actions") {
                 Button("Override Day") {
                     isShowingOverride = true
+                }
+                if day.isOverride {
+                    Button("Delete Override", role: .destructive) {
+                        isShowingDeleteAlert = true
+                    }
                 }
             }
 
@@ -40,23 +69,45 @@ struct PresenceDayDetailView: View {
                 Section("Suggestions") {
                     Button(action: {
                         applySuggestion(code: code1, name: name1)
+                        withAnimation(.easeInOut(duration: 0.35)) {
+                            appliedSuggestion = code1
+                        }
                     }) {
                         HStack {
-                            Text("Apply \(name1)")
-                            Spacer()
-                            Image(systemName: "plus.circle.fill")
-                        }
-                    }
-                    if let code2 = day.suggestedCountryCode2, let name2 = day.suggestedCountryName2, code2 != code1 {
-                        Button(action: {
-                            applySuggestion(code: code2, name: name2)
-                        }) {
-                            HStack {
-                                Text("Apply \(name2)")
+                            if appliedSuggestion == code1 {
+                                Image(systemName: "checkmark.circle.fill")
+                                    .foregroundStyle(.green)
+                                Text("Applied")
+                                    .foregroundStyle(.green)
+                            } else {
+                                Text("Apply \(name1)")
                                 Spacer()
                                 Image(systemName: "plus.circle.fill")
                             }
                         }
+                    }
+                    .disabled(appliedSuggestion != nil)
+                    if let code2 = day.suggestedCountryCode2, let name2 = day.suggestedCountryName2, code2 != code1 {
+                        Button(action: {
+                            applySuggestion(code: code2, name: name2)
+                            withAnimation(.easeInOut(duration: 0.35)) {
+                                appliedSuggestion = code2
+                            }
+                        }) {
+                            HStack {
+                                if appliedSuggestion == code2 {
+                                    Image(systemName: "checkmark.circle.fill")
+                                        .foregroundStyle(.green)
+                                    Text("Applied")
+                                        .foregroundStyle(.green)
+                                } else {
+                                    Text("Apply \(name2)")
+                                    Spacer()
+                                    Image(systemName: "plus.circle.fill")
+                                }
+                            }
+                        }
+                        .disabled(appliedSuggestion != nil)
                     }
                 }
             }
@@ -104,6 +155,65 @@ struct PresenceDayDetailView: View {
                 )
             }
         }
+        .alert("Delete Override", isPresented: $isShowingDeleteAlert) {
+            Button("Cancel", role: .cancel) { }
+            Button("Delete", role: .destructive) {
+                deleteOverride()
+            }
+        } message: {
+            Text("This will remove the manual override for this day. The day will revert to its inferred location.")
+        }
+    }
+
+    private var rangeSummary: some View {
+        let formatter = Date.FormatStyle(date: .abbreviated, time: .omitted)
+        return VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                Label("Last 2 years", systemImage: "calendar")
+                    .font(.subheadline.weight(.semibold))
+                Spacer()
+                Text("\(recentDayCount) days")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            Text("\(dateRange.start.formatted(formatter)) – \(dateRange.end.formatted(formatter))")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            Text("Evidence for this day appears below.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+        .padding(.vertical, 4)
+    }
+
+    private var activityStatus: some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: 8) {
+                ActivityBadge(
+                    title: "Photo scanning",
+                    systemImage: "photo",
+                    isActive: inferenceActivity.isPhotoScanning
+                )
+                ActivityBadge(
+                    title: "Location inference",
+                    systemImage: "location",
+                    isActive: inferenceActivity.isInferenceRunning
+                )
+            }
+            VStack(alignment: .leading, spacing: 8) {
+                ActivityBadge(
+                    title: "Photo scanning",
+                    systemImage: "photo",
+                    isActive: inferenceActivity.isPhotoScanning
+                )
+                ActivityBadge(
+                    title: "Location inference",
+                    systemImage: "location",
+                    isActive: inferenceActivity.isInferenceRunning
+                )
+            }
+        }
+        .padding(.vertical, 2)
     }
 
     @Environment(\.modelContext) private var modelContext
@@ -136,6 +246,43 @@ struct PresenceDayDetailView: View {
             modelContext.insert(newOverride)
         }
         try? modelContext.save()
+    }
+
+    private func deleteOverride() {
+        let calendar = Calendar.current
+        let normalizedDate = calendar.startOfDay(for: day.date)
+        let predicate = #Predicate<DayOverride> { override in
+            override.date == normalizedDate
+        }
+        if let matches = try? modelContext.fetch(FetchDescriptor(predicate: predicate)) {
+            for match in matches {
+                modelContext.delete(match)
+            }
+        }
+        try? modelContext.save()
+    }
+}
+
+private struct ActivityBadge: View {
+    let title: String
+    let systemImage: String
+    let isActive: Bool
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Image(systemName: systemImage)
+            Text(title)
+            if isActive {
+                ProgressView()
+                    .controlSize(.mini)
+            }
+        }
+        .font(.caption)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+        .background(isActive ? Color.accentColor.opacity(0.12) : Color.secondary.opacity(0.1))
+        .foregroundStyle(isActive ? .primary : .secondary)
+        .clipShape(Capsule())
     }
 }
 
