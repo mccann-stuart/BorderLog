@@ -16,9 +16,16 @@ actor PhotoSignalIngestor {
     enum IngestMode {
         case auto
         case manualFullScan
+        case sequenced
     }
 
     private var resolver: CountryResolving?
+
+    struct IngestQueryConfig {
+        let startDate: Date
+        let endDate: Date?
+        let sortAscending: Bool
+    }
 
     init(modelContainer: ModelContainer, resolver: CountryResolving) {
         self.modelContainer = modelContainer
@@ -38,21 +45,19 @@ actor PhotoSignalIngestor {
         let calendar = Calendar.current
         let now = Date()
 
-        let startDate: Date
-        switch mode {
-        case .manualFullScan:
-            startDate = Date.distantPast
-        case .auto:
-            if let lastDate = state.lastAssetCreationDate {
-                startDate = lastDate.addingTimeInterval(1)
-            } else {
-                startDate = calendar.date(byAdding: .month, value: -12, to: now) ?? now
-            }
-        }
+        let config = Self.ingestQueryConfig(mode: mode, state: state, now: now, calendar: calendar)
 
         let options = PHFetchOptions()
-        options.predicate = NSPredicate(format: "creationDate >= %@", startDate as NSDate)
-        options.sortDescriptors = [NSSortDescriptor(key: "creationDate", ascending: true)]
+        if let endDate = config.endDate {
+            options.predicate = NSPredicate(
+                format: "creationDate >= %@ AND creationDate <= %@",
+                config.startDate as NSDate,
+                endDate as NSDate
+            )
+        } else {
+            options.predicate = NSPredicate(format: "creationDate >= %@", config.startDate as NSDate)
+        }
+        options.sortDescriptors = [NSSortDescriptor(key: "creationDate", ascending: config.sortAscending)]
 
         let assets = PHAsset.fetchAssets(with: .image, options: options)
         let assetCount = assets.count
@@ -60,6 +65,7 @@ actor PhotoSignalIngestor {
         var processed = 0
         var touchedDayKeys: Set<String> = []
         let saveEvery = 25
+        var didSetSequencedCheckpoint = false
 
         if assetCount > 0 {
             for index in 0..<assetCount {
@@ -72,6 +78,12 @@ actor PhotoSignalIngestor {
                 let assetIdHash = Self.hashAssetId(asset.localIdentifier)
                 if Self.photoSignalExists(assetIdHash: assetIdHash, in: modelContext) {
                     continue
+                }
+
+                if mode == .sequenced, !didSetSequencedCheckpoint {
+                    state.lastAssetCreationDate = creationDate
+                    state.lastAssetIdHash = assetIdHash
+                    didSetSequencedCheckpoint = true
                 }
 
                 let activeResolver: CountryResolving
@@ -99,8 +111,10 @@ actor PhotoSignalIngestor {
                 modelContext.insert(signal)
                 touchedDayKeys.insert(dayKey)
 
-                state.lastAssetCreationDate = creationDate
-                state.lastAssetIdHash = assetIdHash
+                if mode != .sequenced {
+                    state.lastAssetCreationDate = creationDate
+                    state.lastAssetIdHash = assetIdHash
+                }
                 state.lastIngestedAt = Date()
                 if mode == .manualFullScan {
                     state.fullScanCompleted = true
@@ -114,6 +128,11 @@ actor PhotoSignalIngestor {
             }
         }
 
+        if mode == .sequenced {
+            state.fullScanCompleted = true
+            state.lastFullScanAt = now
+        }
+
         if modelContext.hasChanges {
             try? modelContext.save()
         }
@@ -124,6 +143,31 @@ actor PhotoSignalIngestor {
         }
 
         return processed
+    }
+
+    static func ingestQueryConfig(
+        mode: IngestMode,
+        state: PhotoIngestState,
+        now: Date,
+        calendar: Calendar
+    ) -> IngestQueryConfig {
+        switch mode {
+        case .sequenced:
+            let startDate = calendar.date(byAdding: .day, value: -730, to: now) ?? now
+            return IngestQueryConfig(startDate: startDate, endDate: now, sortAscending: false)
+        case .manualFullScan:
+            return IngestQueryConfig(startDate: Date.distantPast, endDate: nil, sortAscending: true)
+        case .auto:
+            if let lastDate = state.lastAssetCreationDate {
+                return IngestQueryConfig(
+                    startDate: lastDate.addingTimeInterval(1),
+                    endDate: nil,
+                    sortAscending: true
+                )
+            }
+            let startDate = calendar.date(byAdding: .month, value: -12, to: now) ?? now
+            return IngestQueryConfig(startDate: startDate, endDate: nil, sortAscending: true)
+        }
     }
 
     private func fetchOrCreateState() -> PhotoIngestState {

@@ -119,7 +119,7 @@ struct SettingsView: View {
                         } label: {
                             HStack {
                                 Label(
-                                    isIngestingPhotos ? "Rescanning…" : "Rescan Photo Library",
+                                    isIngestingPhotos ? "Scanning…" : "Scan Last 2 Years",
                                     systemImage: isIngestingPhotos ? "arrow.triangle.2.circlepath" : "arrow.clockwise"
                                 )
                                 if isIngestingPhotos {
@@ -274,7 +274,7 @@ struct SettingsView: View {
         let container = modelContext.container
         Task {
             let ingestor = PhotoSignalIngestor(modelContainer: container, resolver: CLGeocoderCountryResolver())
-            _ = await ingestor.ingest(mode: .manualFullScan)
+            _ = await ingestor.ingest(mode: .sequenced)
             await MainActor.run { isIngestingPhotos = false }
         }
     }
