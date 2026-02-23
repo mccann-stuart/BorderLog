@@ -95,6 +95,7 @@ actor CalendarSignalIngestor {
                 }
             }
             guard shouldIngest(event) else { continue }
+            guard let startDate = event.startDate else { continue }
 
             let (parsedFrom, parsedTo) = parseFlightInfo(event)
 
@@ -137,13 +138,13 @@ actor CalendarSignalIngestor {
                     if await resolveAndCreateSignal(
                         locationString: startLocationString,
                         coordinate: startCoordinate,
-                        date: event.startDate,
+                        date: startDate,
                         eventIdentifier: id,
                         event: event,
                         activeResolver: activeResolver
                     ) {
                         signalsCreatedForEvent += 1
-                        let dayKey = await DayKey.make(from: event.startDate, timeZone: event.timeZone ?? .current)
+                        let dayKey = await DayKey.make(from: startDate, timeZone: event.timeZone ?? .current)
                         touchedDayKeys.insert(dayKey)
                     }
                 }
@@ -153,8 +154,8 @@ actor CalendarSignalIngestor {
             if let to = parsedTo {
                 let id = event.eventIdentifier + "#end"
                 if !calendarSignalExists(eventIdentifier: id, in: modelContext) {
-                    let nextDay = calendar.date(byAdding: .day, value: 1, to: event.startDate) ?? event.endDate
-                     if await resolveAndCreateSignal(
+                    let nextDay = calendar.date(byAdding: .day, value: 1, to: startDate) ?? event.endDate ?? startDate
+                    if await resolveAndCreateSignal(
                         locationString: to,
                         coordinate: nil, // Destination usually just string unless we parsed it from somewhere else
                         date: nextDay, // Signal at arrival on the next day
