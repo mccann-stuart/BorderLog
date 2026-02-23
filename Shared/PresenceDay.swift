@@ -22,6 +22,10 @@ final class PresenceDay {
     var stayCount: Int
     var photoCount: Int
     var locationCount: Int
+    var suggestedCountryCode1: String?
+    var suggestedCountryName1: String?
+    var suggestedCountryCode2: String?
+    var suggestedCountryName2: String?
 
     init(
         dayKey: String,
@@ -35,7 +39,11 @@ final class PresenceDay {
         isOverride: Bool,
         stayCount: Int,
         photoCount: Int,
-        locationCount: Int
+        locationCount: Int,
+        suggestedCountryCode1: String? = nil,
+        suggestedCountryName1: String? = nil,
+        suggestedCountryCode2: String? = nil,
+        suggestedCountryName2: String? = nil
     ) {
         self.dayKey = dayKey
         self.date = date
@@ -49,6 +57,10 @@ final class PresenceDay {
         self.stayCount = stayCount
         self.photoCount = photoCount
         self.locationCount = locationCount
+        self.suggestedCountryCode1 = suggestedCountryCode1
+        self.suggestedCountryName1 = suggestedCountryName1
+        self.suggestedCountryCode2 = suggestedCountryCode2
+        self.suggestedCountryName2 = suggestedCountryName2
     }
 
     var confidenceLabel: ConfidenceLabel {

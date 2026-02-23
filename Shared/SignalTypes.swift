@@ -66,4 +66,8 @@ struct PresenceDayResult: Sendable {
     let stayCount: Int
     let photoCount: Int
     let locationCount: Int
+    var suggestedCountryCode1: String?
+    var suggestedCountryName1: String?
+    var suggestedCountryCode2: String?
+    var suggestedCountryName2: String?
 }

@@ -23,26 +23,23 @@ struct ContentView: View {
         DataManager(modelContext: modelContext)
     }
 
+    enum LedgerFilter: String, CaseIterable, Identifiable {
+        case all = "All"
+        case unknown = "Unknown"
+        case manual = "Manually Marked"
+        var id: String { rawValue }
+    }
+
     @State private var isPresentingAddStay = false
     @State private var isPresentingAddOverride = false
     @State private var isConfirmingReset = false
     @State private var isShowingSeedAlert = false
     @State private var schengenState = SchengenState()
+    @State private var ledgerFilter: LedgerFilter = .all
 
     var body: some View {
         NavigationStack {
             List {
-                Section {
-                    SchengenSummaryRow(summary: schengenState.summary)
-                        .listRowSeparator(.hidden)
-                }
-                
-                Section("Configuration") {
-                    Text("Schengen membership: hard-coded (M1)")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-
                 if schengenState.overlapCount > 0 || schengenState.gapDays > 0 {
                     Section("Data Quality") {
                         if schengenState.overlapCount > 0 {
@@ -54,6 +51,61 @@ struct ContentView: View {
                             Text("Gaps between stays: \(schengenState.gapDays) day(s). Consider adding stays or overrides.")
                                 .font(.callout)
                                 .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+
+                Section {
+                    Picker("Filter Ledger", selection: $ledgerFilter) {
+                        ForEach(LedgerFilter.allCases) { filter in
+                            Text(filter.rawValue).tag(filter)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                    .listRowBackground(Color.clear)
+                    .listRowInsets(EdgeInsets())
+                    .padding(.bottom, 8)
+
+                    if filteredPresenceDays.isEmpty {
+                        ContentUnavailableView(
+                            "No ledger data",
+                            systemImage: "calendar",
+                            description: Text("No days match the selected filter.")
+                        )
+                    } else {
+                        ForEach(filteredPresenceDays.prefix(5)) { day in
+                            NavigationLink {
+                                PresenceDayDetailView(day: day)
+                            } label: {
+                                PresenceDayRow(day: day)
+                            }
+                        }
+                        
+                        NavigationLink {
+                            DailyLedgerView()
+                        } label: {
+                            Text("See All")
+                                .foregroundStyle(Color.accentColor)
+                        }
+                    }
+                } header: {
+                    Text("Daily Ledger")
+                }
+
+                Section("Day Overrides") {
+                    if overrides.isEmpty {
+                        ContentUnavailableView(
+                            "No overrides",
+                            systemImage: "calendar.badge.exclamationmark",
+                            description: Text("Add a day override to correct a specific date.")
+                        )
+                    } else {
+                        ForEach(overrides) { overrideDay in
+                            NavigationLink {
+                                DayOverrideEditorView(overrideDay: overrideDay)
+                            } label: {
+                                DayOverrideRow(overrideDay: overrideDay)
+                            }
                         }
                     }
                 }
@@ -77,41 +129,10 @@ struct ContentView: View {
                     }
                 }
 
-                Section("Daily Ledger") {
-                    if presenceDays.isEmpty {
-                        ContentUnavailableView(
-                            "No ledger data",
-                            systemImage: "calendar",
-                            description: Text("Enable location or photo access to infer daily presence.")
-                        )
-                    } else {
-                        ForEach(presenceDays.prefix(30)) { day in
-                            NavigationLink {
-                                PresenceDayDetailView(day: day)
-                            } label: {
-                                PresenceDayRow(day: day)
-                            }
-                        }
-                    }
-                }
-
-                Section("Day Overrides") {
-                    if overrides.isEmpty {
-                        ContentUnavailableView(
-                            "No overrides",
-                            systemImage: "calendar.badge.exclamationmark",
-                            description: Text("Add a day override to correct a specific date.")
-                        )
-                    } else {
-                        ForEach(overrides) { overrideDay in
-                            NavigationLink {
-                                DayOverrideEditorView(overrideDay: overrideDay)
-                            } label: {
-                                DayOverrideRow(overrideDay: overrideDay)
-                            }
-                        }
-                        .onDelete(perform: deleteOverrides)
-                    }
+                Section("Configuration") {
+                    Text("Schengen membership: hard-coded (M1)")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                 }
             }
             .scrollContentBackground(.hidden)
@@ -302,113 +323,8 @@ private struct DayOverrideRow: View {
     }
 }
 
-struct PresenceDayRow: View {
-    let day: PresenceDay
 
-    private var dayText: String {
-        day.dayKey
-    }
 
-    private var countryText: String {
-        if let name = day.countryName ?? day.countryCode {
-            return name
-        }
-        return "Unknown"
-    }
-
-    private var confidenceColor: Color {
-        switch day.confidenceLabel {
-        case .high: return .green
-        case .medium: return .orange
-        case .low: return .secondary
-        }
-    }
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack {
-                Text(countryText)
-                    .font(.system(.headline, design: .rounded))
-
-                if day.isOverride {
-                    Text("Override")
-                        .font(.system(.caption, design: .rounded))
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 2)
-                        .background(Color.accentColor.opacity(0.15))
-                        .clipShape(Capsule())
-                }
-            }
-
-            HStack {
-                Text(dayText)
-                    .font(.system(.subheadline, design: .rounded))
-                    .foregroundStyle(.secondary)
-
-                Spacer()
-
-                Text(day.confidenceLabel.rawValue.capitalized)
-                    .font(.system(.caption, design: .rounded))
-                    .foregroundStyle(confidenceColor)
-            }
-        }
-        .padding(.vertical, 4)
-    }
-}
-
-private struct SchengenSummaryRow: View {
-    let summary: SchengenSummary
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("Schengen 90/180")
-                .font(.system(.headline, design: .rounded))
-
-            HStack(spacing: 12) {
-                StatPill(title: "Used", value: "\(summary.usedDays)d")
-                StatPill(title: "Remaining", value: "\(summary.remainingDays)d", tint: .green)
-                StatPill(title: "Overstay", value: "\(summary.overstayDays)d", tint: .red)
-            }
-
-            Text(windowText)
-                .font(.system(.caption, design: .rounded))
-                .foregroundStyle(.secondary)
-        }
-        .padding(.vertical, 6)
-    }
-
-    private var windowText: String {
-        let formatter = Date.FormatStyle(date: .abbreviated, time: .omitted)
-        let start = summary.windowStart.formatted(formatter)
-        let end = summary.windowEnd.formatted(formatter)
-        return "Window: \(start) - \(end)"
-    }
-}
-
-private struct StatPill: View {
-    let title: String
-    let value: String
-    var tint: Color = .accentColor
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text(title)
-                .font(.system(.caption, design: .rounded))
-                .foregroundStyle(.secondary)
-            Text(value)
-                .font(.system(.headline, design: .rounded))
-        }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 6)
-        .background(.ultraThinMaterial)
-        .overlay(
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .stroke(.white.opacity(0.2), lineWidth: 1)
-        )
-        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-        .shadow(color: .black.opacity(0.05), radius: 4, y: 2)
-    }
-}
 
 #Preview {
     ContentView()

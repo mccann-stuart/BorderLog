@@ -66,6 +66,31 @@ struct PresenceDayDetailView: View {
                     isShowingOverride = true
                 }
             }
+
+            if day.countryCode == nil, let code1 = day.suggestedCountryCode1, let name1 = day.suggestedCountryName1 {
+                Section("Suggestions") {
+                    Button(action: {
+                        applySuggestion(code: code1, name: name1)
+                    }) {
+                        HStack {
+                            Text("Apply \(name1)")
+                            Spacer()
+                            Image(systemName: "plus.circle.fill")
+                        }
+                    }
+                    if let code2 = day.suggestedCountryCode2, let name2 = day.suggestedCountryName2, code2 != code1 {
+                        Button(action: {
+                            applySuggestion(code: code2, name: name2)
+                        }) {
+                            HStack {
+                                Text("Apply \(name2)")
+                                Spacer()
+                                Image(systemName: "plus.circle.fill")
+                            }
+                        }
+                    }
+                }
+            }
         }
         .navigationTitle("Day Details")
         .navigationBarTitleDisplayMode(.inline)
@@ -79,6 +104,18 @@ struct PresenceDayDetailView: View {
                 )
             }
         }
+    }
+
+    @Environment(\.modelContext) private var modelContext
+
+    private func applySuggestion(code: String, name: String) {
+        let newOverride = DayOverride(
+            date: day.date,
+            countryCode: code,
+            countryName: name
+        )
+        modelContext.insert(newOverride)
+        try? modelContext.save()
     }
 }
 

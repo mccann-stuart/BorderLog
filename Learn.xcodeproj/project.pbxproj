@@ -17,6 +17,8 @@
 		A1B2C3D400000002 /* WelcomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D500000002 /* WelcomeView.swift */; };
 		A1B2C3D400000003 /* ProfileSetupView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D500000003 /* ProfileSetupView.swift */; };
 		A1B2C3D400000004 /* PermissionsRequestView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D500000004 /* PermissionsRequestView.swift */; };
+		2F487FA7BBF1403896C2E1B2 /* DailyLedgerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 45B6BD3FEA6D4946ADE3A962 /* DailyLedgerView.swift */; };
+		9B8569591B96412DBFA1FC4E /* PresenceDayRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 42FE2B71A8054D3C9EDC06FC /* PresenceDayRow.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -63,9 +65,18 @@
 		A1B2C3D500000002 /* WelcomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WelcomeView.swift; sourceTree = "<group>"; };
 		A1B2C3D500000003 /* ProfileSetupView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileSetupView.swift; sourceTree = "<group>"; };
 		A1B2C3D500000004 /* PermissionsRequestView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PermissionsRequestView.swift; sourceTree = "<group>"; };
+		45B6BD3FEA6D4946ADE3A962 /* DailyLedgerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DailyLedgerView.swift; sourceTree = "<group>"; };
+		42FE2B71A8054D3C9EDC06FC /* PresenceDayRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PresenceDayRow.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		1F1A3DC1C455376EBF45721F /* Exceptions for "BorderLogWidget" folder in "BorderLogWidget" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 4BEE3D032F4C2F9A00D6F0F1 /* BorderLogWidget */;
+		};
 		4B9C85D62F426FA900C510A8 /* Exceptions for "LearnTests" folder in "Learn" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
@@ -79,13 +90,6 @@
 				SchengenCalculatorTests.swift,
 			);
 			target = 4BF474C92F3FAB7B0026C07A /* LearnTests */;
-		};
-		1F1A3DC1C455376EBF45721F /* Exceptions for "BorderLogWidget" folder in "BorderLogWidget" target */ = {
-			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
-			membershipExceptions = (
-				Info.plist,
-			);
-			target = 4BEE3D032F4C2F9A00D6F0F1 /* BorderLogWidget */;
 		};
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 

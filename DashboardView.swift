@@ -280,6 +280,7 @@ private struct CountryDaysRow: View {
             }
         }
         .padding(.vertical, 4)
+        .contentShape(Rectangle())
         .background(backgroundColor)
         .clipShape(RoundedRectangle(cornerRadius: 8))
     }

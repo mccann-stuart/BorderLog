@@ -213,6 +213,95 @@ struct PresenceInferenceEngine {
             results.append(result)
         }
 
-        return results.sorted { $0.date < $1.date }
+        var sortedResults = results.sorted { $0.date < $1.date }
+        
+        var i = 0
+        while i < sortedResults.count {
+            if sortedResults[i].countryCode == nil {
+                // Find the extent of the gap
+                var j = i
+                while j < sortedResults.count, sortedResults[j].countryCode == nil {
+                    j += 1
+                }
+                
+                let gapLength = j - i
+                
+                // Check if gap is bounded by same country and length is <= 7
+                // And ensure we have a prior day (i > 0) and an after day (j < sortedResults.count)
+                if gapLength <= 7, i > 0, j < sortedResults.count {
+                    let prev = sortedResults[i - 1]
+                    let next = sortedResults[j]
+                    
+                    // Prior day and after day must match
+                    if let prevCode = prev.countryCode, let nextCode = next.countryCode, prevCode == nextCode {
+                        for k in i..<j {
+                            let current = sortedResults[k]
+                            sortedResults[k] = PresenceDayResult(
+                                dayKey: current.dayKey,
+                                date: current.date,
+                                timeZoneId: current.timeZoneId ?? prev.timeZoneId,
+                                countryCode: prevCode,
+                                countryName: prev.countryName,
+                                confidence: 0.5,
+                                confidenceLabel: .medium,
+                                sources: .none, // Explicitly no real sources, just inferred
+                                isOverride: false,
+                                stayCount: 0,
+                                photoCount: 0,
+                                locationCount: 0
+                            )
+                        }
+                    }
+                }
+                
+                i = j // Skip past the gap to avoid re-evaluating
+            } else {
+                i += 1
+            }
+        }
+
+        // Second pass: add suggestions to unknown days
+        for i in 0..<sortedResults.count {
+            if sortedResults[i].countryCode == nil || sortedResults[i].confidence == 0 {
+                // Scan backward for a known day
+                var backwardSuggestion: (code: String, name: String)?
+                for j in stride(from: i - 1, through: 0, by: -1) {
+                    if let code = sortedResults[j].countryCode, let name = sortedResults[j].countryName {
+                        backwardSuggestion = (code, name)
+                        break
+                    }
+                }
+
+                // Scan forward for a known day
+                var forwardSuggestion: (code: String, name: String)?
+                for j in stride(from: i + 1, to: sortedResults.count, by: 1) {
+                    if let code = sortedResults[j].countryCode, let name = sortedResults[j].countryName {
+                        forwardSuggestion = (code, name)
+                        break
+                    }
+                }
+
+                var suggestions: [(code: String, name: String)] = []
+                if let bg = backwardSuggestion {
+                    suggestions.append(bg)
+                }
+                if let fg = forwardSuggestion, fg.code != backwardSuggestion?.code {
+                    suggestions.append(fg)
+                }
+
+                if !suggestions.isEmpty {
+                    var updated = sortedResults[i]
+                    updated.suggestedCountryCode1 = suggestions[0].code
+                    updated.suggestedCountryName1 = suggestions[0].name
+                    if suggestions.count > 1 {
+                        updated.suggestedCountryCode2 = suggestions[1].code
+                        updated.suggestedCountryName2 = suggestions[1].name
+                    }
+                    sortedResults[i] = updated
+                }
+            }
+        }
+
+        return sortedResults
     }
 }
