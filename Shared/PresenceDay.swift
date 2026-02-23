@@ -23,6 +23,7 @@ final class PresenceDay {
     var photoCount: Int
     var locationCount: Int
     var calendarCount: Int = 0
+    var isDisputed: Bool = false
     var suggestedCountryCode1: String?
     var suggestedCountryName1: String?
     var suggestedCountryCode2: String?
@@ -42,6 +43,7 @@ final class PresenceDay {
         photoCount: Int,
         locationCount: Int,
         calendarCount: Int = 0,
+        isDisputed: Bool = false,
         suggestedCountryCode1: String? = nil,
         suggestedCountryName1: String? = nil,
         suggestedCountryCode2: String? = nil,
@@ -60,6 +62,7 @@ final class PresenceDay {
         self.photoCount = photoCount
         self.locationCount = locationCount
         self.calendarCount = calendarCount
+        self.isDisputed = isDisputed
         self.suggestedCountryCode1 = suggestedCountryCode1
         self.suggestedCountryName1 = suggestedCountryName1
         self.suggestedCountryCode2 = suggestedCountryCode2

@@ -11,6 +11,7 @@ enum LedgerPreFilter {
     case none
     case unknown
     case manual
+    case disputed
 }
 
 struct DailyLedgerView: View {
@@ -22,6 +23,7 @@ struct DailyLedgerView: View {
     @State private var showLowConfidenceOnly = false
     @State private var showMediumConfidenceOnly = false
     @State private var showManualOnly = false
+    @State private var showDisputedOnly = false
     @State private var didApplyInitialFilter = false
 
     private var dateRange: (start: Date, end: Date) {
@@ -39,7 +41,7 @@ struct DailyLedgerView: View {
     }
 
     private var anyFilterActive: Bool {
-        showUnknownOnly || showLowConfidenceOnly || showMediumConfidenceOnly || showManualOnly
+        showUnknownOnly || showLowConfidenceOnly || showMediumConfidenceOnly || showManualOnly || showDisputedOnly
     }
 
     private var filteredDays: [PresenceDay] {
@@ -69,6 +71,11 @@ struct DailyLedgerView: View {
             }
             if showManualOnly {
                 if day.isOverride {
+                    matches = true
+                }
+            }
+            if showDisputedOnly {
+                if day.isDisputed && !day.isOverride {
                     matches = true
                 }
             }
@@ -108,9 +115,11 @@ struct DailyLedgerView: View {
                             showLowConfidenceOnly = false
                             showMediumConfidenceOnly = false
                             showManualOnly = false
+                            showDisputedOnly = false
                         }
                     }
                     Toggle("Show Unknown", isOn: $showUnknownOnly)
+                    Toggle("Show Disputed", isOn: $showDisputedOnly)
                     Toggle("Show Low Confidence", isOn: $showLowConfidenceOnly)
                     Toggle("Show Medium Confidence", isOn: $showMediumConfidenceOnly)
                     Toggle("Show Manually Marked", isOn: $showManualOnly)
@@ -131,6 +140,8 @@ struct DailyLedgerView: View {
                 showUnknownOnly = true
             case .manual:
                 showManualOnly = true
+            case .disputed:
+                showDisputedOnly = true
             }
         }
     }

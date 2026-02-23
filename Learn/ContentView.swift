@@ -27,6 +27,7 @@ struct ContentView: View {
         case all = "All"
         case unknown = "Unknown"
         case manual = "Manually Marked"
+        case disputed = "Disputed"
         var id: String { rawValue }
     }
 
@@ -45,6 +46,8 @@ struct ContentView: View {
             }
         case .manual:
             return presenceDays.filter { $0.isOverride }
+        case .disputed:
+            return presenceDays.filter { $0.isDisputed && !$0.isOverride }
         }
     }
 
@@ -101,6 +104,7 @@ struct ContentView: View {
                                 switch ledgerFilter {
                                 case .unknown: return .unknown
                                 case .manual: return .manual
+                                case .disputed: return .disputed
                                 case .all: return .none
                                 }
                             }())

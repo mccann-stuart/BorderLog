@@ -156,6 +156,7 @@ struct PresenceInferenceEngine {
                     confidenceLabel: .high,
                     sources: sources,
                     isOverride: true,
+                    isDisputed: false,
                     stayCount: accumulator.stayCount,
                     photoCount: accumulator.photoCount,
                     locationCount: accumulator.locationCount,
@@ -165,7 +166,8 @@ struct PresenceInferenceEngine {
                 continue
             }
 
-            guard let winner = bucket.countries.max(by: { $0.value.score < $1.value.score }) else {
+            let sortedCountries = bucket.countries.sorted { $0.value.score > $1.value.score }
+            guard let winner = sortedCountries.first else {
                 let result = PresenceDayResult(
                     dayKey: dayKey,
                     date: date,
@@ -176,6 +178,7 @@ struct PresenceInferenceEngine {
                     confidenceLabel: .low,
                     sources: .none,
                     isOverride: false,
+                    isDisputed: false,
                     stayCount: 0,
                     photoCount: 0,
                     locationCount: 0,
@@ -209,6 +212,7 @@ struct PresenceInferenceEngine {
                     confidenceLabel: .low,
                     sources: .none,
                     isOverride: false,
+                    isDisputed: false,
                     stayCount: 0,
                     photoCount: 0,
                     locationCount: 0,
@@ -216,6 +220,11 @@ struct PresenceInferenceEngine {
                 )
                 appendResult(result)
                 continue
+            }
+
+            var isDisputed = false
+            if sortedCountries.count > 1 && sortedCountries[1].value.score > 0 {
+                isDisputed = true
             }
 
             var sources = SignalSourceMask()
@@ -234,6 +243,7 @@ struct PresenceInferenceEngine {
                 confidenceLabel: confidenceLabel,
                 sources: sources,
                 isOverride: false,
+                isDisputed: isDisputed,
                 stayCount: winner.value.stayCount,
                 photoCount: winner.value.photoCount,
                 locationCount: winner.value.locationCount,
@@ -275,6 +285,7 @@ struct PresenceInferenceEngine {
                                 confidenceLabel: .medium,
                                 sources: .none, // Explicitly no real sources, just inferred
                                 isOverride: false,
+                                isDisputed: false,
                                 stayCount: 0,
                                 photoCount: 0,
                                 locationCount: 0,

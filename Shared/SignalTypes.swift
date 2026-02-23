@@ -71,6 +71,7 @@ struct PresenceDayResult: Sendable {
     let confidenceLabel: ConfidenceLabel
     let sources: SignalSourceMask
     let isOverride: Bool
+    let isDisputed: Bool
     let stayCount: Int
     let photoCount: Int
     let locationCount: Int
