@@ -7,7 +7,7 @@ class AuthenticationManager: ObservableObject {
 
     @Published var appleUserId: String = ""
     
-    private let service = "com.MCCANN.Learn"
+    private let service = "com.MCCANN.Border"
     private let account = "appleUserId"
     private let keychain: KeychainHelperProtocol
 

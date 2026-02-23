@@ -11,7 +11,7 @@ import Foundation
 import os
 
 struct ContentView: View {
-    private static let logger = Logger(subsystem: "com.MCCANN.Learn", category: "ContentView")
+    private static let logger = Logger(subsystem: "com.MCCANN.Border", category: "ContentView")
 
     @Environment(\.modelContext) private var modelContext
     @Query(sort: [SortDescriptor(\Stay.enteredOn, order: .reverse)]) private var stays: [Stay]

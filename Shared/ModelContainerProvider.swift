@@ -62,7 +62,7 @@ enum BorderLogMigrationPlan: SchemaMigrationPlan {
 }
 
 enum ModelContainerProvider {
-    private static let logger = Logger(subsystem: "com.MCCANN.Learn", category: "Persistence")
+    private static let logger = Logger(subsystem: "com.MCCANN.Border", category: "Persistence")
 
     static func makeContainer() -> ModelContainer {
         let schema = Schema(versionedSchema: BorderLogSchemaV3.self)
@@ -97,7 +97,7 @@ enum ModelContainerProvider {
         // First, clean up any corrupt App Group store files we know about.
         // The AppGroupId may be missing from Info.plist but the entitlement can still
         // cause SwiftData to route to the App Group path as its "default" store.
-        let knownGroupId = "group.com.MCCANN.Learn"
+        let knownGroupId = "group.com.MCCANN.Border"
         cleanupAppGroupStore(appGroupId: knownGroupId)
 
         let storeURL = appSupport.appendingPathComponent("BorderLog.store")
