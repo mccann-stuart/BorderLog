@@ -19,6 +19,7 @@ enum AppConfig {
     }()
 
     static let cloudKitContainerId = "iCloud.com.MCCANN.BorderLog"
+    static let isCloudKitFeatureEnabled = false
 
     static var sharedDefaults: UserDefaults {
         if let appGroupId = appGroupId, let defaults = UserDefaults(suiteName: appGroupId) {
@@ -172,7 +173,9 @@ enum ModelContainerProvider {
     static func makeContainer() -> ModelContainer {
         let schema = Schema(versionedSchema: BorderLogSchemaV5.self)
         let cloudKitDatabase: ModelConfiguration.CloudKitDatabase? =
-            AppConfig.isCloudKitSyncEnabled ? .private(AppConfig.cloudKitContainerId) : nil
+            (AppConfig.isCloudKitFeatureEnabled && AppConfig.isCloudKitSyncEnabled)
+                ? .private(AppConfig.cloudKitContainerId)
+                : nil
 
         // Tier 1: App Group shared container (needed for widget access)
         if let appGroupId = AppConfig.appGroupId {

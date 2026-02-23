@@ -10,6 +10,7 @@
 - [x] Wire SwiftData ModelContainer to CloudKit when enabled
 - [x] Add CloudKit data reset service
 - [x] Update Settings UI with iCloud sync toggle + delete button
+- [x] Disable CloudKit feature flag and remove CloudKit entitlements
 - [ ] Verify build and manual scenarios (toggle on/off, delete)
 - [ ] Document results in Review section
 
@@ -31,4 +32,5 @@
 - CloudKit entitlements added for app + widget; AppGroupId added to widget Info.plist.
 - Added shared defaults + CloudKit config constants; ModelContainer now uses CloudKit when enabled.
 - Added CloudKit reset service and Settings UI toggle + delete action.
+- CloudKit feature is disabled via flag; CloudKit entitlements removed pending provisioning.
 - Build not run: `xcodebuild -version` fails because Xcode is not selected (CommandLineTools only).

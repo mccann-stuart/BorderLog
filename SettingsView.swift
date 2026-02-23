@@ -81,31 +81,33 @@ struct SettingsView: View {
                     Text("Privacy")
                 }
 
-                // MARK: – iCloud Sync
-                Section {
-                    Toggle(isOn: $cloudKitSyncEnabled) {
-                        Label("iCloud Sync", systemImage: "icloud")
-                    }
+                if AppConfig.isCloudKitFeatureEnabled {
+                    // MARK: – iCloud Sync
+                    Section {
+                        Toggle(isOn: $cloudKitSyncEnabled) {
+                            Label("iCloud Sync", systemImage: "icloud")
+                        }
 
-                    Button(role: .destructive) {
-                        isConfirmingCloudKitDelete = true
-                    } label: {
-                        HStack {
-                            Label(
-                                isDeletingCloudKitData ? "Deleting…" : "Delete iCloud Data",
-                                systemImage: isDeletingCloudKitData ? "arrow.triangle.2.circlepath" : "trash"
-                            )
-                            if isDeletingCloudKitData {
-                                Spacer()
-                                ProgressView()
+                        Button(role: .destructive) {
+                            isConfirmingCloudKitDelete = true
+                        } label: {
+                            HStack {
+                                Label(
+                                    isDeletingCloudKitData ? "Deleting…" : "Delete iCloud Data",
+                                    systemImage: isDeletingCloudKitData ? "arrow.triangle.2.circlepath" : "trash"
+                                )
+                                if isDeletingCloudKitData {
+                                    Spacer()
+                                    ProgressView()
+                                }
                             }
                         }
+                        .disabled(isDeletingCloudKitData)
+                    } header: {
+                        Text("iCloud Sync")
+                    } footer: {
+                        Text("Sync uses your iCloud private database. Changes take effect after restarting the app.")
                     }
-                    .disabled(isDeletingCloudKitData)
-                } header: {
-                    Text("iCloud Sync")
-                } footer: {
-                    Text("Sync uses your iCloud private database. Changes take effect after restarting the app.")
                 }
 
                 // MARK: – App Info
