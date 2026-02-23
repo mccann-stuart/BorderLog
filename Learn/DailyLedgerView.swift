@@ -7,7 +7,7 @@ import SwiftUI
 import SwiftData
 
 struct DailyLedgerView: View {
-    @Query(sort: [SortDescriptor(\PresenceDay.date, order: .reverse)]) private var allPresenceDays: [PresenceDay]
+    @Query(sort: [SortDescriptor(\PresenceDay.date, order: .forward)]) private var allPresenceDays: [PresenceDay]
     
     @State private var showUnknownOnly = false
     @State private var showLowConfidenceOnly = false

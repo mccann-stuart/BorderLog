@@ -11,7 +11,7 @@ struct CountryDetailView: View {
     let countryCode: String?
 
     @Environment(\.modelContext) private var modelContext
-    @Query(sort: [SortDescriptor(\PresenceDay.date, order: .reverse)]) private var allPresenceDays: [PresenceDay]
+    @Query(sort: [SortDescriptor(\PresenceDay.date, order: .forward)]) private var allPresenceDays: [PresenceDay]
     @Query private var allCountryConfigs: [CountryConfig]
 
     @State private var maxAllowedDaysText: String = ""

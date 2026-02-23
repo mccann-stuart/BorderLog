@@ -13,144 +13,241 @@ import Photos
 struct SettingsView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
-    
+
     @State private var isConfirmingReset = false
     @State private var isShowingSeedAlert = false
     @State private var locationStatus: CLAuthorizationStatus = CLLocationManager().authorizationStatus
     @State private var photoStatus: PHAuthorizationStatus = PHPhotoLibrary.authorizationStatus(for: .readWrite)
     @State private var isIngestingPhotos = false
     @State private var locationService = LocationSampleService()
-    
+
     private var dataManager: DataManager {
         DataManager(modelContext: modelContext)
     }
-    
+
     var body: some View {
         NavigationStack {
             Form {
-                Section("Data Management") {
-                    Button("Seed Sample Data") {
-                        seedSampleData()
+                // MARK: – Profile / About
+                Section {
+                    NavigationLink {
+                        ProfileEditView()
+                    } label: {
+                        HStack(spacing: 14) {
+                            ZStack {
+                                Circle()
+                                    .fill(Color.blue.opacity(0.15))
+                                    .frame(width: 46, height: 46)
+                                Image(systemName: "person.circle.fill")
+                                    .font(.system(size: 28))
+                                    .foregroundStyle(.blue)
+                            }
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Your Profile")
+                                    .font(.headline)
+                                Text("Passport nationality, home country")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                        .padding(.vertical, 6)
                     }
-                    
-                    Button("Reset All Data", role: .destructive) {
-                        isConfirmingReset = true
-                    }
+                } header: {
+                    Text("Profile")
                 }
-                
-                Section("About") {
-                    NavigationLink("About / Setup") {
-                        AboutSetupView()
-                    }
-                    
+
+                // MARK: – App Info
+                Section {
                     HStack {
                         Text("Version")
                         Spacer()
-                        Text("1.0.0")
+                        Text(appVersionString)
                             .foregroundStyle(.secondary)
                     }
-                }
-                
-                Section("Configuration") {
                     HStack {
-                        Text("Schengen Membership")
+                        Text("Storage")
                         Spacer()
-                        Text("Hard-coded (M1)")
+                        Text("Local (on-device)")
                             .foregroundStyle(.secondary)
                     }
+                } header: {
+                    Text("About BorderLog")
                 }
 
-                Section("Data Sources") {
+                // MARK: – Configuration
+                Section {
                     HStack {
-                        Text("Location Access")
+                        Label("Schengen Zone", systemImage: "map")
+                        Spacer()
+                        Text("Built-in")
+                            .foregroundStyle(.secondary)
+                    }
+                } header: {
+                    Text("Configuration")
+                } footer: {
+                    Text("Schengen membership data is bundled with the app and updated with each release.")
+                }
+
+                // MARK: – Data Sources
+                Section {
+                    // Location
+                    HStack {
+                        Label("Location", systemImage: "location.fill")
                         Spacer()
                         Text(locationStatusText)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(locationStatusColor)
+                            .font(.subheadline)
                     }
 
-                    Button("Request Location Access") {
-                        locationService.requestAuthorizationIfNeeded()
-                        refreshPermissions()
-                    }
+                    locationActionRow
 
+                    // Photos
                     HStack {
-                        Text("Photos Access")
+                        Label("Photos", systemImage: "photo.fill")
                         Spacer()
                         Text(photoStatusText)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(photoStatusColor)
+                            .font(.subheadline)
                     }
 
-                    Button("Request Photos Access") {
-                        requestPhotosAccess()
-                    }
+                    photoActionRow
 
-                    Button(isIngestingPhotos ? "Rescanning Photos..." : "Rescan Photos") {
-                        rescanPhotos()
+                    if photoStatus == .authorized || photoStatus == .limited {
+                        Button {
+                            rescanPhotos()
+                        } label: {
+                            HStack {
+                                Label(
+                                    isIngestingPhotos ? "Rescanning…" : "Rescan Photo Library",
+                                    systemImage: isIngestingPhotos ? "arrow.triangle.2.circlepath" : "arrow.clockwise"
+                                )
+                                if isIngestingPhotos {
+                                    Spacer()
+                                    ProgressView()
+                                }
+                            }
+                        }
+                        .disabled(isIngestingPhotos)
                     }
-                    .disabled(isIngestingPhotos)
+                } header: {
+                    Text("Data Sources")
+                } footer: {
+                    Text("Location and photo metadata are used to infer which country you were in on each day. All processing happens on-device.")
                 }
-                
-                Section("Privacy") {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Local-First Storage")
-                            .font(.system(.headline, design: .rounded))
-                        Text("All your travel data is stored locally on this device. No data is sent to external servers unless you enable iCloud sync.")
-                            .font(.system(.caption, design: .rounded))
+
+                // MARK: – Privacy
+                Section {
+                    VStack(alignment: .leading, spacing: 10) {
+                        Label("Local-First Storage", systemImage: "lock.shield.fill")
+                            .font(.headline)
+
+                        Text("All your travel data is stored on this device. Nothing is uploaded to any external server.")
+                            .font(.callout)
                             .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
                     }
+                    .padding(.vertical, 4)
+                } header: {
+                    Text("Privacy")
+                }
+
+                // MARK: – Data Management
+                Section {
+                    Button("Reset All Data", role: .destructive) {
+                        isConfirmingReset = true
+                    }
+                } header: {
+                    Text("Data Management")
+                } footer: {
+                    Text("Permanently deletes all stays, day overrides, and location samples stored on this device.")
                 }
             }
             .scrollContentBackground(.hidden)
             .background {
                 ZStack {
                     Color(UIColor.systemGroupedBackground)
-                    LinearGradient(colors: [.blue.opacity(0.05), .purple.opacity(0.05)], startPoint: .topLeading, endPoint: .bottomTrailing)
+                    LinearGradient(
+                        colors: [.blue.opacity(0.05), .purple.opacity(0.05)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
                 }
                 .ignoresSafeArea()
             }
             .navigationTitle("Settings")
-            .navigationBarTitleDisplayMode(.inline)
+            .navigationBarTitleDisplayMode(.large)
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Done") {
-                        dismiss()
-                    }
+                    Button("Done") { dismiss() }
                 }
             }
             .confirmationDialog("Delete all local data?", isPresented: $isConfirmingReset) {
-                Button("Delete All", role: .destructive) {
-                    resetAllData()
-                }
+                Button("Delete All", role: .destructive) { resetAllData() }
             } message: {
-                Text("This will remove all stays and day overrides from this device.")
+                Text("This will remove all stays and day overrides from this device. This cannot be undone.")
             }
             .alert("Sample data unavailable", isPresented: $isShowingSeedAlert) {
                 Button("OK", role: .cancel) {}
             } message: {
                 Text("Reset all data before seeding the sample dataset.")
             }
-            .onAppear {
+            .onAppear { refreshPermissions() }
+        }
+    }
+
+    // MARK: – Smart Location Row
+
+    @ViewBuilder
+    private var locationActionRow: some View {
+        switch locationStatus {
+        case .notDetermined:
+            Button {
+                locationService.requestAuthorizationIfNeeded()
                 refreshPermissions()
+            } label: {
+                Label("Request Location Access", systemImage: "hand.raised")
             }
+        case .denied, .restricted:
+            Button {
+                openAppSettings()
+            } label: {
+                Label("Open Settings to Enable Location", systemImage: "gear")
+            }
+        case .authorizedWhenInUse, .authorizedAlways:
+            EmptyView()
+        @unknown default:
+            EmptyView()
         }
     }
-    
+
+    // MARK: – Smart Photos Row
+
+    @ViewBuilder
+    private var photoActionRow: some View {
+        switch photoStatus {
+        case .notDetermined:
+            Button {
+                requestPhotosAccess()
+            } label: {
+                Label("Request Photos Access", systemImage: "hand.raised")
+            }
+        case .denied, .restricted:
+            Button {
+                openAppSettings()
+            } label: {
+                Label("Open Settings to Enable Photos", systemImage: "gear")
+            }
+        case .authorized, .limited:
+            EmptyView()
+        @unknown default:
+            EmptyView()
+        }
+    }
+
+    // MARK: – Helpers
+
     private func resetAllData() {
-        do {
-            try dataManager.resetAllData()
-        } catch {
-            print("Failed to reset data: \(error)")
-        }
-    }
-    
-    private func seedSampleData() {
-        do {
-            if try !dataManager.seedSampleData() {
-                isShowingSeedAlert = true
-            }
-        } catch {
-            print("Failed to seed data: \(error)")
-        }
+        do { try dataManager.resetAllData() } catch { print("Failed to reset data: \(error)") }
     }
 
     private func refreshPermissions() {
@@ -160,9 +257,7 @@ struct SettingsView: View {
 
     private func requestPhotosAccess() {
         PHPhotoLibrary.requestAuthorization(for: .readWrite) { _ in
-            DispatchQueue.main.async {
-                refreshPermissions()
-            }
+            DispatchQueue.main.async { refreshPermissions() }
         }
     }
 
@@ -172,55 +267,206 @@ struct SettingsView: View {
         Task {
             let ingestor = PhotoSignalIngestor(modelContainer: container, resolver: CLGeocoderCountryResolver())
             _ = await ingestor.ingest(mode: .manualFullScan)
-            await MainActor.run {
-                isIngestingPhotos = false
-            }
+            await MainActor.run { isIngestingPhotos = false }
         }
+    }
+
+    private func openAppSettings() {
+        if let url = URL(string: UIApplication.openSettingsURLString) {
+            UIApplication.shared.open(url)
+        }
+    }
+
+    private var appVersionString: String {
+        let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"
+        let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "1"
+        return "\(version) (\(build))"
     }
 
     private var locationStatusText: String {
         switch locationStatus {
-        case .authorizedAlways: return "Always"
+        case .authorizedAlways:    return "Always On"
         case .authorizedWhenInUse: return "When In Use"
-        case .denied: return "Denied"
-        case .restricted: return "Restricted"
-        case .notDetermined: return "Not Determined"
-        @unknown default: return "Unknown"
+        case .denied:              return "Denied"
+        case .restricted:          return "Restricted"
+        case .notDetermined:       return "Not Set"
+        @unknown default:          return "Unknown"
+        }
+    }
+
+    private var locationStatusColor: Color {
+        switch locationStatus {
+        case .authorizedAlways, .authorizedWhenInUse: return .green
+        case .denied, .restricted:                    return .red
+        case .notDetermined:                          return .orange
+        @unknown default:                             return .secondary
         }
     }
 
     private var photoStatusText: String {
         switch photoStatus {
-        case .authorized: return "Authorized"
-        case .limited: return "Limited"
-        case .denied: return "Denied"
-        case .restricted: return "Restricted"
-        case .notDetermined: return "Not Determined"
-        @unknown default: return "Unknown"
+        case .authorized:  return "Full Access"
+        case .limited:     return "Limited"
+        case .denied:      return "Denied"
+        case .restricted:  return "Restricted"
+        case .notDetermined: return "Not Set"
+        @unknown default:  return "Unknown"
+        }
+    }
+
+    private var photoStatusColor: Color {
+        switch photoStatus {
+        case .authorized:              return .green
+        case .limited:                 return .orange
+        case .denied, .restricted:     return .red
+        case .notDetermined:           return .orange
+        @unknown default:              return .secondary
         }
     }
 }
 
-struct AboutSetupView: View {
+// MARK: – Profile Edit View
+
+struct ProfileEditView: View {
+    @Environment(\.dismiss) private var dismiss
+
+    @State private var passportNationality = ""
+    @State private var homeCountry = ""
+
+    private let keychainService = "com.MCCANN.Learn"
+
+    private struct CountryRegion: Identifiable {
+        let id = UUID()
+        let name: String
+        let countryCodes: [String]
+    }
+
+    private var countryRegions: [CountryRegion] {
+        [
+            CountryRegion(name: "North America",   countryCodes: ["US", "MX", "CA"]),
+            CountryRegion(name: "Central America", countryCodes: ["GT", "HN", "SV", "NI", "CR", "BZ", "PA"]),
+            CountryRegion(name: "Caribbean",       countryCodes: ["CU", "DO", "HT", "JM", "TT", "AG", "BS", "BB", "DM", "GD", "KN", "LC", "VC"]),
+            CountryRegion(name: "South America",   countryCodes: ["BR", "CO", "AR", "PE", "VE", "BO", "CL", "EC", "GY", "PY", "SR", "UY"]),
+            CountryRegion(name: "Europe", countryCodes: [
+                "RU", "DE", "GB", "FR", "IT", "AL", "AD", "AT", "BY", "BE", "BA", "BG", "HR",
+                "CY", "CZ", "DK", "EE", "FI", "GR", "HU", "IS", "IE", "LV", "LI", "LT", "LU",
+                "MT", "MD", "MC", "ME", "NL", "MK", "NO", "PL", "PT", "RO", "SM", "RS", "SK",
+                "SI", "ES", "SE", "CH", "UA", "VA"
+            ]),
+            CountryRegion(name: "Africa", countryCodes: [
+                "NG", "ET", "EG", "CD", "TZ", "DZ", "AO", "BJ", "BW", "BF", "BI", "CV", "CM",
+                "CF", "TD", "KM", "CG", "CI", "DJ", "GQ", "ER", "SZ", "GA", "GM", "GH", "GN",
+                "GW", "KE", "LS", "LR", "LY", "MG", "MW", "ML", "MR", "MU", "MA", "MZ", "NA",
+                "NE", "RW", "ST", "SN", "SC", "SL", "SO", "ZA", "SS", "SD", "TG", "TN", "UG", "ZM", "ZW"
+            ]),
+            CountryRegion(name: "Middle East", countryCodes: ["IR", "IQ", "SA", "YE", "SY", "BH", "IL", "JO", "KW", "LB", "OM", "PS", "QA", "TR", "AE"]),
+            CountryRegion(name: "Asia", countryCodes: [
+                "IN", "CN", "ID", "PK", "BD", "AF", "AM", "AZ", "BT", "BN", "KH", "GE", "HK",
+                "JP", "KZ", "KG", "LA", "MO", "MY", "MV", "MN", "MM", "NP", "KP", "PH", "SG",
+                "KR", "LK", "TW", "TJ", "TH", "TL", "TM", "UZ", "VN"
+            ]),
+            CountryRegion(name: "Oceania", countryCodes: [
+                "AU", "PG", "NZ", "FJ", "SB", "CK", "FM", "KI", "MH", "NR", "NU", "PW", "WS", "TO", "TV", "VU"
+            ])
+        ]
+    }
+
+    private func countryDisplayName(for code: String) -> String {
+        Locale.current.localizedString(forRegionCode: code) ?? code
+    }
+
+    private func countryLabel(for code: String) -> String {
+        "\(countryDisplayName(for: code)) (\(code))"
+    }
+
+    private func selectedLabel(for code: String) -> String {
+        code.isEmpty ? "Not set" : countryLabel(for: code)
+    }
+
     var body: some View {
         Form {
-            Section("About") {
-                Text("BorderLog is a privacy-first, local-first app for tracking days in/out and Schengen 90/180.")
+            Section {
+                Text("This information stays on your device and helps BorderLog personalise your travel tracking — for example, correctly calculating Schengen days for your passport type.")
                     .font(.callout)
                     .foregroundStyle(.secondary)
+                    .padding(.vertical, 4)
             }
 
-            Section("Setup") {
-                Text("App Group: configure Info.plist key 'AppGroupId' and enable the App Groups capability.")
-                Text("Sign in with Apple: temporarily disabled (local-only mode).")
-                Text("iCloud: optional for M1. Add later if you want device sync.")
+            Section("Passport") {
+                Menu {
+                    Button("Clear") { passportNationality = "" }
+                    ForEach(countryRegions) { region in
+                        Menu(region.name) {
+                            ForEach(region.countryCodes, id: \.self) { code in
+                                Button(countryLabel(for: code)) { passportNationality = code }
+                            }
+                        }
+                    }
+                } label: {
+                    HStack {
+                        Text("Nationality")
+                        Spacer()
+                        Text(selectedLabel(for: passportNationality))
+                            .foregroundStyle(passportNationality.isEmpty ? .secondary : .primary)
+                        Image(systemName: "chevron.up.chevron.down")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
             }
 
-            Section("Data Sources (M2)") {
-                Text("Manual stays and day overrides. Inference via widgets and photos is enabled in M2.")
+            Section("Home") {
+                Menu {
+                    Button("Clear") { homeCountry = "" }
+                    ForEach(countryRegions) { region in
+                        Menu(region.name) {
+                            ForEach(region.countryCodes, id: \.self) { code in
+                                Button(countryLabel(for: code)) { homeCountry = code }
+                            }
+                        }
+                    }
+                } label: {
+                    HStack {
+                        Text("Home Country")
+                        Spacer()
+                        Text(selectedLabel(for: homeCountry))
+                            .foregroundStyle(homeCountry.isEmpty ? .secondary : .primary)
+                        Image(systemName: "chevron.up.chevron.down")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+
+            Section("Data") {
+                HStack {
+                    Label("Storage", systemImage: "lock.shield")
+                    Spacer()
+                    Text("On-device only")
+                        .foregroundStyle(.secondary)
+                }
             }
         }
-        .navigationTitle("About / Setup")
+        .navigationTitle("Your Profile")
+        .navigationBarTitleDisplayMode(.large)
+        .onAppear { loadFromKeychain() }
+        .onChange(of: passportNationality) { _, v in save(key: "userPassportNationality", value: v) }
+        .onChange(of: homeCountry)         { _, v in save(key: "userHomeCountry",         value: v) }
+    }
+
+    private func loadFromKeychain() {
+        if let d = KeychainHelper.standard.read(service: keychainService, account: "userPassportNationality"),
+           let v = String(data: d, encoding: .utf8) { passportNationality = v }
+        if let d = KeychainHelper.standard.read(service: keychainService, account: "userHomeCountry"),
+           let v = String(data: d, encoding: .utf8) { homeCountry = v }
+    }
+
+    private func save(key: String, value: String) {
+        if value.isEmpty {
+            KeychainHelper.standard.delete(service: keychainService, account: key)
+        } else if let data = value.data(using: .utf8) {
+            KeychainHelper.standard.save(data, service: keychainService, account: key)
+        }
     }
 }
 

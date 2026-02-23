@@ -32,6 +32,7 @@ struct ContentView: View {
 
     @State private var isPresentingAddStay = false
     @State private var isPresentingAddOverride = false
+    @State private var isShowingSeedAlert = false
     @State private var schengenState = SchengenState()
     @State private var ledgerFilter: LedgerFilter = .all
 
