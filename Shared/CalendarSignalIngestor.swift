@@ -96,85 +96,83 @@ actor CalendarSignalIngestor {
             }
             guard shouldIngest(event) else { continue }
 
-            if calendarSignalExists(eventIdentifier: event.eventIdentifier, in: modelContext) {
-                 continue
-            }
+            let (parsedFrom, parsedTo) = parseFlightInfo(event)
 
-            var coordinate: CLLocationCoordinate2D?
-            var locationString: String?
+            // Determine Start Signal
+            // Prefer parsed "From". Fallback to event location/coordinate if not parsed.
+            // But if event location/coordinate matches "To", do NOT use it for Start (it's likely destination).
 
-            if let structured = event.structuredLocation {
-                if let geo = structured.geoLocation {
-                    coordinate = geo.coordinate
-                }
-                locationString = structured.title
-            }
+            var startLocationString: String? = parsedFrom
+            var startCoordinate: CLLocationCoordinate2D? = nil
 
-            if locationString == nil {
-                locationString = event.location
-            }
-
-            guard coordinate != nil || (locationString != nil && !locationString!.isEmpty) else {
-                continue
-            }
-
-            var countryCode: String?
-            var countryName: String?
-            var timeZoneId: String?
-            var lat: Double = 0
-            var long: Double = 0
-
-            if let coord = coordinate {
-                lat = coord.latitude
-                long = coord.longitude
-                let location = CLLocation(latitude: lat, longitude: long)
-                let resolution = await activeResolver.resolveCountry(for: location)
-                countryCode = resolution?.countryCode
-                countryName = resolution?.countryName
-                timeZoneId = resolution?.timeZone?.identifier
-            } else if let locString = locationString {
-                // Rate limit manually: 1 request per second max
-                try? await Task.sleep(nanoseconds: 1_000_000_000)
-
-                let request = MKLocalSearch.Request()
-                request.naturalLanguageQuery = locString
-                let search = MKLocalSearch(request: request)
-
-                if let response = try? await search.start(),
-                   let item = response.mapItems.first {
-                    let loc = item.location
-                    lat = loc.coordinate.latitude
-                    long = loc.coordinate.longitude
-                    countryCode = item.addressRepresentations?.region?.identifier
-                    countryName = item.addressRepresentations?.regionName
-                    timeZoneId = item.timeZone?.identifier
+            if startLocationString == nil {
+                if let structured = event.structuredLocation, let geo = structured.geoLocation {
+                    // Use coordinate if available
+                    startCoordinate = geo.coordinate
+                    startLocationString = structured.title // For fallback text
+                } else {
+                    startLocationString = event.location
                 }
             }
 
-            guard let validCountryCode = countryCode else { continue }
+            // Check for destination conflict in start location
+            if let to = parsedTo, let startRaw = startLocationString, !startRaw.isEmpty {
+                if startRaw.localizedStandardContains(to) {
+                    // The candidate start location contains the destination name.
+                    // This implies the event location is actually the destination.
+                    // In this case, we suppress the start signal unless we had a different coordinate?
+                    // Coordinates don't have names, but structured.title does.
+                    // To be safe, suppress start signal if we think it's the destination.
+                    startLocationString = nil
+                    startCoordinate = nil
+                }
+            }
 
-            let eventTimeZone = event.timeZone ?? TimeZone(identifier: timeZoneId ?? "") ?? TimeZone.current
-            let dayKey = await DayKey.make(from: event.startDate, timeZone: eventTimeZone)
+            var signalsCreatedForEvent = 0
 
-            let signal = CalendarSignal(
-                timestamp: event.startDate,
-                dayKey: dayKey,
-                latitude: lat,
-                longitude: long,
-                countryCode: validCountryCode,
-                countryName: countryName,
-                timeZoneId: timeZoneId ?? eventTimeZone.identifier,
-                eventIdentifier: event.eventIdentifier,
-                title: event.title,
-                source: "Calendar"
-            )
+            // 1. Create Start Signal
+            if startLocationString != nil || startCoordinate != nil {
+                let id = event.eventIdentifier
+                if !calendarSignalExists(eventIdentifier: id, in: modelContext) {
+                    if await resolveAndCreateSignal(
+                        locationString: startLocationString,
+                        coordinate: startCoordinate,
+                        date: event.startDate,
+                        eventIdentifier: id,
+                        event: event,
+                        activeResolver: activeResolver
+                    ) {
+                        signalsCreatedForEvent += 1
+                        let dayKey = await DayKey.make(from: event.startDate, timeZone: event.timeZone ?? .current)
+                        touchedDayKeys.insert(dayKey)
+                    }
+                }
+            }
 
-            modelContext.insert(signal)
-            touchedDayKeys.insert(dayKey)
-            processed += 1
+            // 2. Create End Signal (Destination)
+            if let to = parsedTo {
+                let id = event.eventIdentifier + "#end"
+                if !calendarSignalExists(eventIdentifier: id, in: modelContext) {
+                     if await resolveAndCreateSignal(
+                        locationString: to,
+                        coordinate: nil, // Destination usually just string unless we parsed it from somewhere else
+                        date: event.endDate, // Signal at arrival
+                        eventIdentifier: id,
+                        event: event,
+                        activeResolver: activeResolver
+                    ) {
+                        signalsCreatedForEvent += 1
+                        let dayKey = await DayKey.make(from: event.endDate, timeZone: event.timeZone ?? .current)
+                        touchedDayKeys.insert(dayKey)
+                    }
+                }
+            }
 
-            if processed % 10 == 0 {
-                 try? modelContext.save()
+            if signalsCreatedForEvent > 0 {
+                processed += 1
+                if processed % 10 == 0 {
+                     try? modelContext.save()
+                }
             }
         }
 
@@ -210,5 +208,134 @@ actor CalendarSignalIngestor {
         let descriptor = FetchDescriptor<CalendarSignal>(predicate: #Predicate { $0.eventIdentifier == eventIdentifier })
         let count = (try? modelContext.fetchCount(descriptor)) ?? 0
         return count > 0
+    }
+
+    private func parseFlightInfo(_ event: EKEvent) -> (from: String?, to: String?) {
+        let title = event.title ?? ""
+        let notes = event.notes ?? ""
+
+        let candidates = [title, notes]
+
+        // Patterns
+        // 1. "From A to B"
+        // 2. "Flight to B"
+        // 3. "A ✈ B"
+
+        // We use NSRegularExpression for compatibility
+        let patternFromTo = try? NSRegularExpression(pattern: "from\\s+(.+?)\\s+to\\s+(.+)", options: [.caseInsensitive])
+        let patternTo = try? NSRegularExpression(pattern: "flight\\s+to\\s+(.+)", options: [.caseInsensitive])
+        let patternPlane = try? NSRegularExpression(pattern: "(.+?)\\s*✈\\s*(.+)", options: [])
+        let patternPlaneEmoji = try? NSRegularExpression(pattern: "(.+?)\\s*✈️\\s*(.+)", options: [])
+
+        for text in candidates {
+            if text.isEmpty { continue }
+            let nsString = text as NSString
+            let range = NSRange(location: 0, length: nsString.length)
+
+            // Check "A ✈ B"
+            if let p = patternPlane, let match = p.firstMatch(in: text, options: [], range: range) {
+                if match.numberOfRanges >= 3 {
+                    let from = nsString.substring(with: match.range(at: 1)).trimmingCharacters(in: .whitespacesAndNewlines)
+                    let to = nsString.substring(with: match.range(at: 2)).trimmingCharacters(in: .whitespacesAndNewlines)
+                    return (from, to)
+                }
+            }
+
+            if let p = patternPlaneEmoji, let match = p.firstMatch(in: text, options: [], range: range) {
+                if match.numberOfRanges >= 3 {
+                    let from = nsString.substring(with: match.range(at: 1)).trimmingCharacters(in: .whitespacesAndNewlines)
+                    let to = nsString.substring(with: match.range(at: 2)).trimmingCharacters(in: .whitespacesAndNewlines)
+                    return (from, to)
+                }
+            }
+
+            // Check "From A to B"
+            if let p = patternFromTo, let match = p.firstMatch(in: text, options: [], range: range) {
+                if match.numberOfRanges >= 3 {
+                    let from = nsString.substring(with: match.range(at: 1)).trimmingCharacters(in: .whitespacesAndNewlines)
+                    let to = nsString.substring(with: match.range(at: 2)).trimmingCharacters(in: .whitespacesAndNewlines)
+                    return (from, to)
+                }
+            }
+
+            // Check "Flight to B" (Only yields 'to')
+            if let p = patternTo, let match = p.firstMatch(in: text, options: [], range: range) {
+                if match.numberOfRanges >= 2 {
+                    let to = nsString.substring(with: match.range(at: 1)).trimmingCharacters(in: .whitespacesAndNewlines)
+                    // Continue searching for 'from' in other candidates?
+                    // For now, return what we found.
+                    return (nil, to)
+                }
+            }
+        }
+
+        return (nil, nil)
+    }
+
+    private func resolveAndCreateSignal(
+        locationString: String?,
+        coordinate: CLLocationCoordinate2D?,
+        date: Date,
+        eventIdentifier: String,
+        event: EKEvent,
+        activeResolver: CountryResolving
+    ) async -> Bool {
+        guard coordinate != nil || (locationString != nil && !locationString!.isEmpty) else {
+            return false
+        }
+
+        var countryCode: String?
+        var countryName: String?
+        var timeZoneId: String?
+        var lat: Double = 0
+        var long: Double = 0
+
+        if let coord = coordinate {
+            lat = coord.latitude
+            long = coord.longitude
+            let location = CLLocation(latitude: lat, longitude: long)
+            let resolution = await activeResolver.resolveCountry(for: location)
+            countryCode = resolution?.countryCode
+            countryName = resolution?.countryName
+            timeZoneId = resolution?.timeZone?.identifier
+        } else if let locString = locationString {
+            // Rate limit manually: 1 request per second max
+            try? await Task.sleep(nanoseconds: 1_000_000_000)
+
+            let request = MKLocalSearch.Request()
+            request.naturalLanguageQuery = locString
+            let search = MKLocalSearch(request: request)
+
+            if let response = try? await search.start(),
+               let item = response.mapItems.first {
+                let loc = item.location
+                lat = loc.coordinate.latitude
+                long = loc.coordinate.longitude
+                countryCode = item.addressRepresentations?.region?.identifier
+                countryName = item.addressRepresentations?.regionName
+                timeZoneId = item.timeZone?.identifier
+            }
+        }
+
+        guard let validCountryCode = countryCode else { return false }
+
+        let eventTimeZone = event.timeZone ?? TimeZone(identifier: timeZoneId ?? "") ?? TimeZone.current
+        let dayKey = await DayKey.make(from: date, timeZone: eventTimeZone)
+
+        let signal = CalendarSignal(
+            timestamp: date,
+            dayKey: dayKey,
+            latitude: lat,
+            longitude: long,
+            countryCode: validCountryCode,
+            countryName: countryName,
+            timeZoneId: timeZoneId ?? eventTimeZone.identifier,
+            eventIdentifier: eventIdentifier,
+            title: event.title,
+            source: "Calendar"
+        )
+
+        modelContext.insert(signal)
+        return true
     }
 }
