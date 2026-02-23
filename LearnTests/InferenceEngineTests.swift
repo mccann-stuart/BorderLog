@@ -29,7 +29,7 @@ final class InferenceEngineTests: XCTestCase {
             stays: [],
             overrides: overrides,
             locations: locations,
-            photos: photos,
+            photos: photos, calendarSignals: [],
             rangeEnd: date,
             calendar: calendar
         )
@@ -48,7 +48,7 @@ final class InferenceEngineTests: XCTestCase {
             stays: [],
             overrides: [],
             locations: locations,
-            photos: [],
+            photos: [], calendarSignals: [],
             rangeEnd: date,
             calendar: calendar
         )

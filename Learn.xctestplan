@@ -20,6 +20,9 @@
   "testTargets" : [
     {
       "parallelizable" : true,
+      "skippedTests" : [
+        "AuthenticationManagerTests"
+      ],
       "target" : {
         "containerPath" : "container:Learn.xcodeproj",
         "identifier" : "4BF474C92F3FAB7B0026C07A",

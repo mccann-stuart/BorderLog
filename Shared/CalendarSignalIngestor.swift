@@ -233,7 +233,7 @@ actor CalendarSignalIngestor {
         // Updated to include arrows (->, →)
         let patternCodes = try? NSRegularExpression(pattern: "\\b([A-Z]{3})\\s*(?:[-/→]|->)\\s*([A-Z]{3})\\b", options: [])
 
-        var bestFrom: String? = nil
+        let bestFrom: String? = nil
         var bestTo: String? = nil
 
         for text in candidates {

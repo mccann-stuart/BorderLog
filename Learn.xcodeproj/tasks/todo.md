@@ -1,9 +1,9 @@
 # Todo
 
-- [ ] Review warning context in `Learn/Shared/AirportCodeResolver.swift` and confirm `airportCodesCSV` isolation
-- [ ] Update resolver loading to safely access `airportCodesCSV` across actors
-- [ ] Verify the warning is cleared using Xcode diagnostics
+- [x] Review warning context in `Learn/Shared/AirportCodeResolver.swift` and confirm `airportCodesCSV` isolation
+- [x] Update resolver loading to safely access `airportCodesCSV` across actors
+- [x] Verify the warning is cleared using Xcode diagnostics
 
 # Review
 
-- Pending
+- Verified with XcodeRefreshCodeIssuesInFile on `Learn/Shared/AirportCodeResolver.swift` (no issues reported).

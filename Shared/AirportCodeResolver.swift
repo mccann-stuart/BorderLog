@@ -20,18 +20,19 @@ actor AirportCodeResolver {
     private var cache: [String: AirportLocation] = [:]
     private var isLoaded = false
 
-    func resolve(code: String) -> AirportLocation? {
+    func resolve(code: String) async -> AirportLocation? {
         if !isLoaded {
-            loadData()
+            await loadData()
         }
         return cache[code.uppercased()]
     }
 
-    private func loadData() {
+    private func loadData() async {
         guard !isLoaded else { return }
 
         // airportCodesCSV is expected to be available globally from AirportCodesData.swift
-        let lines = airportCodesCSV.components(separatedBy: .newlines)
+        let csv = await MainActor.run { airportCodesCSV }
+        let lines = csv.components(separatedBy: .newlines)
         for line in lines {
             let parts = line.split(separator: ",")
             if parts.count >= 4 {

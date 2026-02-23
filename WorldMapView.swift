@@ -44,7 +44,7 @@ struct WorldMapView: View {
                         }
                     }
                     .mapStyle(.standard(elevation: .flat))
-                    .onChange(of: cameraPosition) { _ in
+                    .onChange(of: cameraPosition) { _, _ in
                         scheduleAutoZoomIfNeeded()
                     }
                 } else {
@@ -75,7 +75,7 @@ struct WorldMapView: View {
         .onAppear {
             updateCamera(for: visitedCountries, animated: false)
         }
-        .onChange(of: visitedCountries) { newValue in
+        .onChange(of: visitedCountries) { _, newValue in
             updateCamera(for: newValue, animated: true)
         }
     }
