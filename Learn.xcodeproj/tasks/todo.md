@@ -1,9 +1,9 @@
 # Todo
 
-- [ ] Add a calendar read-access helper that handles iOS 17+ vs earlier status values
-- [ ] Update SettingsView calendar button gating to use the helper
-- [ ] Verify via XcodeRefreshCodeIssuesInFile and document results
+- [x] Add a calendar read-access helper that handles iOS 17+ vs earlier status values
+- [x] Update SettingsView calendar button gating to use the helper
+- [x] Verify via XcodeRefreshCodeIssuesInFile and document results
 
 # Review
 
-- Pending.
+- Verified with XcodeRefreshCodeIssuesInFile on `Learn/SettingsView.swift` (no issues reported).

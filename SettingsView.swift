@@ -161,7 +161,7 @@ struct SettingsView: View {
 
                     calendarActionRow
 
-                    if calendarStatus == .authorized || calendarStatus == .fullAccess {
+                    if calendarHasReadAccess {
                         Button {
                             rescanCalendar()
                         } label: {
@@ -307,7 +307,7 @@ struct SettingsView: View {
             } label: {
                 Label("Open Settings to Allow Calendar Read Access", systemImage: "gear")
             }
-        case .authorized, .fullAccess:
+        case .fullAccess:
             EmptyView()
         @unknown default:
             EmptyView()
@@ -378,6 +378,10 @@ struct SettingsView: View {
         }
     }
 
+    private var calendarHasReadAccess: Bool {
+        calendarStatus == .fullAccess
+    }
+
     private var appVersionString: String {
         let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"
         let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "1"
@@ -427,22 +431,22 @@ struct SettingsView: View {
 
     private var calendarStatusText: String {
         switch calendarStatus {
-        case .authorized, .fullAccess: return "Read Access"
-        case .writeOnly:               return "Write Only"
-        case .denied:                  return "Denied"
-        case .restricted:              return "Restricted"
-        case .notDetermined:           return "Not Set"
-        @unknown default:              return "Unknown"
+        case .fullAccess:    return "Read Access"
+        case .writeOnly:     return "Write Only"
+        case .denied:        return "Denied"
+        case .restricted:    return "Restricted"
+        case .notDetermined: return "Not Set"
+        @unknown default:    return "Unknown"
         }
     }
 
     private var calendarStatusColor: Color {
         switch calendarStatus {
-        case .authorized, .fullAccess: return .green
-        case .writeOnly:               return .orange
-        case .denied, .restricted:     return .red
-        case .notDetermined:           return .orange
-        @unknown default:              return .secondary
+        case .fullAccess:           return .green
+        case .writeOnly:            return .orange
+        case .denied, .restricted:  return .red
+        case .notDetermined:        return .orange
+        @unknown default:           return .secondary
         }
     }
 }
