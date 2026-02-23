@@ -216,11 +216,12 @@ public actor LedgerRecomputeService {
         let calendar = Calendar.current
         let timeZone = calendar.timeZone
         let today = calendar.startOfDay(for: Date())
-        let twoYearsAgo = calendar.date(byAdding: .year, value: -2, to: today) ?? today
-        let earliestSignal = try? self.earliestSignalDate()
-        let earliest = [earliestSignal, twoYearsAgo].compactMap { $0 }.min() ?? twoYearsAgo
 
-        let allDayKeys = Set(self.makeDayKeys(from: earliest, to: today, calendar: calendar))
+        // Cover every day of the current year and the two preceding calendar years.
+        let currentYear = calendar.component(.year, from: today)
+        let startOfTwoYearsAgo = calendar.date(from: DateComponents(year: currentYear - 2, month: 1, day: 1)) ?? today
+
+        let allDayKeys = Set(self.makeDayKeys(from: startOfTwoYearsAgo, to: today, calendar: calendar))
 
         let existingKeys: Set<String>
         do {

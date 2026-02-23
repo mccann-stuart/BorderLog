@@ -98,13 +98,10 @@ struct MainNavigationView: View {
             guard hasCompletedOnboarding else { return }
             let container = modelContext.container
 
-            // Ensure every calendar day has a PresenceDay entry
-            let recomputeService = LedgerRecomputeService(modelContainer: container)
-            await recomputeService.fillMissingDays()
-
             // One-time bootstrap: full recompute + initial photo ingestion
             if !didBootstrapInference {
                 didBootstrapInference = true
+                let recomputeService = LedgerRecomputeService(modelContainer: container)
                 await recomputeService.recomputeAll()
                 let ingestor = PhotoSignalIngestor(modelContainer: container, resolver: CLGeocoderCountryResolver())
                 _ = await ingestor.ingest(mode: .sequenced)

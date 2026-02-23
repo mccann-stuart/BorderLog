@@ -14,6 +14,14 @@ struct BorderLogApp: App {
 
     @StateObject private var authManager = AuthenticationManager()
 
+    init() {
+        let container = sharedModelContainer
+        Task {
+            let service = LedgerRecomputeService(modelContainer: container)
+            await service.fillMissingDays()
+        }
+    }
+
     var body: some Scene {
         WindowGroup {
             MainNavigationView()
