@@ -90,8 +90,8 @@ export default {
           headers: securityHeaders,
         });
       } catch (e) {
-        // Log the actual error but return a generic message to the client
-        console.error(`Error fetching from R2: ${e.message}`);
+        // Log a generic error message to avoid leaking sensitive details
+        console.error("Error fetching from R2");
         return new Response("Internal Server Error", {
             status: 500,
             headers: getSecurityHeaders()
