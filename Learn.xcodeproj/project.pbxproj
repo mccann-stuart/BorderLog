@@ -58,6 +58,13 @@
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		16E1CD7231331A6D85F014E5 /* Exceptions for "BorderLogWidget" folder in "BorderLogWidget" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 4BEE3D032F4C2F9A00D6F0F1 /* BorderLogWidget */;
+		};
 		4B9C85D62F426FA900C510A8 /* Exceptions for "LearnTests" folder in "Learn" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
@@ -72,13 +79,6 @@
 			);
 			target = 4BF474C92F3FAB7B0026C07A /* LearnTests */;
 		};
-		5582EF3F4CEB18A1DCD23CB8 /* Exceptions for "BorderLogWidget" folder in "BorderLogWidget" target */ = {
-			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
-			membershipExceptions = (
-				Info.plist,
-			);
-			target = 4BEE3D032F4C2F9A00D6F0F1 /* BorderLogWidget */;
-		};
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -90,7 +90,7 @@
 		4BEE3D0B2F4C2F9A00D6F0F1 /* BorderLogWidget */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
-				5582EF3F4CEB18A1DCD23CB8 /* Exceptions for "BorderLogWidget" folder in "BorderLogWidget" target */,
+				16E1CD7231331A6D85F014E5 /* Exceptions for "BorderLogWidget" folder in "BorderLogWidget" target */,
 			);
 			path = BorderLogWidget;
 			sourceTree = "<group>";
@@ -524,9 +524,9 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_AppGroupId = "$(APP_GROUP_ID)";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.business";
-				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				INFOPLIST_KEY_NSCalendarsFullAccessUsageDescription = "BorderLog reads your calendar events to infer travel days. It never writes to your calendar.";
 				INFOPLIST_KEY_NSCalendarsUsageDescription = "BorderLog reads your calendar events to infer travel days. It never writes to your calendar.";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "BorderLog uses your location to infer your daily country presence.";
 				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "BorderLog reads photo location metadata to infer your daily country presence.";
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -573,9 +573,9 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_AppGroupId = "$(APP_GROUP_ID)";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.business";
-				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				INFOPLIST_KEY_NSCalendarsFullAccessUsageDescription = "BorderLog reads your calendar events to infer travel days. It never writes to your calendar.";
 				INFOPLIST_KEY_NSCalendarsUsageDescription = "BorderLog reads your calendar events to infer travel days. It never writes to your calendar.";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "BorderLog uses your location to infer your daily country presence.";
 				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "BorderLog reads photo location metadata to infer your daily country presence.";
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
