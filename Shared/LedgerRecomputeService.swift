@@ -39,12 +39,14 @@ public actor LedgerRecomputeService {
         let overrides: [DayOverride]
         let locations: [LocationSample]
         let photos: [PhotoSignal]
+        let calendarSignals: [CalendarSignal]
 
         do {
             stays = try dataFetcher.fetchStays(from: rangeStart, to: rangeEnd)
             overrides = try dataFetcher.fetchOverrides(from: rangeStart, to: rangeEnd)
             locations = try dataFetcher.fetchLocations(from: rangeStart, to: rangeEnd)
             photos = try dataFetcher.fetchPhotos(from: rangeStart, to: rangeEnd)
+            calendarSignals = try dataFetcher.fetchCalendarSignals(from: rangeStart, to: rangeEnd)
         } catch {
             print("LedgerRecomputeService fetch error: \(error)")
             onRecomputeError?(error)
@@ -89,8 +91,19 @@ public actor LedgerRecomputeService {
             )
         }
 
+        let calendarInfos = calendarSignals.compactMap { signal -> CalendarSignalInfo? in
+            guard let name = signal.countryName ?? signal.countryCode else { return nil }
+            return CalendarSignalInfo(
+                dayKey: signal.dayKey,
+                countryCode: signal.countryCode ?? name,
+                countryName: name,
+                timeZoneId: signal.timeZoneId
+            )
+        }
+
         dayKeySet.formUnion(locations.map { $0.dayKey })
         dayKeySet.formUnion(photos.map { $0.dayKey })
+        dayKeySet.formUnion(calendarSignals.map { $0.dayKey })
 
         for overrideDay in overrides {
             let overrideKey = DayKey.make(from: overrideDay.date, timeZone: timeZone)
@@ -103,6 +116,7 @@ public actor LedgerRecomputeService {
             overrides: overrideInfos,
             locations: locationInfos,
             photos: photoInfos,
+            calendarSignals: calendarInfos,
             rangeEnd: rangeEnd,
             calendar: calendar
         )
@@ -145,6 +159,7 @@ public actor LedgerRecomputeService {
                 existing.stayCount = result.stayCount
                 existing.photoCount = result.photoCount
                 existing.locationCount = result.locationCount
+                existing.calendarCount = result.calendarCount
                 existing.suggestedCountryCode1 = result.suggestedCountryCode1
                 existing.suggestedCountryName1 = result.suggestedCountryName1
                 existing.suggestedCountryCode2 = result.suggestedCountryCode2
@@ -163,6 +178,7 @@ public actor LedgerRecomputeService {
                     stayCount: result.stayCount,
                     photoCount: result.photoCount,
                     locationCount: result.locationCount,
+                    calendarCount: result.calendarCount,
                     suggestedCountryCode1: result.suggestedCountryCode1,
                     suggestedCountryName1: result.suggestedCountryName1,
                     suggestedCountryCode2: result.suggestedCountryCode2,
@@ -201,6 +217,7 @@ public actor LedgerRecomputeService {
         let o = try dataFetcher.fetchEarliestOverrideDate()
         let l = try dataFetcher.fetchEarliestLocationDate()
         let p = try dataFetcher.fetchEarliestPhotoDate()
-        return [s, o, l, p].compactMap { $0 }.min()
+        let c = try dataFetcher.fetchEarliestCalendarSignalDate()
+        return [s, o, l, p, c].compactMap { $0 }.min()
     }
 }

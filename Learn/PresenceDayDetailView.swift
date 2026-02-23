@@ -149,6 +149,7 @@ private struct EvidenceSection: View {
     @State private var locations: [LocationSample] = []
     @State private var photos: [PhotoSignal] = []
     @State private var stays: [Stay] = []
+    @State private var calendarSignals: [CalendarSignal] = []
     
     init(dayKey: String, date: Date) {
         self.dayKey = dayKey
@@ -183,6 +184,34 @@ private struct EvidenceSection: View {
                             Text(dateRangeText(for: stay))
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+            }
+
+            Section("Calendar Events (\(calendarSignals.count))") {
+                if calendarSignals.isEmpty {
+                    Text("No calendar evidence")
+                        .foregroundStyle(.secondary)
+                } else {
+                    ForEach(calendarSignals) { signal in
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(signal.countryName ?? signal.countryCode ?? "Unknown Location")
+                                .font(.subheadline)
+                            if let title = signal.title {
+                                Text(title)
+                                    .font(.caption)
+                                    .foregroundStyle(.primary)
+                            }
+                            HStack {
+                                Text(signal.timestamp.formatted(date: .omitted, time: .shortened))
+                                Spacer()
+                                Text(String(format: "%.4f, %.4f", signal.latitude, signal.longitude))
+                                    .font(.caption2)
+                                    .monospacedDigit()
+                            }
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
                         }
                     }
                 }
@@ -273,6 +302,18 @@ private struct EvidenceSection: View {
             photos = []
         }
 
+        // Calendar signals for this dayKey, sorted by timestamp
+        do {
+            let calPredicate = #Predicate<CalendarSignal> { target in
+                target.dayKey == dayKey
+            }
+            var calFetch = FetchDescriptor<CalendarSignal>(predicate: calPredicate)
+            calFetch.sortBy = [SortDescriptor(\.timestamp, order: .forward)]
+            calendarSignals = try modelContext.fetch(calFetch)
+        } catch {
+            calendarSignals = []
+        }
+
         // Stays sorted by enteredOn, reverse order
         do {
             var stayFetch = FetchDescriptor<Stay>()
@@ -306,6 +347,7 @@ private struct EvidenceSection: View {
         isOverride: false,
         stayCount: 1,
         photoCount: 2,
-        locationCount: 3
+        locationCount: 3,
+        calendarCount: 1
     ))
 }

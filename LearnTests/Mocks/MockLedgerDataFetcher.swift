@@ -14,11 +14,13 @@ class MockLedgerDataFetcher: LedgerDataFetching {
     var overrides: [DayOverride] = []
     var locations: [LocationSample] = []
     var photos: [PhotoSignal] = []
+    var calendarSignals: [CalendarSignal] = []
 
     var earliestStayDate: Date?
     var earliestOverrideDate: Date?
     var earliestLocationDate: Date?
     var earliestPhotoDate: Date?
+    var earliestCalendarSignalDate: Date?
 
     var presenceDays: [String: PresenceDay] = [:]
 
@@ -26,6 +28,7 @@ class MockLedgerDataFetcher: LedgerDataFetching {
     var fetchOverridesError: Error?
     var fetchLocationsError: Error?
     var fetchPhotosError: Error?
+    var fetchCalendarSignalsError: Error?
     var fetchPresenceDaysError: Error?
     var saveError: Error?
 
@@ -52,6 +55,11 @@ class MockLedgerDataFetcher: LedgerDataFetching {
         return photos
     }
 
+    func fetchCalendarSignals(from start: Date, to end: Date) throws -> [CalendarSignal] {
+        if let error = fetchCalendarSignalsError { throw error }
+        return calendarSignals
+    }
+
     func fetchEarliestStayDate() throws -> Date? {
         return earliestStayDate
     }
@@ -66,6 +74,10 @@ class MockLedgerDataFetcher: LedgerDataFetching {
 
     func fetchEarliestPhotoDate() throws -> Date? {
         return earliestPhotoDate
+    }
+
+    func fetchEarliestCalendarSignalDate() throws -> Date? {
+        return earliestCalendarSignalDate
     }
 
     func fetchPresenceDays(keys: [String]) throws -> [PresenceDay] {

@@ -13,11 +13,13 @@ protocol LedgerDataFetching {
     func fetchOverrides(from start: Date, to end: Date) throws -> [DayOverride]
     func fetchLocations(from start: Date, to end: Date) throws -> [LocationSample]
     func fetchPhotos(from start: Date, to end: Date) throws -> [PhotoSignal]
+    func fetchCalendarSignals(from start: Date, to end: Date) throws -> [CalendarSignal]
 
     func fetchEarliestStayDate() throws -> Date?
     func fetchEarliestOverrideDate() throws -> Date?
     func fetchEarliestLocationDate() throws -> Date?
     func fetchEarliestPhotoDate() throws -> Date?
+    func fetchEarliestCalendarSignalDate() throws -> Date?
 
     func fetchPresenceDays(keys: [String]) throws -> [PresenceDay]
     func insertPresenceDay(_ day: PresenceDay)
@@ -65,6 +67,15 @@ struct RealLedgerDataFetcher: LedgerDataFetching {
         return try modelContext.fetch(descriptor)
     }
 
+    func fetchCalendarSignals(from start: Date, to end: Date) throws -> [CalendarSignal] {
+        let descriptor = FetchDescriptor<CalendarSignal>(
+            predicate: #Predicate { signal in
+                signal.timestamp >= start && signal.timestamp <= end
+            }
+        )
+        return try modelContext.fetch(descriptor)
+    }
+
     func fetchEarliestStayDate() throws -> Date? {
         var descriptor = FetchDescriptor<Stay>(sortBy: [SortDescriptor(\.enteredOn, order: .forward)])
         descriptor.fetchLimit = 1
@@ -85,6 +96,12 @@ struct RealLedgerDataFetcher: LedgerDataFetching {
 
     func fetchEarliestPhotoDate() throws -> Date? {
         var descriptor = FetchDescriptor<PhotoSignal>(sortBy: [SortDescriptor(\.timestamp, order: .forward)])
+        descriptor.fetchLimit = 1
+        return try modelContext.fetch(descriptor).first?.timestamp
+    }
+
+    func fetchEarliestCalendarSignalDate() throws -> Date? {
+        var descriptor = FetchDescriptor<CalendarSignal>(sortBy: [SortDescriptor(\.timestamp, order: .forward)])
         descriptor.fetchLimit = 1
         return try modelContext.fetch(descriptor).first?.timestamp
     }

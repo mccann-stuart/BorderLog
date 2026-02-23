@@ -18,6 +18,7 @@ struct PresenceInferenceEngine {
         var stayCount: Int = 0
         var photoCount: Int = 0
         var locationCount: Int = 0
+        var calendarCount: Int = 0
     }
 
     private struct DayBucket {
@@ -31,6 +32,7 @@ struct PresenceInferenceEngine {
         overrides: [OverridePresenceInfo],
         locations: [LocationSignalInfo],
         photos: [PhotoSignalInfo],
+        calendarSignals: [CalendarSignalInfo],
         rangeEnd: Date,
         calendar: Calendar = .current
     ) -> [PresenceDayResult] {
@@ -47,7 +49,7 @@ struct PresenceInferenceEngine {
             buckets[dayKey] = current
         }
 
-        func addScore(dayKey: String, countryCode: String?, countryName: String, weight: Double, stay: Bool, photo: Bool, location: Bool, timeZoneId: String?) {
+        func addScore(dayKey: String, countryCode: String?, countryName: String, weight: Double, stay: Bool, photo: Bool, location: Bool, calendarSignal: Bool, timeZoneId: String?) {
             updateBucket(dayKey) { bucket in
                 let key = CountryKey(code: countryCode, name: countryName)
                 var accumulator = bucket.countries[key] ?? CountryAccumulator()
@@ -55,6 +57,7 @@ struct PresenceInferenceEngine {
                 if stay { accumulator.stayCount += 1 }
                 if photo { accumulator.photoCount += 1 }
                 if location { accumulator.locationCount += 1 }
+                if calendarSignal { accumulator.calendarCount += 1 }
                 bucket.countries[key] = accumulator
                 if bucket.timeZoneId == nil {
                     bucket.timeZoneId = timeZoneId
@@ -74,7 +77,7 @@ struct PresenceInferenceEngine {
                 let dayKey = DayKey.make(from: day, timeZone: timeZone)
                 if dayKeys.contains(dayKey) {
                     let countryName = stay.countryName
-                    addScore(dayKey: dayKey, countryCode: stay.countryCode, countryName: countryName, weight: 5.0, stay: true, photo: false, location: false, timeZoneId: timeZone.identifier)
+                    addScore(dayKey: dayKey, countryCode: stay.countryCode, countryName: countryName, weight: 5.0, stay: true, photo: false, location: false, calendarSignal: false, timeZoneId: timeZone.identifier)
                 }
                 guard let next = calendar.date(byAdding: .day, value: 1, to: day) else { break }
                 day = next
@@ -84,7 +87,14 @@ struct PresenceInferenceEngine {
         // Photo signals
         for photo in photos {
             if dayKeys.contains(photo.dayKey) {
-                addScore(dayKey: photo.dayKey, countryCode: photo.countryCode, countryName: photo.countryName, weight: 2.0, stay: false, photo: true, location: false, timeZoneId: photo.timeZoneId)
+                addScore(dayKey: photo.dayKey, countryCode: photo.countryCode, countryName: photo.countryName, weight: 2.0, stay: false, photo: true, location: false, calendarSignal: false, timeZoneId: photo.timeZoneId)
+            }
+        }
+
+        // Calendar signals
+        for signal in calendarSignals {
+            if dayKeys.contains(signal.dayKey) {
+                addScore(dayKey: signal.dayKey, countryCode: signal.countryCode, countryName: signal.countryName, weight: 2.0, stay: false, photo: false, location: false, calendarSignal: true, timeZoneId: signal.timeZoneId)
             }
         }
 
@@ -93,7 +103,7 @@ struct PresenceInferenceEngine {
             if dayKeys.contains(location.dayKey) {
                 let accuracy = max(location.accuracyMeters, 1)
                 let accuracyFactor = min(1.0, max(0.2, 100.0 / accuracy))
-                addScore(dayKey: location.dayKey, countryCode: location.countryCode, countryName: location.countryName, weight: 1.0 * accuracyFactor, stay: false, photo: false, location: true, timeZoneId: location.timeZoneId)
+                addScore(dayKey: location.dayKey, countryCode: location.countryCode, countryName: location.countryName, weight: 1.0 * accuracyFactor, stay: false, photo: false, location: true, calendarSignal: false, timeZoneId: location.timeZoneId)
             }
         }
 
@@ -121,6 +131,7 @@ struct PresenceInferenceEngine {
                 if accumulator.stayCount > 0 { sources.formUnion(.stay) }
                 if accumulator.photoCount > 0 { sources.formUnion(.photo) }
                 if accumulator.locationCount > 0 { sources.formUnion(.location) }
+                if accumulator.calendarCount > 0 { sources.formUnion(.calendar) }
 
                 let result = PresenceDayResult(
                     dayKey: dayKey,
@@ -134,7 +145,8 @@ struct PresenceInferenceEngine {
                     isOverride: true,
                     stayCount: accumulator.stayCount,
                     photoCount: accumulator.photoCount,
-                    locationCount: accumulator.locationCount
+                    locationCount: accumulator.locationCount,
+                    calendarCount: accumulator.calendarCount
                 )
                 results.append(result)
                 continue
@@ -153,7 +165,8 @@ struct PresenceInferenceEngine {
                     isOverride: false,
                     stayCount: 0,
                     photoCount: 0,
-                    locationCount: 0
+                    locationCount: 0,
+                    calendarCount: 0
                 )
                 results.append(result)
                 continue
@@ -185,7 +198,8 @@ struct PresenceInferenceEngine {
                     isOverride: false,
                     stayCount: 0,
                     photoCount: 0,
-                    locationCount: 0
+                    locationCount: 0,
+                    calendarCount: 0
                 )
                 results.append(result)
                 continue
@@ -195,6 +209,7 @@ struct PresenceInferenceEngine {
             if winner.value.stayCount > 0 { sources.formUnion(.stay) }
             if winner.value.photoCount > 0 { sources.formUnion(.photo) }
             if winner.value.locationCount > 0 { sources.formUnion(.location) }
+            if winner.value.calendarCount > 0 { sources.formUnion(.calendar) }
 
             let result = PresenceDayResult(
                 dayKey: dayKey,
@@ -208,7 +223,8 @@ struct PresenceInferenceEngine {
                 isOverride: false,
                 stayCount: winner.value.stayCount,
                 photoCount: winner.value.photoCount,
-                locationCount: winner.value.locationCount
+                locationCount: winner.value.locationCount,
+                calendarCount: winner.value.calendarCount
             )
             results.append(result)
         }
@@ -248,7 +264,8 @@ struct PresenceInferenceEngine {
                                 isOverride: false,
                                 stayCount: 0,
                                 photoCount: 0,
-                                locationCount: 0
+                                locationCount: 0,
+                                calendarCount: 0
                             )
                         }
                     }

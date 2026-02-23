@@ -22,6 +22,7 @@ final class PresenceDay {
     var stayCount: Int
     var photoCount: Int
     var locationCount: Int
+    var calendarCount: Int = 0
     var suggestedCountryCode1: String?
     var suggestedCountryName1: String?
     var suggestedCountryCode2: String?
@@ -40,6 +41,7 @@ final class PresenceDay {
         stayCount: Int,
         photoCount: Int,
         locationCount: Int,
+        calendarCount: Int = 0,
         suggestedCountryCode1: String? = nil,
         suggestedCountryName1: String? = nil,
         suggestedCountryCode2: String? = nil,
@@ -57,6 +59,7 @@ final class PresenceDay {
         self.stayCount = stayCount
         self.photoCount = photoCount
         self.locationCount = locationCount
+        self.calendarCount = calendarCount
         self.suggestedCountryCode1 = suggestedCountryCode1
         self.suggestedCountryName1 = suggestedCountryName1
         self.suggestedCountryCode2 = suggestedCountryCode2

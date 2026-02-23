@@ -20,9 +20,17 @@ struct SignalSourceMask: OptionSet, Codable, Sendable {
     static let stay = SignalSourceMask(rawValue: 1 << 1)
     static let photo = SignalSourceMask(rawValue: 1 << 2)
     static let location = SignalSourceMask(rawValue: 1 << 3)
+    static let calendar = SignalSourceMask(rawValue: 1 << 4)
 
     static let none: SignalSourceMask = []
-    static let all: SignalSourceMask = [.`override`, .stay, .photo, .location]
+    static let all: SignalSourceMask = [.`override`, .stay, .photo, .location, .calendar]
+}
+
+struct CalendarSignalInfo: Sendable {
+    let dayKey: String
+    let countryCode: String
+    let countryName: String
+    let timeZoneId: String?
 }
 
 struct LocationSignalInfo: Sendable {
@@ -66,6 +74,7 @@ struct PresenceDayResult: Sendable {
     let stayCount: Int
     let photoCount: Int
     let locationCount: Int
+    let calendarCount: Int
     var suggestedCountryCode1: String?
     var suggestedCountryName1: String?
     var suggestedCountryCode2: String?

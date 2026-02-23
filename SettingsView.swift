@@ -9,6 +9,7 @@ import SwiftUI
 import SwiftData
 import CoreLocation
 import Photos
+import EventKit
 
 struct SettingsView: View {
     @Environment(\.modelContext) private var modelContext
@@ -18,7 +19,9 @@ struct SettingsView: View {
     @State private var isShowingSeedAlert = false
     @State private var locationStatus: CLAuthorizationStatus = CLLocationManager().authorizationStatus
     @State private var photoStatus: PHAuthorizationStatus = PHPhotoLibrary.authorizationStatus(for: .readWrite)
+    @State private var calendarStatus: EKAuthorizationStatus = EKEventStore.authorizationStatus(for: .event)
     @State private var isIngestingPhotos = false
+    @State private var isIngestingCalendar = false
     @State private var locationService = LocationSampleService()
     @AppStorage("didBootstrapInference") private var didBootstrapInference = false
 
@@ -130,10 +133,39 @@ struct SettingsView: View {
                         }
                         .disabled(isIngestingPhotos)
                     }
+
+                    // Calendar
+                    HStack {
+                        Label("Calendar", systemImage: "calendar")
+                        Spacer()
+                        Text(calendarStatusText)
+                            .foregroundStyle(calendarStatusColor)
+                            .font(.subheadline)
+                    }
+
+                    calendarActionRow
+
+                    if calendarStatus == .authorized || calendarStatus == .fullAccess {
+                        Button {
+                            rescanCalendar()
+                        } label: {
+                            HStack {
+                                Label(
+                                    isIngestingCalendar ? "Scanning…" : "Scan Last 2 Years",
+                                    systemImage: isIngestingCalendar ? "arrow.triangle.2.circlepath" : "arrow.clockwise"
+                                )
+                                if isIngestingCalendar {
+                                    Spacer()
+                                    ProgressView()
+                                }
+                            }
+                        }
+                        .disabled(isIngestingCalendar)
+                    }
                 } header: {
                     Text("Data Sources")
                 } footer: {
-                    Text("Location and photo metadata are used to infer which country you were in on each day. All processing happens on-device.")
+                    Text("Location, photo metadata, and calendar events are used to infer which country you were in on each day. All processing happens on-device.")
                 }
 
                 // MARK: – Privacy
@@ -245,6 +277,30 @@ struct SettingsView: View {
         }
     }
 
+    // MARK: – Smart Calendar Row
+
+    @ViewBuilder
+    private var calendarActionRow: some View {
+        switch calendarStatus {
+        case .notDetermined:
+            Button {
+                requestCalendarAccess()
+            } label: {
+                Label("Request Calendar Access", systemImage: "hand.raised")
+            }
+        case .denied, .restricted:
+            Button {
+                openAppSettings()
+            } label: {
+                Label("Open Settings to Enable Calendar", systemImage: "gear")
+            }
+        case .authorized, .fullAccess, .writeOnly:
+            EmptyView()
+        @unknown default:
+            EmptyView()
+        }
+    }
+
     // MARK: – Helpers
 
     private func resetAllData() {
@@ -261,11 +317,25 @@ struct SettingsView: View {
     private func refreshPermissions() {
         locationStatus = CLLocationManager().authorizationStatus
         photoStatus = PHPhotoLibrary.authorizationStatus(for: .readWrite)
+        calendarStatus = EKEventStore.authorizationStatus(for: .event)
     }
 
     private func requestPhotosAccess() {
         PHPhotoLibrary.requestAuthorization(for: .readWrite) { _ in
             DispatchQueue.main.async { refreshPermissions() }
+        }
+    }
+
+    private func requestCalendarAccess() {
+        let store = EKEventStore()
+        if #available(iOS 17.0, *) {
+            store.requestFullAccessToEvents { _, _ in
+                DispatchQueue.main.async { refreshPermissions() }
+            }
+        } else {
+            store.requestAccess(to: .event) { _, _ in
+                DispatchQueue.main.async { refreshPermissions() }
+            }
         }
     }
 
@@ -276,6 +346,16 @@ struct SettingsView: View {
             let ingestor = PhotoSignalIngestor(modelContainer: container, resolver: CLGeocoderCountryResolver())
             _ = await ingestor.ingest(mode: .sequenced)
             await MainActor.run { isIngestingPhotos = false }
+        }
+    }
+
+    private func rescanCalendar() {
+        isIngestingCalendar = true
+        let container = modelContext.container
+        Task {
+            let ingestor = CalendarSignalIngestor(modelContainer: container, resolver: CLGeocoderCountryResolver())
+            _ = await ingestor.ingest(mode: .manualFullScan)
+            await MainActor.run { isIngestingCalendar = false }
         }
     }
 
@@ -326,6 +406,27 @@ struct SettingsView: View {
         switch photoStatus {
         case .authorized:              return .green
         case .limited:                 return .orange
+        case .denied, .restricted:     return .red
+        case .notDetermined:           return .orange
+        @unknown default:              return .secondary
+        }
+    }
+
+    private var calendarStatusText: String {
+        switch calendarStatus {
+        case .authorized, .fullAccess: return "Full Access"
+        case .writeOnly:               return "Write Only"
+        case .denied:                  return "Denied"
+        case .restricted:              return "Restricted"
+        case .notDetermined:           return "Not Set"
+        @unknown default:              return "Unknown"
+        }
+    }
+
+    private var calendarStatusColor: Color {
+        switch calendarStatus {
+        case .authorized, .fullAccess: return .green
+        case .writeOnly:               return .orange
         case .denied, .restricted:     return .red
         case .notDetermined:           return .orange
         @unknown default:              return .secondary
