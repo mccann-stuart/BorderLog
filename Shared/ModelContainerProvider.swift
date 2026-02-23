@@ -75,76 +75,80 @@ enum ModelContainerProvider {
                 logger.info("Using App Group store at group: \(appGroupId, privacy: .public)")
                 return container
             } catch {
-                // Migration failed — wipe the corrupt App Group store and fall through to local store.
-                // "Unknown model version" means the store pre-dates the migration plan; we can't upgrade it.
-                logger.error("App Group store migration failed. Deleting corrupt store and falling back to local. Error: \(error, privacy: .public)")
-                if let appGroupRoot = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: appGroupId) {
-                    deleteStoreFiles(in: appGroupRoot.appendingPathComponent("Library/Application Support"))
+                logger.error("App Group store migration failed. Deleting and retrying. Error: \(error, privacy: .public)")
+                cleanupAppGroupStore(appGroupId: appGroupId)
+                // Retry App Group after cleanup
+                if let container = try? ModelContainer(for: schema, migrationPlan: BorderLogMigrationPlan.self, configurations: [appGroupConfig]) {
+                    logger.info("App Group store recreated after cleanup.")
+                    return container
                 }
             }
-        } else {
-            logger.warning("AppGroupId missing or empty in Info.plist. Using local store (widget will not share data).")
         }
 
-        // Tier 2: Local on-disk store (no widget sharing, but data is preserved)
-        // After deleting a corrupt App Group store above, try App Group one more time so widget keeps working.
-        if let appGroupId = AppConfig.appGroupId {
-            let appGroupConfig = ModelConfiguration(schema: schema, groupContainer: .identifier(appGroupId))
-            if let container = try? ModelContainer(for: schema, migrationPlan: BorderLogMigrationPlan.self, configurations: [appGroupConfig]) {
-                logger.info("App Group store recreated successfully after recovery.")
-                return container
-            }
+        // Tier 2: Local sandbox store with explicit URL.
+        // IMPORTANT: Always specify an explicit URL to prevent SwiftData from defaulting
+        // to the App Group container (which happens when no URL is given and the app has
+        // an App Group entitlement, even without a groupContainer configuration).
+        guard let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first else {
+            logger.critical("Cannot locate Application Support directory — using in-memory store.")
+            return makeInMemoryContainer(schema: schema)
         }
 
-        // Tier 3: Local on-disk fallback
-        let localConfig = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
+        // First, clean up any corrupt App Group store files we know about.
+        // The AppGroupId may be missing from Info.plist but the entitlement can still
+        // cause SwiftData to route to the App Group path as its "default" store.
+        let knownGroupId = "group.com.MCCANN.Learn"
+        cleanupAppGroupStore(appGroupId: knownGroupId)
+
+        let storeURL = appSupport.appendingPathComponent("BorderLog.store")
+        let localConfig = ModelConfiguration(schema: schema, url: storeURL)
         do {
             let container = try ModelContainer(for: schema, migrationPlan: BorderLogMigrationPlan.self, configurations: [localConfig])
-            logger.info("Using local on-disk store.")
+            logger.info("Using local sandbox store at: \(storeURL.lastPathComponent, privacy: .public)")
             return container
         } catch {
-            logger.critical("Local store also failed. Deleting and recreating. Error: \(error, privacy: .public)")
-            if let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first {
-                deleteStoreFiles(in: appSupport)
-            }
+            // Corrupt or unmigratable local store — delete and recreate fresh.
+            logger.critical("Local store failed. Deleting and recreating. Error: \(error, privacy: .public)")
+            deleteStoreFiles(in: appSupport, named: "BorderLog.store")
         }
 
-        // Tier 4: Fresh local store after recovery deletion
-        let recoveryConfig = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
+        // Tier 3: Fresh local store after wiping corrupt files
         do {
-            let container = try ModelContainer(for: schema, migrationPlan: BorderLogMigrationPlan.self, configurations: [recoveryConfig])
-            logger.warning("Recovery succeeded — fresh local store created. Previous data was lost.")
+            let container = try ModelContainer(for: schema, migrationPlan: BorderLogMigrationPlan.self, configurations: [localConfig])
+            logger.warning("Recovery succeeded — fresh local store at \(storeURL.lastPathComponent, privacy: .public). Previous data was lost.")
             return container
         } catch {
-            // Absolute last resort: in-memory. The app will work this session but not persist.
-            // This is preferable to crashing permanently on every launch.
-            logger.critical("All store options failed. Using in-memory store for this session. Error: \(error, privacy: .public)")
-            let memConfig = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
-            return try! ModelContainer(for: schema, configurations: [memConfig])
+            logger.critical("All store options failed. Falling back to in-memory store. Error: \(error, privacy: .public)")
+            return makeInMemoryContainer(schema: schema)
         }
     }
 
-    /// Deletes SwiftData store files from the given directory.
-    /// CoreData/SwiftData uses the store name directly as the SQLite filename,
-    /// with -wal and -shm variants (e.g. default.store, default.store-wal, default.store-shm).
-    private static func deleteStoreFiles(in directory: URL) {
-        let fm = FileManager.default
-        let bundleName = Bundle.main.infoDictionary?["CFBundleName"] as? String ?? "default"
-        // Cover both the bundle-name variant and SwiftData's "default" fallback
-        let storeNames = ["\(bundleName).store", "default.store"]
-        // The store name IS the SQLite file; WAL and SHM use dash suffixes, not dot suffixes
-        let fileSuffixes = ["", "-wal", "-shm"]
+    private static func makeInMemoryContainer(schema: Schema) -> ModelContainer {
+        let memConfig = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
+        return try! ModelContainer(for: schema, configurations: [memConfig])
+    }
 
-        for storeName in storeNames {
-            for suffix in fileSuffixes {
-                let url = directory.appendingPathComponent(storeName + suffix)
-                guard fm.fileExists(atPath: url.path) else { continue }
-                do {
-                    try fm.removeItem(at: url)
-                    logger.info("Deleted store file: \(url.lastPathComponent, privacy: .public)")
-                } catch {
-                    logger.error("Failed to delete \(url.lastPathComponent, privacy: .public): \(error, privacy: .public)")
-                }
+    /// Deletes the App Group SwiftData store files for the given group identifier.
+    private static func cleanupAppGroupStore(appGroupId: String) {
+        guard let root = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: appGroupId) else { return }
+        let dir = root.appendingPathComponent("Library/Application Support")
+        deleteStoreFiles(in: dir, named: "default.store")
+        deleteStoreFiles(in: dir, named: "Learn.store")
+    }
+
+    /// Deletes a named SwiftData store and its -wal/-shm sidecar files from the given directory.
+    /// CoreData stores the SQLite file using the store name directly (e.g. "BorderLog.store"),
+    /// with -wal and -shm dash-suffixed variants alongside it.
+    private static func deleteStoreFiles(in directory: URL, named storeName: String) {
+        let fm = FileManager.default
+        for suffix in ["", "-wal", "-shm"] {
+            let url = directory.appendingPathComponent(storeName + suffix)
+            guard fm.fileExists(atPath: url.path) else { continue }
+            do {
+                try fm.removeItem(at: url)
+                logger.info("Deleted store file: \(url.lastPathComponent, privacy: .public)")
+            } catch {
+                logger.error("Failed to delete \(url.lastPathComponent, privacy: .public): \(error, privacy: .public)")
             }
         }
     }
