@@ -153,16 +153,17 @@ actor CalendarSignalIngestor {
             if let to = parsedTo {
                 let id = event.eventIdentifier + "#end"
                 if !calendarSignalExists(eventIdentifier: id, in: modelContext) {
+                    let nextDay = calendar.date(byAdding: .day, value: 1, to: event.startDate) ?? event.endDate
                      if await resolveAndCreateSignal(
                         locationString: to,
                         coordinate: nil, // Destination usually just string unless we parsed it from somewhere else
-                        date: event.endDate, // Signal at arrival
+                        date: nextDay, // Signal at arrival on the next day
                         eventIdentifier: id,
                         event: event,
                         activeResolver: activeResolver
                     ) {
                         signalsCreatedForEvent += 1
-                        let dayKey = await DayKey.make(from: event.endDate, timeZone: event.timeZone ?? .current)
+                        let dayKey = await DayKey.make(from: nextDay, timeZone: event.timeZone ?? .current)
                         touchedDayKeys.insert(dayKey)
                     }
                 }
