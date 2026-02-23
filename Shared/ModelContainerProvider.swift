@@ -75,57 +75,65 @@ enum ModelContainerProvider {
                 logger.info("Using App Group store at group: \(appGroupId, privacy: .public)")
                 return container
             } catch {
-                // Fall through to local store — log but don't crash.
-                logger.error("App Group store failed. Falling back to local store. Error: \(error, privacy: .public)")
+                // Migration failed — wipe the corrupt App Group store and fall through to local store.
+                // "Unknown model version" means the store pre-dates the migration plan; we can't upgrade it.
+                logger.error("App Group store migration failed. Deleting corrupt store and falling back to local. Error: \(error, privacy: .public)")
+                if let appGroupRoot = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: appGroupId) {
+                    deleteStoreFiles(in: appGroupRoot.appendingPathComponent("Library/Application Support"))
+                }
             }
         } else {
             logger.warning("AppGroupId missing or empty in Info.plist. Using local store (widget will not share data).")
         }
 
         // Tier 2: Local on-disk store (no widget sharing, but data is preserved)
+        // After deleting a corrupt App Group store above, try App Group one more time so widget keeps working.
+        if let appGroupId = AppConfig.appGroupId {
+            let appGroupConfig = ModelConfiguration(schema: schema, groupContainer: .identifier(appGroupId))
+            if let container = try? ModelContainer(for: schema, migrationPlan: BorderLogMigrationPlan.self, configurations: [appGroupConfig]) {
+                logger.info("App Group store recreated successfully after recovery.")
+                return container
+            }
+        }
+
+        // Tier 3: Local on-disk fallback
         let localConfig = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
         do {
             let container = try ModelContainer(for: schema, migrationPlan: BorderLogMigrationPlan.self, configurations: [localConfig])
             logger.info("Using local on-disk store.")
             return container
         } catch {
-            // Migration or load failure — the store file is corrupt or incompatible.
-            // Recovery: delete the broken store files and create a fresh one.
-            // This loses persisted data but is far better than crashing in production
-            // or silently running on an in-memory store every launch.
-            logger.critical("Local store failed to open/migrate. Attempting recovery by deleting corrupt store. Error: \(error, privacy: .public)")
-            deleteLocalStoreFiles()
+            logger.critical("Local store also failed. Deleting and recreating. Error: \(error, privacy: .public)")
+            if let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first {
+                deleteStoreFiles(in: appSupport)
+            }
         }
 
-        // Tier 3: Fresh local store after recovery deletion
+        // Tier 4: Fresh local store after recovery deletion
         let recoveryConfig = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
         do {
             let container = try ModelContainer(for: schema, migrationPlan: BorderLogMigrationPlan.self, configurations: [recoveryConfig])
-            logger.warning("Recovery succeeded — started with a fresh local store. All previous data was lost.")
+            logger.warning("Recovery succeeded — fresh local store created. Previous data was lost.")
             return container
         } catch {
             fatalError("Could not create a fresh SwiftData store after recovery. Error: \(error)")
         }
     }
 
-    /// Deletes the default SwiftData SQLite store files from the app's Application Support directory.
-    private static func deleteLocalStoreFiles() {
+    /// Deletes SwiftData SQLite store files (*.sqlite, *-shm, *-wal) from the given directory.
+    private static func deleteStoreFiles(in directory: URL) {
         let fm = FileManager.default
-        guard let appSupport = fm.urls(for: .applicationSupportDirectory, in: .userDomainMask).first else { return }
-
-        // SwiftData stores files named after the app bundle name (e.g., "Learn.store.sqlite").
-        // Cover both the bundle-name variant and the "default" fallback name.
         let bundleName = Bundle.main.infoDictionary?["CFBundleName"] as? String ?? "default"
         let storeNames = ["\(bundleName).store", "default.store"]
         let sqliteSuffixes = [".sqlite", ".sqlite-shm", ".sqlite-wal"]
 
         for storeName in storeNames {
             for suffix in sqliteSuffixes {
-                let url = appSupport.appendingPathComponent(storeName + suffix)
+                let url = directory.appendingPathComponent(storeName + suffix)
                 guard fm.fileExists(atPath: url.path) else { continue }
                 do {
                     try fm.removeItem(at: url)
-                    logger.info("Deleted corrupt store file: \(url.lastPathComponent, privacy: .public)")
+                    logger.info("Deleted store file: \(url.lastPathComponent, privacy: .public)")
                 } catch {
                     logger.error("Failed to delete \(url.lastPathComponent, privacy: .public): \(error, privacy: .public)")
                 }
