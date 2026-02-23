@@ -98,7 +98,7 @@ struct PresenceInferenceEngine {
         // Calendar signals
         for signal in calendarSignals {
             if dayKeys.contains(signal.dayKey) {
-                addScore(dayKey: signal.dayKey, countryCode: signal.countryCode, countryName: signal.countryName, weight: 2.0, stay: false, photo: false, location: false, calendarSignal: true, timeZoneId: signal.timeZoneId)
+                addScore(dayKey: signal.dayKey, countryCode: signal.countryCode, countryName: signal.countryName, weight: 1.0, stay: false, photo: false, location: false, calendarSignal: true, timeZoneId: signal.timeZoneId)
             }
         }
 
@@ -107,7 +107,7 @@ struct PresenceInferenceEngine {
             if dayKeys.contains(location.dayKey) {
                 let accuracy = max(location.accuracyMeters, 1)
                 let accuracyFactor = min(1.0, max(0.2, 100.0 / accuracy))
-                addScore(dayKey: location.dayKey, countryCode: location.countryCode, countryName: location.countryName, weight: 1.0 * accuracyFactor, stay: false, photo: false, location: true, calendarSignal: false, timeZoneId: location.timeZoneId)
+                addScore(dayKey: location.dayKey, countryCode: location.countryCode, countryName: location.countryName, weight: 3.0 * accuracyFactor, stay: false, photo: false, location: true, calendarSignal: false, timeZoneId: location.timeZoneId)
             }
         }
 

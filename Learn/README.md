@@ -229,8 +229,9 @@ Step 1: Bucket signals by local day
 Step 2: Candidate country scoring
 	•	Manual day override: score = ∞ (wins)
 	•	Manual stay segment: very high weight
-	•	Photo signals: medium-high weight (users tend to take photos where they are)
-	•	Location samples: medium weight, adjusted by accuracy and number of samples
+	•	Location samples: high weight, adjusted by accuracy and number of samples
+	•	Photo signals: medium weight (users tend to take photos where they are)
+	•	Calendar signals: lower weight (helpful but less reliable)
 
 Step 3: Select day country
 	•	Choose highest-scoring country if above threshold.
@@ -540,7 +541,7 @@ Enable expatriates, digital nomads, and frequent international travelers to accu
 4. Implement `LocationSampleService` to capture a single fix, resolve country/timezone, store a sample, and trigger ledger recompute.
 5. Implement `PhotoSignalIngestor` to scan the last 12 months (incremental on subsequent runs), hash asset IDs, store signals, and trigger recompute.
 6. Create a WidgetKit extension that captures location on refresh and displays the last sample.
-7. Build `PresenceInferenceEngine` scoring logic with weights (override > stay > photo > location).
+7. Build `PresenceInferenceEngine` scoring logic with weights (override > stay > location > photo > calendar).
 8. Add `LedgerRecomputeService` to upsert `PresenceDay` by dayKey and handle unknowns.
 9. Add a Daily Ledger section in Details with confidence pills, evidence, and an override action.
 10. Switch Dashboard metrics to use `PresenceDay` with unknown-day reporting.
