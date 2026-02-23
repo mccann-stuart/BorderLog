@@ -32,8 +32,6 @@ struct ContentView: View {
 
     @State private var isPresentingAddStay = false
     @State private var isPresentingAddOverride = false
-    @State private var isConfirmingReset = false
-    @State private var isShowingSeedAlert = false
     @State private var schengenState = SchengenState()
     @State private var ledgerFilter: LedgerFilter = .all
 
@@ -171,43 +169,6 @@ struct ContentView: View {
                     }
                 }
 
-                ToolbarItem(placement: .automatic) {
-                    Menu {
-                        NavigationLink("About / Setup") {
-                            AboutSetupView()
-                        }
-
-                        Button("Seed Sample Data") {
-                            seedSampleData()
-                        }
-
-                        Button("Reset All Data", role: .destructive) {
-                            isConfirmingReset = true
-                        }
-
-                        if AuthenticationManager.isAppleSignInEnabled {
-                            Divider()
-
-                            Button("Sign Out") {
-                                authManager.signOut()
-                            }
-                        }
-                    } label: {
-                        Image(systemName: "ellipsis.circle")
-                    }
-                }
-            }
-            .confirmationDialog("Delete all local data?", isPresented: $isConfirmingReset) {
-                Button("Delete All", role: .destructive) {
-                    resetAllData()
-                }
-            } message: {
-                Text("This will remove all stays and day overrides from this device.")
-            }
-            .alert("Sample data unavailable", isPresented: $isShowingSeedAlert) {
-                Button("OK", role: .cancel) {}
-            } message: {
-                Text("Reset all data before seeding the sample dataset.")
             }
             .sheet(isPresented: $isPresentingAddStay) {
                 NavigationStack {

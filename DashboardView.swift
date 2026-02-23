@@ -10,6 +10,39 @@ import SwiftData
 
 struct DashboardView: View {
     @Query(sort: [SortDescriptor(\PresenceDay.date, order: .reverse)]) private var presenceDays: [PresenceDay]
+    @Query private var countryConfigs: [CountryConfig]
+    
+    @State private var selectedTimeframe: VisitedCountriesTimeframe = .last12Months
+    
+    enum VisitedCountriesTimeframe: String, CaseIterable, Identifiable {
+        case last12Months = "Last 12 Months"
+        case lastYear = "Last Year"
+        case thisYear = "This Year"
+        case last6Months = "Last 6 Months"
+        var id: Self { self }
+    }
+    
+    private var timeframeDays: [PresenceDay] {
+        let calendar = Calendar.current
+        let now = Date()
+        return presenceDays.filter { day in
+            switch selectedTimeframe {
+            case .last12Months:
+                guard let start = calendar.date(byAdding: .month, value: -12, to: now) else { return true }
+                return day.date >= start
+            case .last6Months:
+                guard let start = calendar.date(byAdding: .month, value: -6, to: now) else { return true }
+                return day.date >= start
+            case .thisYear:
+                guard let start = calendar.date(from: calendar.dateComponents([.year], from: now)) else { return true }
+                return day.date >= start
+            case .lastYear:
+                guard let startOfThisYear = calendar.date(from: calendar.dateComponents([.year], from: now)),
+                      let startOfLastYear = calendar.date(byAdding: .year, value: -1, to: startOfThisYear) else { return true }
+                return day.date >= startOfLastYear && day.date < startOfThisYear
+            }
+        }
+    }
     
     private var schengenSummary: SchengenLedgerSummary {
         SchengenLedgerCalculator.summary(for: presenceDays, asOf: Date())
@@ -28,28 +61,31 @@ struct DashboardView: View {
     private var countryDaysSummary: [CountryDaysInfo] {
         var countryDict: [String: CountryDaysInfo] = [:]
         
-        for day in presenceDays {
+        for day in timeframeDays {
             guard let countryName = day.countryName ?? day.countryCode else { continue }
             let normalizedCode = CountryCodeNormalizer.normalize(day.countryCode)
             let key = normalizedCode ?? countryName
-            
+
             if let info = countryDict[key] {
                 countryDict[key] = CountryDaysInfo(
                     countryName: info.countryName,
                     countryCode: info.countryCode,
                     totalDays: info.totalDays + 1,
-                    region: info.region
+                    region: info.region,
+                    maxAllowedDays: info.maxAllowedDays
                 )
             } else {
+                let maxDays = countryConfigs.first { $0.countryCode == (normalizedCode ?? "") }?.maxAllowedDays
                 countryDict[key] = CountryDaysInfo(
                     countryName: countryName,
                     countryCode: normalizedCode,
                     totalDays: 1,
-                    region: normalizedCode.flatMap { SchengenMembers.isMember($0) ? .schengen : .nonSchengen } ?? .other
+                    region: normalizedCode.flatMap { SchengenMembers.isMember($0) ? .schengen : .nonSchengen } ?? .other,
+                    maxAllowedDays: maxDays
                 )
             }
         }
-        
+
         return countryDict.values.sorted { $0.totalDays > $1.totalDays }
     }
 
@@ -62,7 +98,7 @@ struct DashboardView: View {
             VStack(spacing: 20) {
                 WorldMapSection(visitedCountries: visitedCountryCodes)
                 SchengenSummarySection(summary: schengenSummary, unknownDays: unknownSchengenDays)
-                CountriesListSection(countries: countryDaysSummary)
+                CountriesListSection(countries: countryDaysSummary, selectedTimeframe: $selectedTimeframe)
             }
             .padding(.vertical)
         }
@@ -145,17 +181,28 @@ private struct SchengenSummarySection: View {
 private struct CountriesListSection: View {
     let countries: [CountryDaysInfo]
     let warningThreshold: Int
+    @Binding var selectedTimeframe: DashboardView.VisitedCountriesTimeframe
     
-    init(countries: [CountryDaysInfo], warningThreshold: Int = 80) {
+    init(countries: [CountryDaysInfo], warningThreshold: Int = 80, selectedTimeframe: Binding<DashboardView.VisitedCountriesTimeframe>) {
         self.countries = countries
         self.warningThreshold = warningThreshold
+        self._selectedTimeframe = selectedTimeframe
     }
     
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Visited Countries")
-                .font(.system(.title2, design: .rounded).bold())
-                .padding(.horizontal)
+            HStack {
+                Text("Visited Countries")
+                    .font(.system(.title2, design: .rounded).bold())
+                Spacer()
+                Picker("Timeframe", selection: $selectedTimeframe) {
+                    ForEach(DashboardView.VisitedCountriesTimeframe.allCases) { tf in
+                        Text(tf.rawValue).tag(tf)
+                    }
+                }
+                .tint(.secondary)
+            }
+            .padding(.horizontal)
             
             if countries.isEmpty {
                 ContentUnavailableView(
@@ -167,14 +214,20 @@ private struct CountriesListSection: View {
             } else {
                 LazyVStack(spacing: 0) {
                     ForEach(countries) { info in
-                        CountryDaysRow(info: info, warningThreshold: warningThreshold)
-                            .padding(.horizontal)
-                            .padding(.vertical, 8)
-                        
-                        if info.id != countries.last?.id {
-                            Divider()
-                                .padding(.leading, 60)
-                        }
+                            NavigationLink(destination: CountryDetailView(
+                                countryName: info.countryName,
+                                countryCode: info.countryCode
+                            )) {
+                                CountryDaysRow(info: info, warningThreshold: warningThreshold)
+                                    .padding(.horizontal)
+                                    .padding(.vertical, 8)
+                            }
+                            .buttonStyle(.plain)
+
+                            if info.id != countries.last?.id {
+                                Divider()
+                                    .padding(.leading, 60)
+                            }
                     }
                 }
                 .cardShell()
@@ -210,7 +263,8 @@ struct CountryDaysInfo: Identifiable {
     let countryCode: String?
     var totalDays: Int
     let region: Region
-    
+    var maxAllowedDays: Int?
+
     var flagEmoji: String {
         guard let code = countryCode?.uppercased() else { return "🌍" }
         return countryCodeToEmoji(code)
@@ -270,13 +324,25 @@ private struct CountryDaysRow: View {
             Spacer()
             
             VStack(alignment: .trailing, spacing: 2) {
-                Text("\(info.totalDays)")
-                    .font(.system(.title2, design: .rounded).bold())
-                    .foregroundStyle(badgeColor)
-                
-                Text("days")
-                    .font(.system(.caption, design: .rounded))
-                    .foregroundStyle(.secondary)
+                if let maxDays = info.maxAllowedDays {
+                    (Text("\(info.totalDays)")
+                        .foregroundColor(badgeColor)
+                    + Text(" of \(maxDays)")
+                        .foregroundColor(.secondary))
+                        .font(.system(.title2, design: .rounded).bold())
+
+                    Text("allowed days".uppercased())
+                        .font(.system(.caption, design: .rounded))
+                        .foregroundStyle(.secondary)
+                } else {
+                    Text("\(info.totalDays)")
+                        .font(.system(.title2, design: .rounded).bold())
+                        .foregroundStyle(badgeColor)
+
+                    Text("days".uppercased())
+                        .font(.system(.caption, design: .rounded))
+                        .foregroundStyle(.secondary)
+                }
             }
         }
         .padding(.vertical, 4)
@@ -315,6 +381,8 @@ private struct StatCard: View {
 }
 
 #Preview {
-    DashboardView()
-        .modelContainer(for: [Stay.self, DayOverride.self, LocationSample.self, PhotoSignal.self, PresenceDay.self, PhotoIngestState.self], inMemory: true)
+    NavigationStack {
+        DashboardView()
+            .modelContainer(for: [Stay.self, DayOverride.self, LocationSample.self, PhotoSignal.self, PresenceDay.self, PhotoIngestState.self, CountryConfig.self], inMemory: true)
+    }
 }
