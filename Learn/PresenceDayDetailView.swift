@@ -111,6 +111,11 @@ struct PresenceDayDetailView: View {
     private func applySuggestion(code: String, name: String) {
         let calendar = Calendar.current
         let normalizedDate = calendar.startOfDay(for: day.date)
+        let region: Region = {
+            let trimmed = code.trimmingCharacters(in: .whitespacesAndNewlines)
+            if trimmed.isEmpty { return .other }
+            return SchengenMembers.isMember(trimmed) ? .schengen : .nonSchengen
+        }()
 
         // Check if an override already exists for this day and update it in-place
         let predicate = #Predicate<DayOverride> { override in
@@ -120,11 +125,13 @@ struct PresenceDayDetailView: View {
         if let existingOverride = existing?.first {
             existingOverride.countryName = name
             existingOverride.countryCode = code
+            existingOverride.region = region
         } else {
             let newOverride = DayOverride(
                 date: normalizedDate,
                 countryName: name,
-                countryCode: code
+                countryCode: code,
+                region: region
             )
             modelContext.insert(newOverride)
         }
