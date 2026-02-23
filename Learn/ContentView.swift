@@ -14,7 +14,6 @@ struct ContentView: View {
     private static let logger = Logger(subsystem: "com.MCCANN.Border", category: "ContentView")
 
     @Environment(\.modelContext) private var modelContext
-    @Query(sort: [SortDescriptor(\Stay.enteredOn, order: .reverse)]) private var stays: [Stay]
     @Query(sort: [SortDescriptor(\DayOverride.date, order: .reverse)]) private var overrides: [DayOverride]
     @Query(sort: [SortDescriptor(\PresenceDay.date, order: .reverse)]) private var presenceDays: [PresenceDay]
     @EnvironmentObject private var authManager: AuthenticationManager
@@ -30,7 +29,6 @@ struct ContentView: View {
         var id: String { rawValue }
     }
 
-    @State private var isPresentingAddStay = false
     @State private var isPresentingAddOverride = false
     @State private var isShowingSeedAlert = false
     @State private var schengenState = SchengenState()
@@ -52,20 +50,6 @@ struct ContentView: View {
     var body: some View {
         NavigationStack {
             List {
-                if schengenState.overlapCount > 0 || schengenState.gapDays > 0 {
-                    Section("Data Quality") {
-                        if schengenState.overlapCount > 0 {
-                            Text("Overlapping stays detected: \(schengenState.overlapCount). Review overlaps or mark as transit days.")
-                                .font(.callout)
-                                .foregroundStyle(.secondary)
-                        }
-                        if schengenState.gapDays > 0 {
-                            Text("Gaps between stays: \(schengenState.gapDays) day(s). Consider adding stays or overrides.")
-                                .font(.callout)
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                }
 
                 Section {
                     Picker("Filter Ledger", selection: $ledgerFilter) {
@@ -94,7 +78,13 @@ struct ContentView: View {
                         }
                         
                         NavigationLink {
-                            DailyLedgerView()
+                            DailyLedgerView(initialFilter: {
+                                switch ledgerFilter {
+                                case .unknown: return .unknown
+                                case .manual: return .manual
+                                case .all: return .none
+                                }
+                            }())
                         } label: {
                             Text("See All")
                                 .foregroundStyle(Color.accentColor)
@@ -105,25 +95,6 @@ struct ContentView: View {
                 }
 
 
-
-                Section("Stays") {
-                    if stays.isEmpty {
-                        ContentUnavailableView(
-                            "No stays yet",
-                            systemImage: "globe",
-                            description: Text("Add your first stay to start tracking days.")
-                        )
-                    } else {
-                        ForEach(stays) { stay in
-                            NavigationLink {
-                                StayEditorView(stay: stay)
-                            } label: {
-                                StayRow(stay: stay)
-                            }
-                        }
-                        .onDelete(perform: deleteStays)
-                    }
-                }
 
                 Section("Configuration") {
                     Text("Schengen membership: hard-coded (M1)")
@@ -142,23 +113,13 @@ struct ContentView: View {
             .navigationTitle("BorderLog")
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
-                    Menu {
-                        Button("Add Stay") {
-                            isPresentingAddStay = true
-                        }
-                        Button("Add Day Override") {
-                            isPresentingAddOverride = true
-                        }
+                    Button {
+                        isPresentingAddOverride = true
                     } label: {
                         Label("Add", systemImage: "plus")
                     }
                 }
 
-            }
-            .sheet(isPresented: $isPresentingAddStay) {
-                NavigationStack {
-                    StayEditorView()
-                }
             }
             .sheet(isPresented: $isPresentingAddOverride) {
                 NavigationStack {
@@ -166,21 +127,13 @@ struct ContentView: View {
                 }
             }
         }
-        .task(id: stays) {
-            await schengenState.update(stays: stays, overrides: overrides)
-            let recomputeService = LedgerRecomputeService(modelContainer: modelContext.container)
-            await recomputeService.recomputeAll()
-        }
         .task(id: overrides) {
-            await schengenState.update(stays: stays, overrides: overrides)
+            await schengenState.update(stays: [], overrides: overrides)
             let recomputeService = LedgerRecomputeService(modelContainer: modelContext.container)
             await recomputeService.recomputeAll()
         }
     }
 
-    private func deleteStays(offsets: IndexSet) {
-        dataManager.delete(offsets: offsets, from: stays)
-    }
 
     private func deleteOverrides(offsets: IndexSet) {
         dataManager.delete(offsets: offsets, from: overrides)
@@ -205,49 +158,7 @@ struct ContentView: View {
     }
 }
 
-private struct StayRow: View {
-    let stay: Stay
 
-    var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack(spacing: 8) {
-                Text(stay.displayTitle)
-                    .font(.system(.headline, design: .rounded))
-
-                if stay.isOngoing {
-                    Text("Ongoing")
-                        .font(.system(.caption, design: .rounded))
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 2)
-                        .background(Color.accentColor.opacity(0.15))
-                        .clipShape(Capsule())
-                }
-            }
-
-            HStack {
-                Text(dateRangeText)
-                    .font(.system(.subheadline, design: .rounded))
-                    .foregroundStyle(.secondary)
-
-                Spacer()
-
-                Text(stay.region.rawValue)
-                    .font(.system(.caption, design: .rounded))
-                    .foregroundStyle(.secondary)
-            }
-        }
-        .padding(.vertical, 4)
-    }
-
-    private var dateRangeText: String {
-        let formatter = Date.FormatStyle(date: .abbreviated, time: .omitted)
-        let start = stay.enteredOn.formatted(formatter)
-        if let exit = stay.exitedOn {
-            return "\(start) - \(exit.formatted(formatter))"
-        }
-        return "\(start) - Present"
-    }
-}
 
 
 

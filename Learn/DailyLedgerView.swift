@@ -7,13 +7,23 @@ import SwiftUI
 import SwiftData
 import Foundation
 
+enum LedgerPreFilter {
+    case none
+    case unknown
+    case manual
+}
+
 struct DailyLedgerView: View {
     @Query(sort: [SortDescriptor(\PresenceDay.date, order: .reverse)]) private var allPresenceDays: [PresenceDay]
     @ObservedObject private var inferenceActivity = InferenceActivity.shared
     
+    var initialFilter: LedgerPreFilter = .none
+    
     @State private var showUnknownOnly = false
     @State private var showLowConfidenceOnly = false
     @State private var showMediumConfidenceOnly = false
+    @State private var showManualOnly = false
+    @State private var didApplyInitialFilter = false
 
     private var dateRange: (start: Date, end: Date) {
         let calendar = Calendar.current
@@ -29,10 +39,14 @@ struct DailyLedgerView: View {
             .sorted { $0.date > $1.date }
     }
 
+    private var anyFilterActive: Bool {
+        showUnknownOnly || showLowConfidenceOnly || showMediumConfidenceOnly || showManualOnly
+    }
+
     private var filteredDays: [PresenceDay] {
         recentDays.filter { day in
             // If no filters are active, show all
-            if !showUnknownOnly && !showLowConfidenceOnly && !showMediumConfidenceOnly {
+            if !anyFilterActive {
                 return true
             }
             
@@ -51,6 +65,11 @@ struct DailyLedgerView: View {
             }
             if showMediumConfidenceOnly {
                 if day.confidenceLabel == .medium {
+                    matches = true
+                }
+            }
+            if showManualOnly {
+                if day.isOverride {
                     matches = true
                 }
             }
@@ -89,21 +108,35 @@ struct DailyLedgerView: View {
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 Menu {
-                    if showUnknownOnly || showLowConfidenceOnly || showMediumConfidenceOnly {
+                    if anyFilterActive {
                         Button("Clear Filters") {
                             showUnknownOnly = false
                             showLowConfidenceOnly = false
                             showMediumConfidenceOnly = false
+                            showManualOnly = false
                         }
                     }
                     Toggle("Show Unknown", isOn: $showUnknownOnly)
                     Toggle("Show Low Confidence", isOn: $showLowConfidenceOnly)
                     Toggle("Show Medium Confidence", isOn: $showMediumConfidenceOnly)
+                    Toggle("Show Manually Marked", isOn: $showManualOnly)
                 } label: {
                     Label("Filter", systemImage: "line.3.horizontal.decrease.circle")
                         // Fill the icon if any filter is active
-                        .symbolVariant((showUnknownOnly || showLowConfidenceOnly || showMediumConfidenceOnly) ? .fill : .none)
+                        .symbolVariant(anyFilterActive ? .fill : .none)
                 }
+            }
+        }
+        .onAppear {
+            guard !didApplyInitialFilter else { return }
+            didApplyInitialFilter = true
+            switch initialFilter {
+            case .none:
+                break
+            case .unknown:
+                showUnknownOnly = true
+            case .manual:
+                showManualOnly = true
             }
         }
     }
@@ -185,7 +218,7 @@ private struct ActivityBadge: View {
 
 #Preview {
     NavigationStack {
-        DailyLedgerView()
+        DailyLedgerView(initialFilter: .unknown)
             .modelContainer(for: [PresenceDay.self], inMemory: true)
     }
 }

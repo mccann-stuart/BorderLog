@@ -10,7 +10,6 @@ struct MainNavigationView: View {
     @State private var selectedTab = 0
     @State private var isShowingSettings = false
     @State private var isShowingAccount = false
-    @State private var isPresentingAddStay = false
     @State private var isPresentingAddOverride = false
     @AppStorage("didBootstrapInference") private var didBootstrapInference = false
     @State private var locationService = LocationSampleService()
@@ -32,18 +31,8 @@ struct MainNavigationView: View {
                             ToolbarItemGroup(placement: .topBarTrailing) {
                                 settingsMenu
                                 
-                                Menu {
-                                    Button {
-                                        isPresentingAddStay = true
-                                    } label: {
-                                        Label("Add Stay", systemImage: "airplane")
-                                    }
-                                    
-                                    Button {
-                                        isPresentingAddOverride = true
-                                    } label: {
-                                        Label("Add Day Override", systemImage: "calendar.badge.exclamationmark")
-                                    }
+                                Button {
+                                    isPresentingAddOverride = true
                                 } label: {
                                     Image(systemName: "plus.circle.fill")
                                         .font(.title3)
@@ -80,11 +69,6 @@ struct MainNavigationView: View {
         }
         .sheet(isPresented: $isShowingAccount) {
             UserAccountView()
-        }
-        .sheet(isPresented: $isPresentingAddStay) {
-            NavigationStack {
-                StayEditorView()
-            }
         }
         .sheet(isPresented: $isPresentingAddOverride) {
             NavigationStack {
