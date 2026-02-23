@@ -17,6 +17,19 @@ enum AppConfig {
         let trimmed = groupId.trimmingCharacters(in: .whitespacesAndNewlines)
         return trimmed.isEmpty ? nil : trimmed
     }()
+
+    static let cloudKitContainerId = "iCloud.com.MCCANN.BorderLog"
+
+    static var sharedDefaults: UserDefaults {
+        if let appGroupId = appGroupId, let defaults = UserDefaults(suiteName: appGroupId) {
+            return defaults
+        }
+        return .standard
+    }
+
+    static var isCloudKitSyncEnabled: Bool {
+        sharedDefaults.bool(forKey: "cloudKitSyncEnabled")
+    }
 }
 
 enum BorderLogSchemaV1: VersionedSchema {
@@ -158,10 +171,16 @@ enum ModelContainerProvider {
 
     static func makeContainer() -> ModelContainer {
         let schema = Schema(versionedSchema: BorderLogSchemaV5.self)
+        let cloudKitDatabase: ModelConfiguration.CloudKitDatabase? =
+            AppConfig.isCloudKitSyncEnabled ? .private(AppConfig.cloudKitContainerId) : nil
 
         // Tier 1: App Group shared container (needed for widget access)
         if let appGroupId = AppConfig.appGroupId {
-            let appGroupConfig = ModelConfiguration(schema: schema, groupContainer: .identifier(appGroupId))
+            let appGroupConfig = ModelConfiguration(
+                schema: schema,
+                groupContainer: .identifier(appGroupId),
+                cloudKitDatabase: cloudKitDatabase
+            )
             do {
                 let container = try ModelContainer(for: schema, migrationPlan: BorderLogMigrationPlan.self, configurations: [appGroupConfig])
                 logger.info("Using App Group store at group: \(appGroupId, privacy: .public)")
@@ -193,7 +212,7 @@ enum ModelContainerProvider {
         cleanupAppGroupStore(appGroupId: knownGroupId)
 
         let storeURL = appSupport.appendingPathComponent("BorderLog.store")
-        let localConfig = ModelConfiguration(schema: schema, url: storeURL)
+        let localConfig = ModelConfiguration(schema: schema, url: storeURL, cloudKitDatabase: cloudKitDatabase)
         do {
             let container = try ModelContainer(for: schema, migrationPlan: BorderLogMigrationPlan.self, configurations: [localConfig])
             logger.info("Using local sandbox store at: \(storeURL.lastPathComponent, privacy: .public)")

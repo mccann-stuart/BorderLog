@@ -16,7 +16,10 @@ struct SettingsView: View {
 
 
     @State private var isConfirmingReset = false
+    @State private var isConfirmingCloudKitDelete = false
     @State private var isShowingSeedAlert = false
+    @State private var isDeletingCloudKitData = false
+    @State private var cloudKitDeleteError: String?
     @State private var locationStatus: CLAuthorizationStatus = CLLocationManager().authorizationStatus
     @State private var photoStatus: PHAuthorizationStatus = PHPhotoLibrary.authorizationStatus(for: .readWrite)
     @State private var calendarStatus: EKAuthorizationStatus = EKEventStore.authorizationStatus(for: .event)
@@ -26,6 +29,7 @@ struct SettingsView: View {
     @AppStorage("didBootstrapInference") private var didBootstrapInference = false
     @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
     @AppStorage("usePolygonMapView") private var usePolygonMapView = true
+    @AppStorage("cloudKitSyncEnabled", store: AppConfig.sharedDefaults) private var cloudKitSyncEnabled = false
 
     private var dataManager: DataManager {
         DataManager(modelContext: modelContext)
@@ -76,7 +80,34 @@ struct SettingsView: View {
                 } header: {
                     Text("Privacy")
                 }
-                
+
+                // MARK: – iCloud Sync
+                Section {
+                    Toggle(isOn: $cloudKitSyncEnabled) {
+                        Label("iCloud Sync", systemImage: "icloud")
+                    }
+
+                    Button(role: .destructive) {
+                        isConfirmingCloudKitDelete = true
+                    } label: {
+                        HStack {
+                            Label(
+                                isDeletingCloudKitData ? "Deleting…" : "Delete iCloud Data",
+                                systemImage: isDeletingCloudKitData ? "arrow.triangle.2.circlepath" : "trash"
+                            )
+                            if isDeletingCloudKitData {
+                                Spacer()
+                                ProgressView()
+                            }
+                        }
+                    }
+                    .disabled(isDeletingCloudKitData)
+                } header: {
+                    Text("iCloud Sync")
+                } footer: {
+                    Text("Sync uses your iCloud private database. Changes take effect after restarting the app.")
+                }
+
                 // MARK: – App Info
                 Section {
                     HStack {
@@ -241,10 +272,20 @@ struct SettingsView: View {
             } message: {
                 Text("This will remove all stays and day overrides from this device. This cannot be undone.")
             }
+            .confirmationDialog("Delete iCloud data?", isPresented: $isConfirmingCloudKitDelete) {
+                Button("Delete iCloud Data", role: .destructive) { deleteCloudKitData() }
+            } message: {
+                Text("This removes BorderLog data stored in iCloud. Local data stays on this device.")
+            }
             .alert("Sample data unavailable", isPresented: $isShowingSeedAlert) {
                 Button("OK", role: .cancel) {}
             } message: {
                 Text("Reset all data before seeding the sample dataset.")
+            }
+            .alert("Unable to delete iCloud data", isPresented: cloudKitDeleteErrorPresented) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text(cloudKitDeleteError ?? "Unknown error.")
             }
             .onAppear { refreshPermissions() }
     }
@@ -338,6 +379,18 @@ struct SettingsView: View {
             didBootstrapInference = false
         } catch {
             print("Failed to reset data: \(error)")
+        }
+    }
+
+    private func deleteCloudKitData() {
+        isDeletingCloudKitData = true
+        Task {
+            do {
+                try await CloudKitDataResetService.deleteAllUserData()
+            } catch {
+                await MainActor.run { cloudKitDeleteError = error.localizedDescription }
+            }
+            await MainActor.run { isDeletingCloudKitData = false }
         }
     }
 
@@ -462,6 +515,13 @@ struct SettingsView: View {
         case .notDetermined:        return .orange
         @unknown default:           return .secondary
         }
+    }
+
+    private var cloudKitDeleteErrorPresented: Binding<Bool> {
+        Binding(
+            get: { cloudKitDeleteError != nil },
+            set: { if !$0 { cloudKitDeleteError = nil } }
+        )
     }
 }
 
