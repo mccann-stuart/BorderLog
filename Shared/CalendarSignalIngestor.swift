@@ -191,6 +191,10 @@ actor CalendarSignalIngestor {
     }
 
     private func shouldIngest(_ event: EKEvent) -> Bool {
+        if let title = event.title, title.contains("Friend:") {
+            return false
+        }
+
         let candidates = [
             event.title,
             event.location,
