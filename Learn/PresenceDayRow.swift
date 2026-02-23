@@ -17,8 +17,13 @@ struct PresenceDayRow: View {
     }
 
     private var dayText: String {
-        let formatter = Date.FormatStyle(date: .abbreviated, time: .omitted)
-        return day.date.formatted(formatter.timeZone(dayTimeZone))
+        let formatter = DateFormatter()
+        formatter.calendar = Calendar(identifier: .gregorian)
+        formatter.locale = .current
+        formatter.timeZone = dayTimeZone
+        formatter.dateStyle = .medium
+        formatter.timeStyle = .none
+        return formatter.string(from: day.date)
     }
 
     private var countryText: String {

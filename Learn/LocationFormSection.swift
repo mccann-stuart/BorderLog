@@ -182,7 +182,8 @@ struct CountryOption: Identifiable, Hashable {
 enum CountryOptions {
     static let all: [CountryOption] = {
         let locale = Locale.autoupdatingCurrent
-        return Locale.isoRegionCodes.compactMap { code in
+        return Locale.Region.isoRegions.compactMap { region in
+            let code = region.identifier
             guard let name = locale.localizedString(forRegionCode: code) else { return nil }
             return CountryOption(code: code, name: name)
         }

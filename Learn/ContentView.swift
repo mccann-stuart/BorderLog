@@ -104,7 +104,8 @@ struct ContentView: View {
                 }
                 .ignoresSafeArea()
             }
-            .navigationTitle("BorderLog")
+            .navigationTitle("Daily Ledger")
+            .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button {
