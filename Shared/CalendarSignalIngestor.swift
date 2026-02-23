@@ -30,7 +30,13 @@ actor CalendarSignalIngestor {
         let store = EKEventStore()
 
         let status = EKEventStore.authorizationStatus(for: .event)
-        guard status == .authorized || status == .fullAccess else {
+        let hasReadAccess: Bool
+        if #available(iOS 17.0, *) {
+            hasReadAccess = status == .fullAccess
+        } else {
+            hasReadAccess = status == .authorized
+        }
+        guard hasReadAccess else {
             return 0
         }
 
@@ -148,7 +154,7 @@ actor CalendarSignalIngestor {
             guard let validCountryCode = countryCode else { continue }
 
             let eventTimeZone = event.timeZone ?? TimeZone(identifier: timeZoneId ?? "") ?? TimeZone.current
-            let dayKey = DayKey.make(from: event.startDate, timeZone: eventTimeZone)
+            let dayKey = await DayKey.make(from: event.startDate, timeZone: eventTimeZone)
 
             let signal = CalendarSignal(
                 timestamp: event.startDate,

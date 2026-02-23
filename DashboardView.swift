@@ -76,10 +76,21 @@ struct DashboardView: View {
         ScrollView {
             VStack(spacing: 20) {
                 WorldMapSection(visitedCountries: visitedCountryCodes)
-                if inferenceActivity.isPhotoScanning {
-                    PhotoScanProgressSection(
-                        scanned: inferenceActivity.photoScanScanned,
-                        total: inferenceActivity.photoScanTotal,
+                if inferenceActivity.isPhotoScanning ||
+                    inferenceActivity.isCalendarScanning ||
+                    inferenceActivity.isInferenceRunning ||
+                    inferenceActivity.isLocationBatching ||
+                    inferenceActivity.isGeoLookupPaused {
+                    InferenceProgressSection(
+                        photoScanned: inferenceActivity.photoScanScanned,
+                        photoTotal: inferenceActivity.photoScanTotal,
+                        calendarScanned: inferenceActivity.calendarScanScanned,
+                        calendarTotal: inferenceActivity.calendarScanTotal,
+                        inferenceProgress: inferenceActivity.inferenceProgress,
+                        inferenceTotal: inferenceActivity.inferenceTotal,
+                        isPhotoScanning: inferenceActivity.isPhotoScanning,
+                        isCalendarScanning: inferenceActivity.isCalendarScanning,
+                        isInferenceRunning: inferenceActivity.isInferenceRunning,
                         isLocationBatching: inferenceActivity.isLocationBatching,
                         isGeoLookupPaused: inferenceActivity.isGeoLookupPaused
                     )
@@ -114,24 +125,25 @@ private struct WorldMapSection: View {
     }
 }
 
-private struct PhotoScanProgressSection: View {
-    let scanned: Int
-    let total: Int
+private struct InferenceProgressSection: View {
+    let photoScanned: Int
+    let photoTotal: Int
+    let calendarScanned: Int
+    let calendarTotal: Int
+    let inferenceProgress: Int
+    let inferenceTotal: Int
+    let isPhotoScanning: Bool
+    let isCalendarScanning: Bool
+    let isInferenceRunning: Bool
     let isLocationBatching: Bool
     let isGeoLookupPaused: Bool
 
-    private var progressFraction: Double {
-        guard total > 0 else { return 0 }
-        let clamped = min(max(scanned, 0), total)
-        return Double(clamped) / Double(total)
-    }
-
-    private var pauseText: String? {
+    private var locationStatusText: String? {
         if isLocationBatching && isGeoLookupPaused {
             return "Paused: waiting for location batch and geo lookup capacity."
         }
         if isLocationBatching {
-            return "Paused: waiting for location batch."
+            return "Capturing location samples."
         }
         if isGeoLookupPaused {
             return "Paused: waiting for geo lookup capacity."
@@ -139,15 +151,92 @@ private struct PhotoScanProgressSection: View {
         return nil
     }
 
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Inference progress")
+                .font(.system(.headline, design: .rounded))
+
+            ProgressRow(
+                title: "Photos",
+                systemImage: "photo",
+                scanned: photoScanned,
+                total: photoTotal,
+                isActive: isPhotoScanning
+            )
+
+            ProgressRow(
+                title: "Calendar",
+                systemImage: "calendar",
+                scanned: calendarScanned,
+                total: calendarTotal,
+                isActive: isCalendarScanning
+            )
+
+            VStack(alignment: .leading, spacing: 6) {
+                HStack {
+                    Label("Location inference", systemImage: "location")
+                        .font(.system(.subheadline, design: .rounded))
+                    Spacer()
+                    if isInferenceRunning {
+                        Text(progressPercent(scanned: inferenceProgress, total: inferenceTotal))
+                            .font(.system(.caption, design: .rounded))
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                if isInferenceRunning {
+                    ProgressView(value: progressFraction(scanned: inferenceProgress, total: inferenceTotal), total: 1)
+                        .progressViewStyle(.linear)
+                        .tint(.accentColor)
+                } else if locationStatusText != nil {
+                    ProgressView()
+                        .controlSize(.small)
+                }
+                if let locationStatusText {
+                    Text(locationStatusText)
+                        .font(.system(.caption, design: .rounded))
+                        .foregroundStyle(.secondary)
+                }
+            }
+        }
+        .padding()
+        .cardShell()
+        .padding(.horizontal)
+    }
+
+    private func progressFraction(scanned: Int, total: Int) -> Double {
+        guard total > 0 else { return 0 }
+        let clamped = min(max(scanned, 0), total)
+        return Double(clamped) / Double(total)
+    }
+
+    private func progressPercent(scanned: Int, total: Int) -> String {
+        let fraction = progressFraction(scanned: scanned, total: total)
+        return "\(Int((fraction * 100).rounded()))%"
+    }
+}
+
+private struct ProgressRow: View {
+    let title: String
+    let systemImage: String
+    let scanned: Int
+    let total: Int
+    let isActive: Bool
+
+    private var progressFraction: Double {
+        guard total > 0 else { return 0 }
+        let clamped = min(max(scanned, 0), total)
+        return Double(clamped) / Double(total)
+    }
+
     private var percentText: String {
         "\(Int((progressFraction * 100).rounded()))%"
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 6) {
             HStack {
-                Text("Photo scanning")
-                    .font(.system(.headline, design: .rounded))
+                Label(title, systemImage: systemImage)
+                    .font(.system(.subheadline, design: .rounded))
                 Spacer()
                 Text(percentText)
                     .font(.system(.caption, design: .rounded))
@@ -156,15 +245,8 @@ private struct PhotoScanProgressSection: View {
             ProgressView(value: progressFraction, total: 1)
                 .progressViewStyle(.linear)
                 .tint(.accentColor)
-            if let pauseText {
-                Text(pauseText)
-                    .font(.system(.caption, design: .rounded))
-                    .foregroundStyle(.secondary)
-            }
+                .opacity(isActive ? 1 : 0.6)
         }
-        .padding()
-        .cardShell()
-        .padding(.horizontal)
     }
 }
 

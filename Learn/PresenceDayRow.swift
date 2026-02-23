@@ -9,9 +9,16 @@ import Foundation
 struct PresenceDayRow: View {
     let day: PresenceDay
 
+    private var dayTimeZone: TimeZone {
+        if let id = day.timeZoneId, let tz = TimeZone(identifier: id) {
+            return tz
+        }
+        return .current
+    }
+
     private var dayText: String {
         let formatter = Date.FormatStyle(date: .abbreviated, time: .omitted)
-        return day.date.formatted(formatter)
+        return day.date.formatted(formatter.timeZone(dayTimeZone))
     }
 
     private var countryText: String {
