@@ -83,12 +83,25 @@ actor GeocodeCoordinator {
     }
 
     private func waitForPermit() async {
+        var didEnterHold = false
         while true {
             let now = Date()
             pruneRequests(now: now)
             if requestTimes.count < maxRequests {
                 requestTimes.append(now)
+                if didEnterHold {
+                    await MainActor.run {
+                        InferenceActivity.shared.endGeoLookupHold()
+                    }
+                }
                 return
+            }
+
+            if !didEnterHold {
+                await MainActor.run {
+                    InferenceActivity.shared.beginGeoLookupHold()
+                }
+                didEnterHold = true
             }
 
             let earliest = requestTimes.first ?? now

@@ -101,7 +101,9 @@ struct DashboardView: View {
                 if inferenceActivity.isPhotoScanning {
                     PhotoScanProgressSection(
                         scanned: inferenceActivity.photoScanScanned,
-                        total: inferenceActivity.photoScanTotal
+                        total: inferenceActivity.photoScanTotal,
+                        isLocationBatching: inferenceActivity.isLocationBatching,
+                        isGeoLookupPaused: inferenceActivity.isGeoLookupPaused
                     )
                 }
                 SchengenSummarySection(summary: schengenSummary, unknownDays: unknownSchengenDays)
@@ -137,11 +139,26 @@ private struct WorldMapSection: View {
 private struct PhotoScanProgressSection: View {
     let scanned: Int
     let total: Int
+    let isLocationBatching: Bool
+    let isGeoLookupPaused: Bool
 
     private var progressFraction: Double {
         guard total > 0 else { return 0 }
         let clamped = min(max(scanned, 0), total)
         return Double(clamped) / Double(total)
+    }
+
+    private var pauseText: String? {
+        if isLocationBatching && isGeoLookupPaused {
+            return "Paused: waiting for location batch and geo lookup capacity."
+        }
+        if isLocationBatching {
+            return "Paused: waiting for location batch."
+        }
+        if isGeoLookupPaused {
+            return "Paused: waiting for geo lookup capacity."
+        }
+        return nil
     }
 
     private var percentText: String {
@@ -161,6 +178,11 @@ private struct PhotoScanProgressSection: View {
             ProgressView(value: progressFraction, total: 1)
                 .progressViewStyle(.linear)
                 .tint(.accentColor)
+            if let pauseText {
+                Text(pauseText)
+                    .font(.system(.caption, design: .rounded))
+                    .foregroundStyle(.secondary)
+            }
         }
         .padding()
         .cardShell()

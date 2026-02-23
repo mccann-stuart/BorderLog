@@ -14,9 +14,13 @@ final class InferenceActivity: ObservableObject {
     @Published private(set) var isInferenceRunning = false
     @Published private(set) var photoScanScanned = 0
     @Published private(set) var photoScanTotal = 0
+    @Published private(set) var isLocationBatching = false
+    @Published private(set) var isGeoLookupPaused = false
 
     private var photoScanCount = 0
     private var inferenceCount = 0
+    private var locationBatchCount = 0
+    private var geoLookupHoldCount = 0
 
     private init() {}
 
@@ -46,6 +50,26 @@ final class InferenceActivity: ObservableObject {
             photoScanScanned = 0
             photoScanTotal = 0
         }
+    }
+
+    func beginLocationBatch() {
+        locationBatchCount += 1
+        isLocationBatching = locationBatchCount > 0
+    }
+
+    func endLocationBatch() {
+        locationBatchCount = max(0, locationBatchCount - 1)
+        isLocationBatching = locationBatchCount > 0
+    }
+
+    func beginGeoLookupHold() {
+        geoLookupHoldCount += 1
+        isGeoLookupPaused = geoLookupHoldCount > 0
+    }
+
+    func endGeoLookupHold() {
+        geoLookupHoldCount = max(0, geoLookupHoldCount - 1)
+        isGeoLookupPaused = geoLookupHoldCount > 0
     }
 
     func beginInference() {

@@ -158,6 +158,7 @@ final class LocationSampleService: NSObject, CLLocationManagerDelegate {
             batchLocations = []
             batchTargetCount = maxSamples
             batchMaxSampleAge = maxSampleAge
+            InferenceActivity.shared.beginLocationBatch()
             manager.startUpdatingLocation()
 
             batchTimeoutTask?.cancel()
@@ -172,6 +173,7 @@ final class LocationSampleService: NSObject, CLLocationManagerDelegate {
 
     private func finishBatchCapture() {
         guard let continuation = batchContinuation else { return }
+        InferenceActivity.shared.endLocationBatch()
         manager.stopUpdatingLocation()
         batchTimeoutTask?.cancel()
         batchTimeoutTask = nil
