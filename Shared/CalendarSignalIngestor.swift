@@ -94,7 +94,27 @@ actor CalendarSignalIngestor {
                     InferenceActivity.shared.updateCalendarScanProgress(scannedEvents: scannedEvents)
                 }
             }
-            guard shouldIngest(event) else { continue }
+            
+            let id = event.eventIdentifier ?? event.calendarItemIdentifier
+            let endId = id + "#end"
+            var signalsCreatedOrDeleted = 0
+
+            guard shouldIngest(event) else { 
+                let descriptor = FetchDescriptor<CalendarSignal>()
+                if let signals = try? modelContext.fetch(descriptor) {
+                    let stales = signals.filter { $0.eventIdentifier == id || $0.eventIdentifier == endId }
+                    for stale in stales {
+                        touchedDayKeys.insert(stale.dayKey)
+                        modelContext.delete(stale)
+                        signalsCreatedOrDeleted += 1
+                    }
+                }
+                if signalsCreatedOrDeleted > 0 {
+                    processed += 1
+                    if processed % 10 == 0 { try? modelContext.save() }
+                }
+                continue 
+            }
             guard let startDate = event.startDate else { continue }
 
             let (parsedFrom, parsedTo) = parseFlightInfo(event)
@@ -129,11 +149,8 @@ actor CalendarSignalIngestor {
                 }
             }
 
-            var signalsCreatedForEvent = 0
-
             // 1. Create Start Signal
             if startLocationString != nil || startCoordinate != nil {
-                let id = event.eventIdentifier ?? event.calendarItemIdentifier
                 if !calendarSignalExists(eventIdentifier: id, in: modelContext) {
                     if await resolveAndCreateSignal(
                         locationString: startLocationString,
@@ -143,7 +160,7 @@ actor CalendarSignalIngestor {
                         event: event,
                         activeResolver: activeResolver
                     ) {
-                        signalsCreatedForEvent += 1
+                        signalsCreatedOrDeleted += 1
                         let dayKey = await DayKey.make(from: startDate, timeZone: event.timeZone ?? .current)
                         touchedDayKeys.insert(dayKey)
                     }
@@ -152,25 +169,24 @@ actor CalendarSignalIngestor {
 
             // 2. Create End Signal (Destination)
             if let to = parsedTo {
-                let id = event.eventIdentifier + "#end"
-                if !calendarSignalExists(eventIdentifier: id, in: modelContext) {
+                if !calendarSignalExists(eventIdentifier: endId, in: modelContext) {
                     let nextDay = calendar.date(byAdding: .day, value: 1, to: startDate) ?? event.endDate ?? startDate
                     if await resolveAndCreateSignal(
                         locationString: to,
                         coordinate: nil, // Destination usually just string unless we parsed it from somewhere else
                         date: nextDay, // Signal at arrival on the next day
-                        eventIdentifier: id,
+                        eventIdentifier: endId,
                         event: event,
                         activeResolver: activeResolver
                     ) {
-                        signalsCreatedForEvent += 1
+                        signalsCreatedOrDeleted += 1
                         let dayKey = await DayKey.make(from: nextDay, timeZone: event.timeZone ?? .current)
                         touchedDayKeys.insert(dayKey)
                     }
                 }
             }
 
-            if signalsCreatedForEvent > 0 {
+            if signalsCreatedOrDeleted > 0 {
                 processed += 1
                 if processed % 10 == 0 {
                      try? modelContext.save()
