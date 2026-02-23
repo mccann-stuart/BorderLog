@@ -116,19 +116,27 @@ enum ModelContainerProvider {
             logger.warning("Recovery succeeded — fresh local store created. Previous data was lost.")
             return container
         } catch {
-            fatalError("Could not create a fresh SwiftData store after recovery. Error: \(error)")
+            // Absolute last resort: in-memory. The app will work this session but not persist.
+            // This is preferable to crashing permanently on every launch.
+            logger.critical("All store options failed. Using in-memory store for this session. Error: \(error, privacy: .public)")
+            let memConfig = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
+            return try! ModelContainer(for: schema, configurations: [memConfig])
         }
     }
 
-    /// Deletes SwiftData SQLite store files (*.sqlite, *-shm, *-wal) from the given directory.
+    /// Deletes SwiftData store files from the given directory.
+    /// CoreData/SwiftData uses the store name directly as the SQLite filename,
+    /// with -wal and -shm variants (e.g. default.store, default.store-wal, default.store-shm).
     private static func deleteStoreFiles(in directory: URL) {
         let fm = FileManager.default
         let bundleName = Bundle.main.infoDictionary?["CFBundleName"] as? String ?? "default"
+        // Cover both the bundle-name variant and SwiftData's "default" fallback
         let storeNames = ["\(bundleName).store", "default.store"]
-        let sqliteSuffixes = [".sqlite", ".sqlite-shm", ".sqlite-wal"]
+        // The store name IS the SQLite file; WAL and SHM use dash suffixes, not dot suffixes
+        let fileSuffixes = ["", "-wal", "-shm"]
 
         for storeName in storeNames {
-            for suffix in sqliteSuffixes {
+            for suffix in fileSuffixes {
                 let url = directory.appendingPathComponent(storeName + suffix)
                 guard fm.fileExists(atPath: url.path) else { continue }
                 do {
