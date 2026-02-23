@@ -39,7 +39,7 @@ struct WelcomeView: View {
                     icon: "lock.fill",
                     color: .green,
                     title: "Local-First Privacy",
-                    description: "Your travel data stays on this device. No cloud analytics, no server storage."
+                    description: "Your travel data stays on this device. No analytics, no server storage."
                 )
                 
                 ValuePropRow(
@@ -53,7 +53,7 @@ struct WelcomeView: View {
                     icon: "wand.and.stars",
                     color: .purple,
                     title: "Smart Inference",
-                    description: "BorderLog infers your location using on-device signals, minimizing manual entry."
+                    description: "BorderLog infers your location using Apple MapKit signals, minimizing manual entry."
                 )
             }
             .padding(.horizontal, 24)
@@ -81,7 +81,7 @@ struct WelcomeView: View {
                             currentStep = 1
                         }
                     } label: {
-                        Text("Continue (Local Mode)")
+                        Text("Continue in Local Mode")
                             .font(.headline)
                             .foregroundStyle(.white)
                             .frame(maxWidth: .infinity)

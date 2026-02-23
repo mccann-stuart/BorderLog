@@ -38,7 +38,7 @@ struct SettingsView: View {
     var body: some View {
             Form {
                 // MARK: – Profile / About
-                Section {
+                SwiftUI.Section {
                     NavigationLink {
                         ProfileEditView()
                     } label: {
@@ -110,50 +110,6 @@ struct SettingsView: View {
                     }
                 }
 
-                // MARK: – App Info
-                Section {
-                    HStack {
-                        Text("Version")
-                        Spacer()
-                        Text(appVersionString)
-                            .foregroundStyle(.secondary)
-                    }
-                    HStack {
-                        Text("Storage")
-                        Spacer()
-                        Text("Local (on-device)")
-                            .foregroundStyle(.secondary)
-                    }
-                } header: {
-                    Text("About BorderLog")
-                }
-
-                // MARK: – Customization
-                Section {
-                    Picker("Map Display", selection: $usePolygonMapView) {
-                        Text("Dots").tag(false)
-                        Text("Coloured Countries").tag(true)
-                    }
-                    .pickerStyle(.segmented)
-                } header: {
-                    Text("Map Display")
-                } footer: {
-                    Text("Choose how visited countries are displayed on the map.")
-                }
-
-                // MARK: – Configuration
-                Section {
-                    HStack {
-                        Label("Schengen Zone", systemImage: "map")
-                        Spacer()
-                        Text("Built-in")
-                            .foregroundStyle(.secondary)
-                    }
-                } header: {
-                    Text("Configuration")
-                } footer: {
-                    Text("Schengen membership data is bundled with the app and updated with each release.")
-                }
 
                 // MARK: – Data Sources
                 Section {
@@ -253,6 +209,51 @@ struct SettingsView: View {
                     Text("Data Management")
                 } footer: {
                     Text("Permanently deletes all stays, day overrides, and location samples stored on this device.")
+                }
+
+                // MARK: – App Info
+                Section {
+                    HStack {
+                        Text("Version")
+                        Spacer()
+                        Text(appVersionString)
+                            .foregroundStyle(.secondary)
+                    }
+                    HStack {
+                        Text("Storage")
+                        Spacer()
+                        Text("Local (on-device)")
+                            .foregroundStyle(.secondary)
+                    }
+                } header: {
+                    Text("About BorderLog")
+                }
+
+                // MARK: – Customization
+                Section {
+                    Picker("Map Display", selection: $usePolygonMapView) {
+                        Text("Dots").tag(false)
+                        Text("Coloured Countries").tag(true)
+                    }
+                    .pickerStyle(.segmented)
+                } header: {
+                    Text("Map Display")
+                } footer: {
+                    Text("Choose how visited countries are displayed on the map.")
+                }
+
+                // MARK: – Configuration
+                Section {
+                    HStack {
+                        Label("Schengen Zone", systemImage: "map")
+                        Spacer()
+                        Text("Built-in")
+                            .foregroundStyle(.secondary)
+                    }
+                } header: {
+                    Text("Configuration")
+                } footer: {
+                    Text("Schengen membership data is bundled with the app and updated with each release.")
                 }
             }
             .scrollContentBackground(.hidden)

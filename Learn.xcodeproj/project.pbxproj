@@ -135,6 +135,13 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		4B5701C32F4D1A450076D9DE /* tasks 2 */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			path = "tasks 2";
+			sourceTree = "<group>";
+		};
 		4BF474B22F3FAB7A0026C07A = {
 			isa = PBXGroup;
 			children = (
@@ -154,6 +161,7 @@
 				4B9C85D02F426E4C00C510A8 /* SettingsView.swift */,
 				4B9C85D22F426E5C00C510A8 /* UserAccountView.swift */,
 				4B9C85D42F426E7A00C510A8 /* MainNavigationView.swift */,
+				4B5701C32F4D1A450076D9DE /* tasks 2 */,
 			);
 			sourceTree = "<group>";
 			usesTabs = 0;
