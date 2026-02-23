@@ -76,10 +76,12 @@ struct LocationFormSection: View {
     var body: some View {
         Section("Location") {
             if style == .picker {
-                if hasTieredData {
-                    tieredPicker
-                } else {
-                    flatPicker
+                Group {
+                    if hasTieredData {
+                        tieredPicker
+                    } else {
+                        flatPicker
+                    }
                 }
                 .onAppear { syncCountryName(for: countryCode) }
                 .onChange(of: countryCode) { _, newValue in

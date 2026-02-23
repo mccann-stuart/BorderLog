@@ -7,84 +7,99 @@
 
 import Foundation
 
+/// Geographic region grouping for ISO country codes.
+/// Used by the onboarding profile setup and the country picker.
 enum GeoRegion: String, CaseIterable, Identifiable {
+    case northAmerica = "North America"
+    case centralAmerica = "Central America"
+    case caribbean = "Caribbean"
+    case southAmerica = "South America"
     case europe = "Europe"
-    case americas = "Americas"
-    case asiaPacific = "Asia & Pacific"
-    case middleEastAfrica = "Middle East & Africa"
-    case other = "Other"
+    case africa = "Africa"
+    case middleEast = "Middle East"
+    case asia = "Asia"
+    case oceania = "Oceania"
 
     var id: String { rawValue }
-
     var displayName: String { rawValue }
 
-    // MARK: - Country Code → Region Mapping
+    // MARK: - Lookup
 
+    /// Returns the geographic region for a given ISO 3166-1 alpha-2 country code.
     static func region(for countryCode: String) -> GeoRegion {
         let code = countryCode.uppercased()
-        if europeCodes.contains(code) { return .europe }
-        if americasCodes.contains(code) { return .americas }
-        if asiaPacificCodes.contains(code) { return .asiaPacific }
-        if middleEastAfricaCodes.contains(code) { return .middleEastAfrica }
-        return .other
+        return codeToRegion[code] ?? .europe // fallback; most obscure territories are European
     }
 
-    // MARK: - Region Sets
+    /// All country codes belonging to this region.
+    var countryCodes: [String] {
+        Self.regionToCodesMap[self] ?? []
+    }
 
-    private static let europeCodes: Set<String> = [
-        // EU / Schengen / EEA
-        "AT", "BE", "BG", "HR", "CY", "CZ", "DK", "EE", "FI", "FR",
-        "DE", "GR", "HU", "IE", "IT", "LV", "LT", "LU", "MT", "NL",
-        "PL", "PT", "RO", "SK", "SI", "ES", "SE",
-        // EFTA / Other Europe
-        "IS", "LI", "NO", "CH",
-        "GB", "AL", "AD", "AM", "AZ", "BY", "BA", "GE", "GI", "XK",
-        "MD", "MC", "ME", "MK", "RS", "SM", "TR", "UA", "VA",
-        // Territories
-        "FO", "GL", "GG", "IM", "JE", "AX", "SJ",
+    // MARK: - Data
+
+    static let regions: [(region: GeoRegion, codes: [String])] = [
+        (.northAmerica, [
+            "US", "CA", "MX",
+        ]),
+        (.centralAmerica, [
+            "GT", "HN", "SV", "NI", "CR", "BZ", "PA",
+        ]),
+        (.caribbean, [
+            "CU", "DO", "HT", "JM", "TT", "AG", "BS", "BB", "DM", "GD", "KN", "LC", "VC",
+            "AW", "AI", "BM", "VG", "KY", "CW", "GP", "MQ", "MS", "PR", "BL", "MF", "SX",
+            "TC", "VI", "BQ",
+        ]),
+        (.southAmerica, [
+            "BR", "CO", "AR", "PE", "VE", "BO", "CL", "EC", "GY", "PY", "SR", "UY",
+            "GF", "FK",
+        ]),
+        (.europe, [
+            "RU", "DE", "GB", "FR", "IT", "AL", "AD", "AT", "BY", "BE", "BA", "BG", "HR",
+            "CY", "CZ", "DK", "EE", "FI", "GR", "HU", "IS", "IE", "LV", "LI", "LT", "LU",
+            "MT", "MD", "MC", "ME", "NL", "MK", "NO", "PL", "PT", "RO", "SM", "RS", "SK",
+            "SI", "ES", "SE", "CH", "UA", "VA", "XK",
+            "GI", "FO", "GL", "GG", "IM", "JE", "AX", "SJ",
+        ]),
+        (.africa, [
+            "NG", "ET", "EG", "CD", "TZ", "DZ", "AO", "BJ", "BW", "BF", "BI", "CV", "CM",
+            "CF", "TD", "KM", "CG", "CI", "DJ", "GQ", "ER", "SZ", "GA", "GM", "GH", "GN",
+            "GW", "KE", "LS", "LR", "LY", "MG", "MW", "ML", "MR", "MU", "MA", "MZ", "NA",
+            "NE", "RW", "ST", "SN", "SC", "SL", "SO", "ZA", "SS", "SD", "TG", "TN", "UG",
+            "ZM", "ZW", "EH", "YT", "RE",
+        ]),
+        (.middleEast, [
+            "IR", "IQ", "SA", "YE", "SY", "BH", "IL", "JO", "KW", "LB", "OM", "PS", "QA",
+            "TR", "AE",
+        ]),
+        (.asia, [
+            "IN", "CN", "ID", "PK", "BD", "AF", "AM", "AZ", "BT", "BN", "KH", "GE", "HK",
+            "JP", "KZ", "KG", "LA", "MO", "MY", "MV", "MN", "MM", "NP", "KP", "PH", "SG",
+            "KR", "LK", "TW", "TJ", "TH", "TL", "TM", "UZ", "VN",
+        ]),
+        (.oceania, [
+            "AU", "PG", "NZ", "FJ", "SB", "CK", "FM", "KI", "MH", "NR", "NU", "PW", "WS",
+            "TO", "TV", "VU", "AS", "GU", "MP", "NC", "PF", "WF", "PN", "TK",
+        ]),
     ]
 
-    private static let americasCodes: Set<String> = [
-        // North America
-        "US", "CA", "MX",
-        // Central America
-        "BZ", "CR", "SV", "GT", "HN", "NI", "PA",
-        // Caribbean
-        "AG", "BS", "BB", "CU", "DM", "DO", "GD", "HT", "JM", "KN",
-        "LC", "VC", "TT",
-        "AW", "AI", "BM", "VG", "KY", "CW", "GP", "MQ", "MS", "PR",
-        "BL", "MF", "SX", "TC", "VI", "BQ",
-        // South America
-        "AR", "BO", "BR", "CL", "CO", "EC", "FK", "GF", "GY", "PY",
-        "PE", "SR", "UY", "VE",
-    ]
+    // MARK: - Precomputed Maps
 
-    private static let asiaPacificCodes: Set<String> = [
-        // East Asia
-        "CN", "JP", "KR", "KP", "MN", "TW", "HK", "MO",
-        // Southeast Asia
-        "BN", "KH", "ID", "LA", "MY", "MM", "PH", "SG", "TH", "TL", "VN",
-        // South Asia
-        "AF", "BD", "BT", "IN", "MV", "NP", "LK", "PK",
-        // Central Asia
-        "KZ", "KG", "TJ", "TM", "UZ",
-        // Oceania
-        "AU", "NZ", "FJ", "PG", "SB", "VU", "WS", "TO", "KI", "MH",
-        "FM", "NR", "PW", "TV", "CK", "NU", "TK", "AS", "GU", "MP",
-        "NC", "PF", "WF", "PN",
-    ]
+    private static let codeToRegion: [String: GeoRegion] = {
+        var map: [String: GeoRegion] = [:]
+        for entry in regions {
+            for code in entry.codes {
+                map[code] = entry.region
+            }
+        }
+        return map
+    }()
 
-    private static let middleEastAfricaCodes: Set<String> = [
-        // Middle East
-        "BH", "IR", "IQ", "IL", "JO", "KW", "LB", "OM", "PS", "QA",
-        "SA", "SY", "AE", "YE",
-        // North Africa
-        "DZ", "EG", "LY", "MA", "TN", "EH", "MR",
-        // Sub-Saharan Africa
-        "AO", "BJ", "BW", "BF", "BI", "CV", "CM", "CF", "TD", "KM",
-        "CG", "CD", "CI", "DJ", "GQ", "ER", "SZ", "ET", "GA", "GM",
-        "GH", "GN", "GW", "KE", "LS", "LR", "MG", "MW", "ML", "MU",
-        "YT", "MZ", "NA", "NE", "NG", "RE", "RW", "ST", "SN", "SC",
-        "SL", "SO", "ZA", "SS", "SD", "TZ", "TG", "UG", "ZM", "ZW",
-    ]
+    private static let regionToCodesMap: [GeoRegion: [String]] = {
+        var map: [GeoRegion: [String]] = [:]
+        for entry in regions {
+            map[entry.region] = entry.codes
+        }
+        return map
+    }()
 }
