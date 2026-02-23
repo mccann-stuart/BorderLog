@@ -1,11 +1,14 @@
 import SwiftUI
 import SwiftData
+import Photos
 
 struct MainNavigationView: View {
     @EnvironmentObject private var authManager: AuthenticationManager
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.scenePhase) private var scenePhase
     
     @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
+    @AppStorage("hasPromptedPhotos") private var hasPromptedPhotos = false
     
     @State private var selectedTab = 0
     @State private var isShowingSettings = false
@@ -16,6 +19,8 @@ struct MainNavigationView: View {
     @AppStorage("didBootstrapInference") private var didBootstrapInference = false
     @State private var locationService = LocationSampleService()
     @State private var didAttemptLaunchLocationCapture = false
+    @State private var isBootstrappingInference = false
+    @State private var isBootstrappingPhotoScan = false
     
     var body: some View {
         ZStack {
@@ -104,22 +109,11 @@ struct MainNavigationView: View {
             await captureTodayLocationIfNeeded()
         }
         .task(id: hasCompletedOnboarding) {
-            guard hasCompletedOnboarding else { return }
-            let container = modelContext.container
-
-            if !didBootstrapInference {
-                didBootstrapInference = true
-                let recomputeService = LedgerRecomputeService(modelContainer: container)
-                await recomputeService.recomputeAll()
-                let ingestor = PhotoSignalIngestor(modelContainer: container, resolver: CLGeocoderCountryResolver())
-                _ = await ingestor.ingest(mode: .sequenced)
-                let calendarIngestor = CalendarSignalIngestor(modelContainer: container, resolver: CLGeocoderCountryResolver())
-                _ = await calendarIngestor.ingest(mode: .manualFullScan)
-                return
-            }
-
-            let calendarIngestor = CalendarSignalIngestor(modelContainer: container, resolver: CLGeocoderCountryResolver())
-            _ = await calendarIngestor.ingest(mode: .auto)
+            await bootstrapInferenceIfNeeded()
+        }
+        .onChange(of: scenePhase) { phase in
+            guard phase == .active else { return }
+            Task { await bootstrapPhotoScanIfNeeded() }
         }
     }
     
@@ -181,6 +175,76 @@ struct MainNavigationView: View {
             source: .app,
             modelContext: modelContext
         )
+    }
+
+    @MainActor
+    private func bootstrapInferenceIfNeeded() async {
+        guard hasCompletedOnboarding else { return }
+        guard !isBootstrappingInference else { return }
+
+        isBootstrappingInference = true
+        defer { isBootstrappingInference = false }
+
+        let container = modelContext.container
+
+        if !didBootstrapInference {
+            let recomputeService = LedgerRecomputeService(modelContainer: container)
+            await recomputeService.recomputeAll()
+
+            await bootstrapPhotoScanIfNeeded()
+
+            let calendarIngestor = CalendarSignalIngestor(modelContainer: container, resolver: CLGeocoderCountryResolver())
+            _ = await calendarIngestor.ingest(mode: .manualFullScan)
+            didBootstrapInference = true
+            return
+        }
+
+        await bootstrapPhotoScanIfNeeded()
+
+        let calendarIngestor = CalendarSignalIngestor(modelContainer: container, resolver: CLGeocoderCountryResolver())
+        _ = await calendarIngestor.ingest(mode: .auto)
+    }
+
+    @MainActor
+    private func bootstrapPhotoScanIfNeeded() async {
+        guard hasCompletedOnboarding else { return }
+        guard !isBootstrappingPhotoScan else { return }
+
+        isBootstrappingPhotoScan = true
+        defer { isBootstrappingPhotoScan = false }
+
+        var status = PHPhotoLibrary.authorizationStatus(for: .readWrite)
+        if status == .notDetermined, hasPromptedPhotos {
+            status = await waitForPhotoAuthorizationResolution()
+        }
+
+        guard status == .authorized || status == .limited else { return }
+        guard needsPhotoBootstrap() else { return }
+
+        let ingestor = PhotoSignalIngestor(modelContainer: modelContext.container, resolver: CLGeocoderCountryResolver())
+        _ = await ingestor.ingest(mode: .sequenced)
+    }
+
+    @MainActor
+    private func needsPhotoBootstrap() -> Bool {
+        let descriptor = FetchDescriptor<PhotoIngestState>()
+        guard let state = try? modelContext.fetch(descriptor).first else {
+            return true
+        }
+        return !state.fullScanCompleted
+    }
+
+    @MainActor
+    private func waitForPhotoAuthorizationResolution() async -> PHAuthorizationStatus {
+        let maxAttempts = 50
+        for _ in 0..<maxAttempts {
+            let status = PHPhotoLibrary.authorizationStatus(for: .readWrite)
+            if status != .notDetermined {
+                return status
+            }
+            try? await Task.sleep(nanoseconds: 200_000_000)
+        }
+        return PHPhotoLibrary.authorizationStatus(for: .readWrite)
     }
 }
 
