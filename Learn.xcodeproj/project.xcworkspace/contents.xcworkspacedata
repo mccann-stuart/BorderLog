@@ -4,11 +4,4 @@
    <FileRef
       location = "self:">
    </FileRef>
-   <Group
-      location = "group:tasks"
-      name = "tasks">
-      <FileRef
-         location = "group:todo.md">
-      </FileRef>
-   </Group>
 </Workspace>
