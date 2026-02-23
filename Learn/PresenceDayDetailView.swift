@@ -111,8 +111,7 @@ struct PresenceDayDetailView: View {
     private func applySuggestion(code: String, name: String) {
         let newOverride = DayOverride(
             date: day.date,
-            countryCode: code,
-            countryName: name
+            countryName: name, countryCode: code
         )
         modelContext.insert(newOverride)
         try? modelContext.save()

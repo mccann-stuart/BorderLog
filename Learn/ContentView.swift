@@ -37,6 +37,19 @@ struct ContentView: View {
     @State private var schengenState = SchengenState()
     @State private var ledgerFilter: LedgerFilter = .all
 
+    private var filteredPresenceDays: [PresenceDay] {
+        switch ledgerFilter {
+        case .all:
+            return presenceDays
+        case .unknown:
+            return presenceDays.filter { day in
+                day.countryCode == nil && day.countryName == nil
+            }
+        case .manual:
+            return presenceDays.filter { $0.isOverride }
+        }
+    }
+
     var body: some View {
         NavigationStack {
             List {
