@@ -31,7 +31,7 @@ enum BorderLogSchemaV2: VersionedSchema {
         DayOverride.self,
         LocationSample.self,
         PhotoSignal.self,
-        PresenceDay.self,
+        BorderLogSchemaV4.PresenceDay.self,
         PhotoIngestState.self
     ]
 }
@@ -43,7 +43,7 @@ enum BorderLogSchemaV3: VersionedSchema {
         DayOverride.self,
         LocationSample.self,
         PhotoSignal.self,
-        PresenceDay.self,
+        BorderLogSchemaV4.PresenceDay.self,
         PhotoIngestState.self,
         CountryConfig.self
     ]
@@ -51,6 +51,66 @@ enum BorderLogSchemaV3: VersionedSchema {
 
 enum BorderLogSchemaV4: VersionedSchema {
     static var versionIdentifier: Schema.Version = .init(4, 0, 0)
+
+    @Model
+    final class PresenceDay {
+        @Attribute(.unique) var dayKey: String
+        var date: Date
+        var timeZoneId: String?
+        var countryCode: String?
+        var countryName: String?
+        var confidence: Double
+        var confidenceLabelRaw: String
+        var sourcesRaw: Int
+        var isOverride: Bool
+        var stayCount: Int
+        var photoCount: Int
+        var locationCount: Int
+        var calendarCount: Int = 0
+        var suggestedCountryCode1: String?
+        var suggestedCountryName1: String?
+        var suggestedCountryCode2: String?
+        var suggestedCountryName2: String?
+
+        init(
+            dayKey: String,
+            date: Date,
+            timeZoneId: String?,
+            countryCode: String?,
+            countryName: String?,
+            confidence: Double,
+            confidenceLabelRaw: String,
+            sourcesRaw: Int,
+            isOverride: Bool,
+            stayCount: Int,
+            photoCount: Int,
+            locationCount: Int,
+            calendarCount: Int = 0,
+            suggestedCountryCode1: String? = nil,
+            suggestedCountryName1: String? = nil,
+            suggestedCountryCode2: String? = nil,
+            suggestedCountryName2: String? = nil
+        ) {
+            self.dayKey = dayKey
+            self.date = date
+            self.timeZoneId = timeZoneId
+            self.countryCode = countryCode
+            self.countryName = countryName
+            self.confidence = confidence
+            self.confidenceLabelRaw = confidenceLabelRaw
+            self.sourcesRaw = sourcesRaw
+            self.isOverride = isOverride
+            self.stayCount = stayCount
+            self.photoCount = photoCount
+            self.locationCount = locationCount
+            self.calendarCount = calendarCount
+            self.suggestedCountryCode1 = suggestedCountryCode1
+            self.suggestedCountryName1 = suggestedCountryName1
+            self.suggestedCountryCode2 = suggestedCountryCode2
+            self.suggestedCountryName2 = suggestedCountryName2
+        }
+    }
+
     static var models: [any PersistentModel.Type] = [
         Stay.self,
         DayOverride.self,
