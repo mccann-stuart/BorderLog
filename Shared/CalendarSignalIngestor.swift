@@ -220,56 +220,76 @@ actor CalendarSignalIngestor {
         // 1. "From A to B"
         // 2. "Flight to B"
         // 3. "A ✈ B"
+        // 4. "LHR - JFK" or "LHR/JFK" (3-letter codes)
 
         // We use NSRegularExpression for compatibility
         let patternFromTo = try? NSRegularExpression(pattern: "from\\s+(.+?)\\s+to\\s+(.+)", options: [.caseInsensitive])
         let patternTo = try? NSRegularExpression(pattern: "flight\\s+to\\s+(.+)", options: [.caseInsensitive])
         let patternPlane = try? NSRegularExpression(pattern: "(.+?)\\s*✈\\s*(.+)", options: [])
         let patternPlaneEmoji = try? NSRegularExpression(pattern: "(.+?)\\s*✈️\\s*(.+)", options: [])
+        let patternCodes = try? NSRegularExpression(pattern: "\\b([A-Z]{3})\\s*[-/]\\s*([A-Z]{3})\\b", options: [])
+
+        var bestFrom: String?
+        var bestTo: String?
 
         for text in candidates {
             if text.isEmpty { continue }
             let nsString = text as NSString
             let range = NSRange(location: 0, length: nsString.length)
 
+            // Priority: Find a match that gives BOTH from and to
+
+            // Check "LHR - JFK" or "LHR/JFK"
+            if let p = patternCodes, let match = p.firstMatch(in: text, options: [], range: range) {
+                if match.numberOfRanges >= 3 {
+                    return (
+                        nsString.substring(with: match.range(at: 1)),
+                        nsString.substring(with: match.range(at: 2))
+                    )
+                }
+            }
+
             // Check "A ✈ B"
             if let p = patternPlane, let match = p.firstMatch(in: text, options: [], range: range) {
                 if match.numberOfRanges >= 3 {
-                    let from = nsString.substring(with: match.range(at: 1)).trimmingCharacters(in: .whitespacesAndNewlines)
-                    let to = nsString.substring(with: match.range(at: 2)).trimmingCharacters(in: .whitespacesAndNewlines)
-                    return (from, to)
+                    return (
+                        nsString.substring(with: match.range(at: 1)).trimmingCharacters(in: .whitespacesAndNewlines),
+                        nsString.substring(with: match.range(at: 2)).trimmingCharacters(in: .whitespacesAndNewlines)
+                    )
                 }
             }
 
             if let p = patternPlaneEmoji, let match = p.firstMatch(in: text, options: [], range: range) {
                 if match.numberOfRanges >= 3 {
-                    let from = nsString.substring(with: match.range(at: 1)).trimmingCharacters(in: .whitespacesAndNewlines)
-                    let to = nsString.substring(with: match.range(at: 2)).trimmingCharacters(in: .whitespacesAndNewlines)
-                    return (from, to)
+                    return (
+                        nsString.substring(with: match.range(at: 1)).trimmingCharacters(in: .whitespacesAndNewlines),
+                        nsString.substring(with: match.range(at: 2)).trimmingCharacters(in: .whitespacesAndNewlines)
+                    )
                 }
             }
 
             // Check "From A to B"
             if let p = patternFromTo, let match = p.firstMatch(in: text, options: [], range: range) {
                 if match.numberOfRanges >= 3 {
-                    let from = nsString.substring(with: match.range(at: 1)).trimmingCharacters(in: .whitespacesAndNewlines)
-                    let to = nsString.substring(with: match.range(at: 2)).trimmingCharacters(in: .whitespacesAndNewlines)
-                    return (from, to)
+                    return (
+                        nsString.substring(with: match.range(at: 1)).trimmingCharacters(in: .whitespacesAndNewlines),
+                        nsString.substring(with: match.range(at: 2)).trimmingCharacters(in: .whitespacesAndNewlines)
+                    )
                 }
             }
 
             // Check "Flight to B" (Only yields 'to')
-            if let p = patternTo, let match = p.firstMatch(in: text, options: [], range: range) {
-                if match.numberOfRanges >= 2 {
-                    let to = nsString.substring(with: match.range(at: 1)).trimmingCharacters(in: .whitespacesAndNewlines)
-                    // Continue searching for 'from' in other candidates?
-                    // For now, return what we found.
-                    return (nil, to)
+            // Don't return immediately, try to find a better match in other candidates
+            if bestTo == nil {
+                if let p = patternTo, let match = p.firstMatch(in: text, options: [], range: range) {
+                    if match.numberOfRanges >= 2 {
+                        bestTo = nsString.substring(with: match.range(at: 1)).trimmingCharacters(in: .whitespacesAndNewlines)
+                    }
                 }
             }
         }
 
-        return (nil, nil)
+        return (bestFrom, bestTo)
     }
 
     private func resolveAndCreateSignal(
@@ -299,21 +319,31 @@ actor CalendarSignalIngestor {
             countryName = resolution?.countryName
             timeZoneId = resolution?.timeZone?.identifier
         } else if let locString = locationString {
-            // Rate limit manually: 1 request per second max
-            try? await Task.sleep(nanoseconds: 1_000_000_000)
+            // First try to resolve as an airport code
+            if let airport = await AirportCodeResolver.shared.resolve(code: locString) {
+                lat = airport.lat
+                long = airport.lon
+                countryCode = airport.country
+                countryName = Locale.current.localizedString(forRegionCode: airport.country)
+                // TimeZone: Fallback to event timezone or infer from country?
+                // Event timezone is a safe bet for calendar events.
+            } else {
+                // Rate limit manually: 1 request per second max
+                try? await Task.sleep(nanoseconds: 1_000_000_000)
 
-            let request = MKLocalSearch.Request()
-            request.naturalLanguageQuery = locString
-            let search = MKLocalSearch(request: request)
+                let request = MKLocalSearch.Request()
+                request.naturalLanguageQuery = locString
+                let search = MKLocalSearch(request: request)
 
-            if let response = try? await search.start(),
-               let item = response.mapItems.first {
-                let loc = item.location
-                lat = loc.coordinate.latitude
-                long = loc.coordinate.longitude
-                countryCode = item.addressRepresentations?.region?.identifier
-                countryName = item.addressRepresentations?.regionName
-                timeZoneId = item.timeZone?.identifier
+                if let response = try? await search.start(),
+                   let item = response.mapItems.first {
+                    let loc = item.location
+                    lat = loc.coordinate.latitude
+                    long = loc.coordinate.longitude
+                    countryCode = item.addressRepresentations?.region?.identifier
+                    countryName = item.addressRepresentations?.regionName
+                    timeZoneId = item.timeZone?.identifier
+                }
             }
         }
 
