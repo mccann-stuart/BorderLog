@@ -12,6 +12,8 @@ struct PresenceDayDetailView: View {
     let day: PresenceDay
 
     @State private var isShowingOverride = false
+    @State private var appliedSuggestion: String? = nil
+    @State private var isShowingDeleteAlert = false
 
     private var dayTitle: String {
         day.dayKey
@@ -34,29 +36,56 @@ struct PresenceDayDetailView: View {
                 Button("Override Day") {
                     isShowingOverride = true
                 }
+                if day.isOverride {
+                    Button("Delete Override", role: .destructive) {
+                        isShowingDeleteAlert = true
+                    }
+                }
             }
 
             if day.countryCode == nil, let code1 = day.suggestedCountryCode1, let name1 = day.suggestedCountryName1 {
                 Section("Suggestions") {
                     Button(action: {
                         applySuggestion(code: code1, name: name1)
+                        withAnimation(.easeInOut(duration: 0.35)) {
+                            appliedSuggestion = code1
+                        }
                     }) {
                         HStack {
-                            Text("Apply \(name1)")
-                            Spacer()
-                            Image(systemName: "plus.circle.fill")
-                        }
-                    }
-                    if let code2 = day.suggestedCountryCode2, let name2 = day.suggestedCountryName2, code2 != code1 {
-                        Button(action: {
-                            applySuggestion(code: code2, name: name2)
-                        }) {
-                            HStack {
-                                Text("Apply \(name2)")
+                            if appliedSuggestion == code1 {
+                                Image(systemName: "checkmark.circle.fill")
+                                    .foregroundStyle(.green)
+                                Text("Applied")
+                                    .foregroundStyle(.green)
+                            } else {
+                                Text("Apply \(name1)")
                                 Spacer()
                                 Image(systemName: "plus.circle.fill")
                             }
                         }
+                    }
+                    .disabled(appliedSuggestion != nil)
+                    if let code2 = day.suggestedCountryCode2, let name2 = day.suggestedCountryName2, code2 != code1 {
+                        Button(action: {
+                            applySuggestion(code: code2, name: name2)
+                            withAnimation(.easeInOut(duration: 0.35)) {
+                                appliedSuggestion = code2
+                            }
+                        }) {
+                            HStack {
+                                if appliedSuggestion == code2 {
+                                    Image(systemName: "checkmark.circle.fill")
+                                        .foregroundStyle(.green)
+                                    Text("Applied")
+                                        .foregroundStyle(.green)
+                                } else {
+                                    Text("Apply \(name2)")
+                                    Spacer()
+                                    Image(systemName: "plus.circle.fill")
+                                }
+                            }
+                        }
+                        .disabled(appliedSuggestion != nil)
                     }
                 }
             }
@@ -104,6 +133,14 @@ struct PresenceDayDetailView: View {
                 )
             }
         }
+        .alert("Delete Override", isPresented: $isShowingDeleteAlert) {
+            Button("Cancel", role: .cancel) { }
+            Button("Delete", role: .destructive) {
+                deleteOverride()
+            }
+        } message: {
+            Text("This will remove the manual override for this day. The day will revert to its inferred location.")
+        }
     }
 
     @Environment(\.modelContext) private var modelContext
@@ -134,6 +171,20 @@ struct PresenceDayDetailView: View {
                 region: region
             )
             modelContext.insert(newOverride)
+        }
+        try? modelContext.save()
+    }
+
+    private func deleteOverride() {
+        let calendar = Calendar.current
+        let normalizedDate = calendar.startOfDay(for: day.date)
+        let predicate = #Predicate<DayOverride> { override in
+            override.date == normalizedDate
+        }
+        if let matches = try? modelContext.fetch(FetchDescriptor(predicate: predicate)) {
+            for match in matches {
+                modelContext.delete(match)
+            }
         }
         try? modelContext.save()
     }
