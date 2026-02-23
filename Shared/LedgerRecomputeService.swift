@@ -139,6 +139,10 @@ public actor LedgerRecomputeService {
                 existing.stayCount = result.stayCount
                 existing.photoCount = result.photoCount
                 existing.locationCount = result.locationCount
+                existing.suggestedCountryCode1 = result.suggestedCountryCode1
+                existing.suggestedCountryName1 = result.suggestedCountryName1
+                existing.suggestedCountryCode2 = result.suggestedCountryCode2
+                existing.suggestedCountryName2 = result.suggestedCountryName2
             } else {
                 let newDay = PresenceDay(
                     dayKey: result.dayKey,
@@ -152,7 +156,11 @@ public actor LedgerRecomputeService {
                     isOverride: result.isOverride,
                     stayCount: result.stayCount,
                     photoCount: result.photoCount,
-                    locationCount: result.locationCount
+                    locationCount: result.locationCount,
+                    suggestedCountryCode1: result.suggestedCountryCode1,
+                    suggestedCountryName1: result.suggestedCountryName1,
+                    suggestedCountryCode2: result.suggestedCountryCode2,
+                    suggestedCountryName2: result.suggestedCountryName2
                 )
                 dataFetcher.insertPresenceDay(newDay)
             }
