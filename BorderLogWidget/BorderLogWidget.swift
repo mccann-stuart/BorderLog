@@ -138,7 +138,7 @@ struct TopCountriesWidgetProvider: TimelineProvider {
     }
 
     func getTimeline(in context: Context, completion: @escaping (Timeline<TopCountriesEntry>) -> Void) {
-        Task { @MainActor in
+        Task {
             let container = ModelContainerProvider.makeContainer()
             let modelContext = ModelContext(container)
 
@@ -284,7 +284,7 @@ struct SchengenWidgetProvider: TimelineProvider {
     }
 
     func getTimeline(in context: Context, completion: @escaping (Timeline<SchengenEntry>) -> Void) {
-        Task { @MainActor in
+        Task {
             let container = ModelContainerProvider.makeContainer()
             let modelContext = ModelContext(container)
             
