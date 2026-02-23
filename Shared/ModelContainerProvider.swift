@@ -172,10 +172,10 @@ enum ModelContainerProvider {
 
     static func makeContainer() -> ModelContainer {
         let schema = Schema(versionedSchema: BorderLogSchemaV5.self)
-        let cloudKitDatabase: ModelConfiguration.CloudKitDatabase? =
+        let cloudKitDatabase: ModelConfiguration.CloudKitDatabase =
             (AppConfig.isCloudKitFeatureEnabled && AppConfig.isCloudKitSyncEnabled)
                 ? .private(AppConfig.cloudKitContainerId)
-                : nil
+                : .none
 
         // Tier 1: App Group shared container (needed for widget access)
         if let appGroupId = AppConfig.appGroupId {

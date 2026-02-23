@@ -5,11 +5,7 @@
       location = "self:">
    </FileRef>
    <Group
-      location = "group:tasks 2"
-      name = "tasks 2">
-   </Group>
-   <Group
-      location = "group:tasks 3"
-      name = "tasks 3">
+      location = "group:tasks 4"
+      name = "tasks 4">
    </Group>
 </Workspace>

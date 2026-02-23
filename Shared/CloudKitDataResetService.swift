@@ -28,7 +28,7 @@ enum CloudKitDataResetService {
     }
 
     private static func fetchAllZones(in database: CKDatabase) async throws -> [CKRecordZone] {
-        try await withCheckedThrowingContinuation { continuation in
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<[CKRecordZone], Error>) in
             database.fetchAllRecordZones { zones, error in
                 if let error = error {
                     continuation.resume(throwing: error)
@@ -40,13 +40,14 @@ enum CloudKitDataResetService {
     }
 
     private static func deleteZones(_ zoneIDs: [CKRecordZone.ID], in database: CKDatabase) async throws {
-        try await withCheckedThrowingContinuation { continuation in
-            database.modifyRecordZones(saving: [], deleting: zoneIDs) { _, _, error in
-                if let error = error {
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+            database.modifyRecordZones(saving: [], deleting: zoneIDs) { result in
+                switch result {
+                case .failure(let error):
                     continuation.resume(throwing: error)
-                    return
+                case .success:
+                    continuation.resume()
                 }
-                continuation.resume()
             }
         }
     }
