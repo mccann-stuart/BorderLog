@@ -4,12 +4,14 @@
 //
 
 import SwiftUI
+import Foundation
 
 struct PresenceDayRow: View {
     let day: PresenceDay
 
     private var dayText: String {
-        day.dayKey
+        let formatter = Date.FormatStyle(date: .abbreviated, time: .omitted)
+        return day.date.formatted(formatter)
     }
 
     private var countryText: String {
@@ -39,6 +41,15 @@ struct PresenceDayRow: View {
                         .padding(.horizontal, 6)
                         .padding(.vertical, 2)
                         .background(Color.accentColor.opacity(0.15))
+                        .clipShape(Capsule())
+                }
+
+                if Calendar.current.isDateInToday(day.date) {
+                    Text("Today")
+                        .font(.system(.caption, design: .rounded))
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(Color.blue.opacity(0.15))
                         .clipShape(Capsule())
                 }
             }

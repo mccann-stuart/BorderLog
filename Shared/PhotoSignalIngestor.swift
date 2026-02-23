@@ -40,6 +40,13 @@ actor PhotoSignalIngestor {
             return 0
         }
 
+        await MainActor.run { InferenceActivity.shared.beginPhotoScan() }
+        defer {
+            Task { @MainActor in
+                InferenceActivity.shared.endPhotoScan()
+            }
+        }
+
         let state = fetchOrCreateState()
 
         let calendar = Calendar.current

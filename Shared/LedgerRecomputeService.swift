@@ -21,6 +21,12 @@ public actor LedgerRecomputeService {
     }
 
     public func recompute(dayKeys: [String]) async {
+        await MainActor.run { InferenceActivity.shared.beginInference() }
+        defer {
+            Task { @MainActor in
+                InferenceActivity.shared.endInference()
+            }
+        }
         let calendar = Calendar.current
         let timeZone = calendar.timeZone
         var dayKeySet = Set(dayKeys)

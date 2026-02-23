@@ -13,6 +13,8 @@ struct MainNavigationView: View {
     @State private var isPresentingAddStay = false
     @State private var isPresentingAddOverride = false
     @AppStorage("didBootstrapInference") private var didBootstrapInference = false
+    @State private var locationService = LocationSampleService()
+    @State private var didAttemptLaunchLocationCapture = false
     
     var body: some View {
         ZStack {
@@ -90,6 +92,9 @@ struct MainNavigationView: View {
             }
         }
         .task(id: hasCompletedOnboarding) {
+            await captureTodayLocationIfNeeded()
+        }
+        .task(id: hasCompletedOnboarding) {
             // Only bootstrap after onboarding completes
             guard hasCompletedOnboarding, !didBootstrapInference else { return }
             didBootstrapInference = true
@@ -128,6 +133,36 @@ struct MainNavigationView: View {
             Image(systemName: "ellipsis.circle")
                 .font(.title3)
         }
+    }
+
+    @MainActor
+    private func captureTodayLocationIfNeeded() async {
+        guard hasCompletedOnboarding else { return }
+        guard !didAttemptLaunchLocationCapture else { return }
+        didAttemptLaunchLocationCapture = true
+
+        let calendar = Calendar.current
+        let startOfDay = calendar.startOfDay(for: Date())
+        guard let endOfDay = calendar.date(byAdding: .day, value: 1, to: startOfDay) else { return }
+
+        do {
+            let predicate = #Predicate<LocationSample> { sample in
+                sample.timestamp >= startOfDay && sample.timestamp < endOfDay
+            }
+            var fetch = FetchDescriptor<LocationSample>(predicate: predicate)
+            fetch.fetchLimit = 1
+            let existing = try modelContext.fetch(fetch)
+            if !existing.isEmpty {
+                return
+            }
+        } catch {
+            // If fetching fails, still attempt a best-effort capture.
+        }
+
+        _ = await locationService.captureAndStoreBurst(
+            source: .app,
+            modelContext: modelContext
+        )
     }
 }
 
