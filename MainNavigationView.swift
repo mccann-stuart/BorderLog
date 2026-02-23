@@ -11,10 +11,6 @@ struct MainNavigationView: View {
     @AppStorage("hasPromptedPhotos") private var hasPromptedPhotos = false
     
     @State private var selectedTab = 0
-    @State private var isShowingSettings = false
-    @State private var isShowingAccount = false
-    @State private var isPresentingAddStay = false
-    @State private var isPresentingAddOverride = false
 
     @AppStorage("didBootstrapInference") private var didBootstrapInference = false
     @State private var locationService = LocationSampleService()
@@ -34,28 +30,6 @@ struct MainNavigationView: View {
                 NavigationStack {
                     DashboardView()
                         .navigationTitle("Dashboard")
-                        .toolbar {
-                            ToolbarItemGroup(placement: .topBarTrailing) {
-                                settingsMenu
-                                
-                                Menu {
-                                    Button {
-                                        isPresentingAddStay = true
-                                    } label: {
-                                        Label("Add Stay", systemImage: "airplane")
-                                    }
-                                    
-                                    Button {
-                                        isPresentingAddOverride = true
-                                    } label: {
-                                        Label("Add Day Override", systemImage: "calendar.badge.exclamationmark")
-                                    }
-                                } label: {
-                                    Image(systemName: "plus.circle.fill")
-                                        .font(.title3)
-                                }
-                            }
-                        }
                 }
                 .tag(0)
                 .tabItem {
@@ -64,11 +38,6 @@ struct MainNavigationView: View {
                 
                 NavigationStack {
                     ContentView()
-                        .toolbar {
-                            ToolbarItem(placement: .topBarTrailing) {
-                                settingsMenu
-                            }
-                        }
                 }
                 .tag(1)
                 .tabItem {
@@ -89,22 +58,6 @@ struct MainNavigationView: View {
             OnboardingView()
                 .environmentObject(authManager)
         }
-        .sheet(isPresented: $isShowingSettings) {
-            SettingsView()
-        }
-        .sheet(isPresented: $isShowingAccount) {
-            UserAccountView()
-        }
-        .sheet(isPresented: $isPresentingAddStay) {
-            NavigationStack {
-                StayEditorView()
-            }
-        }
-        .sheet(isPresented: $isPresentingAddOverride) {
-            NavigationStack {
-                DayOverrideEditorView()
-            }
-        }
         .task(id: hasCompletedOnboarding) {
             await captureTodayLocationIfNeeded()
         }
@@ -117,35 +70,6 @@ struct MainNavigationView: View {
         }
     }
     
-    private var settingsMenu: some View {
-        Menu {
-            if AuthenticationManager.isAppleSignInEnabled {
-                Button {
-                    isShowingAccount = true
-                } label: {
-                    Label("Account", systemImage: "person.circle")
-                }
-            }
-            
-            Button {
-                isShowingSettings = true
-            } label: {
-                Label("Settings", systemImage: "gearshape")
-            }
-            
-            Divider()
-            
-            Button {
-                hasCompletedOnboarding = false
-            } label: {
-                Label("Re-Launch Setup", systemImage: "arrow.clockwise")
-            }
-        } label: {
-            Image(systemName: "ellipsis.circle")
-                .font(.title3)
-        }
-    }
-
 
     @MainActor
     private func captureTodayLocationIfNeeded() async {

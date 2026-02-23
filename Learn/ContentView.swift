@@ -50,6 +50,19 @@ struct ContentView: View {
     var body: some View {
         NavigationStack {
             List {
+                HStack {
+                    Spacer()
+                    Button {
+                        isPresentingAddOverride = true
+                    } label: {
+                        Image(systemName: "plus.circle.fill")
+                            .font(.title2)
+                    }
+                    .accessibilityLabel("Add Day Override")
+                }
+                .listRowBackground(Color.clear)
+                .listRowInsets(EdgeInsets())
+                .padding(.vertical, 4)
 
                 Section {
                     Picker("Filter Ledger", selection: $ledgerFilter) {
@@ -106,16 +119,6 @@ struct ContentView: View {
                 .ignoresSafeArea()
             }
             .navigationTitle("BorderLog")
-            .toolbar {
-                ToolbarItem(placement: .primaryAction) {
-                    Button {
-                        isPresentingAddOverride = true
-                    } label: {
-                        Label("Add", systemImage: "plus")
-                    }
-                }
-
-            }
             .sheet(isPresented: $isPresentingAddOverride) {
                 NavigationStack {
                     DayOverrideEditorView()
