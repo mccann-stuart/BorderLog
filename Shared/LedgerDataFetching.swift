@@ -20,6 +20,7 @@ protocol LedgerDataFetching {
     func fetchEarliestPhotoDate() throws -> Date?
 
     func fetchPresenceDays(keys: [String]) throws -> [PresenceDay]
+    func fetchAllPresenceDayKeys() throws -> Set<String>
     func insertPresenceDay(_ day: PresenceDay)
 
     func save() throws
@@ -94,6 +95,12 @@ struct RealLedgerDataFetcher: LedgerDataFetching {
             predicate: #Predicate { keys.contains($0.dayKey) }
         )
         return try modelContext.fetch(descriptor)
+    }
+
+    func fetchAllPresenceDayKeys() throws -> Set<String> {
+        let descriptor = FetchDescriptor<PresenceDay>()
+        let days = try modelContext.fetch(descriptor)
+        return Set(days.map { $0.dayKey })
     }
 
     func insertPresenceDay(_ day: PresenceDay) {

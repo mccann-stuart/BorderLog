@@ -104,23 +104,7 @@ struct ContentView: View {
                     Text("Daily Ledger")
                 }
 
-                Section("Day Overrides") {
-                    if overrides.isEmpty {
-                        ContentUnavailableView(
-                            "No overrides",
-                            systemImage: "calendar.badge.exclamationmark",
-                            description: Text("Add a day override to correct a specific date.")
-                        )
-                    } else {
-                        ForEach(overrides) { overrideDay in
-                            NavigationLink {
-                                DayOverrideEditorView(overrideDay: overrideDay)
-                            } label: {
-                                DayOverrideRow(overrideDay: overrideDay)
-                            }
-                        }
-                    }
-                }
+
 
                 Section("Stays") {
                     if stays.isEmpty {
@@ -265,34 +249,7 @@ private struct StayRow: View {
     }
 }
 
-private struct DayOverrideRow: View {
-    let overrideDay: DayOverride
 
-    var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text(overrideDay.displayTitle)
-                .font(.system(.headline, design: .rounded))
-
-            HStack {
-                Text(dateText)
-                    .font(.system(.subheadline, design: .rounded))
-                    .foregroundStyle(.secondary)
-
-                Spacer()
-
-                Text(overrideDay.region.rawValue)
-                    .font(.system(.caption, design: .rounded))
-                    .foregroundStyle(.secondary)
-            }
-        }
-        .padding(.vertical, 4)
-    }
-
-    private var dateText: String {
-        let formatter = Date.FormatStyle(date: .abbreviated, time: .omitted)
-        return overrideDay.date.formatted(formatter)
-    }
-}
 
 
 

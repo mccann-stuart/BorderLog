@@ -73,6 +73,11 @@ class MockLedgerDataFetcher: LedgerDataFetching {
         return keys.compactMap { presenceDays[$0] }
     }
 
+    func fetchAllPresenceDayKeys() throws -> Set<String> {
+        if let error = fetchPresenceDaysError { throw error }
+        return Set(presenceDays.keys)
+    }
+
     func insertPresenceDay(_ day: PresenceDay) {
         insertPresenceDayCalled = true
         presenceDays[day.dayKey] = day

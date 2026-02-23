@@ -95,14 +95,20 @@ struct MainNavigationView: View {
             await captureTodayLocationIfNeeded()
         }
         .task(id: hasCompletedOnboarding) {
-            // Only bootstrap after onboarding completes
-            guard hasCompletedOnboarding, !didBootstrapInference else { return }
-            didBootstrapInference = true
+            guard hasCompletedOnboarding else { return }
             let container = modelContext.container
+
+            // Ensure every calendar day has a PresenceDay entry
             let recomputeService = LedgerRecomputeService(modelContainer: container)
-            await recomputeService.recomputeAll()
-            let ingestor = PhotoSignalIngestor(modelContainer: container, resolver: CLGeocoderCountryResolver())
-            _ = await ingestor.ingest(mode: .sequenced)
+            await recomputeService.fillMissingDays()
+
+            // One-time bootstrap: full recompute + initial photo ingestion
+            if !didBootstrapInference {
+                didBootstrapInference = true
+                await recomputeService.recomputeAll()
+                let ingestor = PhotoSignalIngestor(modelContainer: container, resolver: CLGeocoderCountryResolver())
+                _ = await ingestor.ingest(mode: .sequenced)
+            }
         }
     }
     

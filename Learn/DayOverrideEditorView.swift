@@ -12,6 +12,7 @@ struct DayOverrideEditorView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
     @Query(sort: [SortDescriptor(\DayOverride.date, order: .reverse)]) private var overrides: [DayOverride]
+    @Query private var presenceDays: [PresenceDay]
 
     private let existingOverride: DayOverride?
     @State private var draft: DayOverrideDraft
@@ -39,7 +40,9 @@ struct DayOverrideEditorView: View {
                 countryName: $draft.countryName,
                 countryCode: $draft.countryCode,
                 region: $draft.region,
-                style: existingOverride == nil ? .picker : .freeText
+                style: existingOverride == nil ? .picker : .freeText,
+                suggestedCodes: suggestedCodes,
+                ledgerCountryCounts: ledgerCountryCounts
             )
 
             Section("Notes") {
@@ -100,6 +103,47 @@ struct DayOverrideEditorView: View {
                 draft.region = .nonSchengen
             }
         }
+    }
+
+    // MARK: - Suggestion & Ledger Data
+
+    private var suggestedCodes: [String] {
+        guard existingOverride == nil else { return [] }
+        let calendar = Calendar.current
+        let targetStart = calendar.startOfDay(for: draft.date)
+        guard let targetEnd = calendar.date(byAdding: .day, value: 1, to: targetStart) else { return [] }
+
+        let matchingDay = presenceDays.first { day in
+            let dayStart = calendar.startOfDay(for: day.date)
+            return dayStart >= targetStart && dayStart < targetEnd
+        }
+
+        var codes: [String] = []
+        if let day = matchingDay {
+            if let c = day.countryCode, !c.isEmpty { codes.append(c.uppercased()) }
+            if let c = day.suggestedCountryCode1, !c.isEmpty {
+                let upper = c.uppercased()
+                if !codes.contains(upper) { codes.append(upper) }
+            }
+            if let c = day.suggestedCountryCode2, !c.isEmpty {
+                let upper = c.uppercased()
+                if !codes.contains(upper) { codes.append(upper) }
+            }
+        }
+        return Array(codes.prefix(3))
+    }
+
+    private var ledgerCountryCounts: [(code: String, count: Int)] {
+        guard existingOverride == nil else { return [] }
+        var counts: [String: Int] = [:]
+        for day in presenceDays {
+            if let code = day.countryCode, !code.isEmpty {
+                counts[code.uppercased(), default: 0] += 1
+            }
+        }
+        return counts
+            .map { (code: $0.key, count: $0.value) }
+            .sorted { $0.count > $1.count }
     }
 
     private var canSave: Bool {
