@@ -192,10 +192,6 @@ struct ContentView: View {
             let recomputeService = LedgerRecomputeService(modelContainer: modelContext.container)
             await recomputeService.recomputeAll()
         }
-        .task {
-            let recomputeService = LedgerRecomputeService(modelContainer: modelContext.container)
-            await recomputeService.recomputeAll()
-        }
     }
 
     private func deleteStays(offsets: IndexSet) {

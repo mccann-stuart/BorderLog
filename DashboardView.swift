@@ -306,6 +306,17 @@ private struct CountryDaysRow: View {
         }
         return .secondary
     }
+
+    private func daysAttributedText(maxDays: Int) -> AttributedString {
+        var daysText = AttributedString("\(info.totalDays) of \(maxDays)")
+        if let range = daysText.range(of: "\(info.totalDays)") {
+            daysText[range].foregroundColor = badgeColor
+        }
+        if let range = daysText.range(of: " of \(maxDays)") {
+            daysText[range].foregroundColor = .secondary
+        }
+        return daysText
+    }
     
     var body: some View {
         HStack(spacing: 12) {
@@ -325,10 +336,7 @@ private struct CountryDaysRow: View {
             
             VStack(alignment: .trailing, spacing: 2) {
                 if let maxDays = info.maxAllowedDays {
-                    (Text("\(info.totalDays)")
-                        .foregroundColor(badgeColor)
-                    + Text(" of \(maxDays)")
-                        .foregroundColor(.secondary))
+                    Text(daysAttributedText(maxDays: maxDays))
                         .font(.system(.title2, design: .rounded).bold())
 
                     Text("allowed days".uppercased())

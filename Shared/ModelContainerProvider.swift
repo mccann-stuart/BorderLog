@@ -66,29 +66,35 @@ enum ModelContainerProvider {
 
     static func makeContainer() -> ModelContainer {
         let schema = Schema(versionedSchema: BorderLogSchemaV3.self)
-        let fallbackConfig = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
-        let memoryConfig = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
 
+        // Tier 1: App Group shared container (needed for widget access)
         if let appGroupId = AppConfig.appGroupId {
             let appGroupConfig = ModelConfiguration(schema: schema, groupContainer: .identifier(appGroupId))
             do {
-                return try ModelContainer(for: schema, migrationPlan: BorderLogMigrationPlan.self, configurations: [appGroupConfig])
+                let container = try ModelContainer(for: schema, migrationPlan: BorderLogMigrationPlan.self, configurations: [appGroupConfig])
+                logger.info("Using App Group store at group: \(appGroupId, privacy: .public)")
+                return container
             } catch {
-                logger.error("App Group store unavailable. Falling back to local store. Error: \(error, privacy: .public)")
+                // Migration errors must NOT silently fall back to memory — that would wipe all data.
+                // Log clearly. We fall through to local store as a recovery path.
+                logger.error("App Group store failed (possible migration issue). Falling back to local store. Error: \(error, privacy: .public)")
             }
         } else {
-            logger.error("AppGroupId missing or empty in Info.plist. Falling back to local store.")
+            logger.warning("AppGroupId missing or empty in Info.plist. Using local store (widget will not share data).")
         }
 
+        // Tier 2: Local on-disk store (no widget sharing, but data is preserved)
+        let localConfig = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
         do {
-            return try ModelContainer(for: schema, migrationPlan: BorderLogMigrationPlan.self, configurations: [fallbackConfig])
+            let container = try ModelContainer(for: schema, migrationPlan: BorderLogMigrationPlan.self, configurations: [localConfig])
+            logger.info("Using local on-disk store.")
+            return container
         } catch {
-            logger.error("Local store unavailable. Falling back to in-memory store. Error: \(error, privacy: .public)")
-            do {
-                return try ModelContainer(for: schema, migrationPlan: BorderLogMigrationPlan.self, configurations: [memoryConfig])
-            } catch {
-                fatalError("Could not create ModelContainer: \(error)")
-            }
+            // A migration failure here means stored data cannot be opened.
+            // Do NOT fall back to in-memory — that silently wipes all persisted data.
+            // Crash loudly in debug; in production the caller can decide how to handle.
+            logger.critical("Local store migration/creation failed. This is a critical error. Error: \(error, privacy: .public)")
+            fatalError("Could not open or migrate the local SwiftData store: \(error)\n\nDelete and reinstall the app if you are in development.")
         }
     }
 }

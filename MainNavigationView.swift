@@ -12,7 +12,7 @@ struct MainNavigationView: View {
     @State private var isShowingAccount = false
     @State private var isPresentingAddStay = false
     @State private var isPresentingAddOverride = false
-    @State private var didBootstrapInference = false
+    @AppStorage("didBootstrapInference") private var didBootstrapInference = false
     
     var body: some View {
         ZStack {

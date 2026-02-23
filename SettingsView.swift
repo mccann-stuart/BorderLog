@@ -20,6 +20,7 @@ struct SettingsView: View {
     @State private var photoStatus: PHAuthorizationStatus = PHPhotoLibrary.authorizationStatus(for: .readWrite)
     @State private var isIngestingPhotos = false
     @State private var locationService = LocationSampleService()
+    @AppStorage("didBootstrapInference") private var didBootstrapInference = false
 
     private var dataManager: DataManager {
         DataManager(modelContext: modelContext)
@@ -247,7 +248,14 @@ struct SettingsView: View {
     // MARK: – Helpers
 
     private func resetAllData() {
-        do { try dataManager.resetAllData() } catch { print("Failed to reset data: \(error)") }
+        do {
+            try dataManager.resetAllData()
+            // Allow the bootstrap to re-run on next launch so fresh inference
+            // is computed against any newly added data.
+            didBootstrapInference = false
+        } catch {
+            print("Failed to reset data: \(error)")
+        }
     }
 
     private func refreshPermissions() {
