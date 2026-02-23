@@ -168,7 +168,8 @@ public actor LedgerRecomputeService {
 
         let existingKeys: Set<String>
         do {
-            existingKeys = try await dataFetcher.fetchAllPresenceDayKeys()
+            // Optimization: Fetch only keys for the relevant 2-year window (plus today) instead of all keys in the database.
+            existingKeys = try await dataFetcher.fetchPresenceDayKeys(from: start, to: today)
         } catch {
             print("LedgerRecomputeService fillMissingDays fetch error: \(error)")
             return

@@ -22,7 +22,7 @@ protocol LedgerDataFetching {
     func fetchEarliestCalendarSignalDate() throws -> Date?
 
     func fetchPresenceDays(keys: [String]) throws -> [PresenceDay]
-    func fetchAllPresenceDayKeys() throws -> Set<String>
+    func fetchPresenceDayKeys(from start: Date, to end: Date) throws -> Set<String>
     func insertPresenceDay(_ day: PresenceDay)
 
     func save() throws
@@ -114,8 +114,13 @@ struct RealLedgerDataFetcher: LedgerDataFetching {
         return try modelContext.fetch(descriptor)
     }
 
-    func fetchAllPresenceDayKeys() throws -> Set<String> {
-        let descriptor = FetchDescriptor<PresenceDay>()
+    // Optimization: Fetch only keys within the relevant date range to avoid loading the entire history.
+    func fetchPresenceDayKeys(from start: Date, to end: Date) throws -> Set<String> {
+        let descriptor = FetchDescriptor<PresenceDay>(
+            predicate: #Predicate { day in
+                day.date >= start && day.date <= end
+            }
+        )
         let days = try modelContext.fetch(descriptor)
         return Set(days.map { $0.dayKey })
     }
