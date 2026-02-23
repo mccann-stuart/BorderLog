@@ -5,6 +5,7 @@
 
 import CoreLocation
 import Foundation
+import Combine
 import zlib
 
 /// Simple GeoJSON models
