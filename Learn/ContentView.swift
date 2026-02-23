@@ -164,7 +164,7 @@ struct ContentView: View {
             Text("\(dateRange.start.formatted(formatter)) – \(dateRange.end.formatted(formatter))")
                 .font(.caption)
                 .foregroundStyle(.secondary)
-            Text("Evidence for this day appears below.")
+            Text("Click each day for evidence of location")
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
