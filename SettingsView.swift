@@ -25,6 +25,7 @@ struct SettingsView: View {
     @State private var locationService = LocationSampleService()
     @AppStorage("didBootstrapInference") private var didBootstrapInference = false
     @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
+    @AppStorage("usePolygonMapView") private var usePolygonMapView = false
 
     private var dataManager: DataManager {
         DataManager(modelContext: modelContext)
@@ -92,6 +93,19 @@ struct SettingsView: View {
                     }
                 } header: {
                     Text("About BorderLog")
+                }
+
+                // MARK: – Customization
+                Section {
+                    Picker("Map Display", selection: $usePolygonMapView) {
+                        Text("Dots").tag(false)
+                        Text("Coloured Countries").tag(true)
+                    }
+                    .pickerStyle(.segmented)
+                } header: {
+                    Text("Map Display")
+                } footer: {
+                    Text("Choose how visited countries are displayed on the map.")
                 }
 
                 // MARK: – Configuration

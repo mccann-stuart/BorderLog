@@ -22,23 +22,38 @@ struct WorldMapView: View {
     @State private var autoZoomTask: Task<Void, Never>?
     @State private var suppressAutoZoom = false
     
+    @AppStorage("usePolygonMapView") private var usePolygonMapView = false
+    @StateObject private var polygonLoader = CountryPolygonLoader.shared
+    
     var body: some View {
         ZStack {
             GeometryReader { proxy in
                 if proxy.size.width > 0 && proxy.size.height > 0 {
                     // Base map
                     Map(position: $cameraPosition, interactionModes: .all) {
+                        let loadedPolygons = usePolygonMapView ? polygonLoader.getPolygons(for: visitedCountries) : [:]
+                        
                         // Add annotations for visited countries
                         ForEach(Array(visitedCountries), id: \.self) { code in
-                            if let coordinate = countryCoordinate(for: code) {
-                                Annotation(code, coordinate: coordinate) {
-                                    Circle()
-                                        .fill(.blue)
-                                        .frame(width: 10, height: 10)
-                                        .overlay(
-                                            Circle()
-                                                .stroke(.white, lineWidth: 2)
-                                        )
+                            if usePolygonMapView {
+                                if let polys = loadedPolygons[CountryCodeNormalizer.normalize(code) ?? code.uppercased()] {
+                                    ForEach(0..<polys.count, id: \.self) { polyIdx in
+                                        MapPolygon(coordinates: polys[polyIdx].first ?? [])
+                                            .foregroundStyle(.blue.opacity(0.3))
+                                            .stroke(.blue.opacity(0.8), lineWidth: 1)
+                                    }
+                                }
+                            } else {
+                                if let coordinate = countryCoordinate(for: code) {
+                                    Annotation(code, coordinate: coordinate) {
+                                        Circle()
+                                            .fill(.blue)
+                                            .frame(width: 10, height: 10)
+                                            .overlay(
+                                                Circle()
+                                                    .stroke(.white, lineWidth: 2)
+                                            )
+                                    }
                                 }
                             }
                         }
