@@ -132,7 +132,7 @@ actor CalendarSignalIngestor {
 
             // 1. Create Start Signal
             if startLocationString != nil || startCoordinate != nil {
-                let id = event.eventIdentifier
+                let id = event.eventIdentifier ?? event.calendarItemIdentifier
                 if !calendarSignalExists(eventIdentifier: id, in: modelContext) {
                     if await resolveAndCreateSignal(
                         locationString: startLocationString,
@@ -231,8 +231,8 @@ actor CalendarSignalIngestor {
         // Updated to include arrows (->, →)
         let patternCodes = try? NSRegularExpression(pattern: "\\b([A-Z]{3})\\s*(?:[-/→]|->)\\s*([A-Z]{3})\\b", options: [])
 
-        var bestFrom: String?
-        var bestTo: String?
+        var bestFrom: String? = nil
+        var bestTo: String? = nil
 
         for text in candidates {
             if text.isEmpty { continue }
