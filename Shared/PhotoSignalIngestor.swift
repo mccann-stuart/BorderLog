@@ -42,9 +42,10 @@ actor PhotoSignalIngestor {
 
         var didBeginScan = false
         defer {
-            guard didBeginScan else { return }
-            Task { @MainActor in
-                InferenceActivity.shared.endPhotoScan()
+            if didBeginScan {
+                Task { @MainActor in
+                    InferenceActivity.shared.endPhotoScan()
+                }
             }
         }
 

@@ -30,37 +30,6 @@ struct PresenceDayDetailView: View {
 
     var body: some View {
         Form {
-            Section("Summary") {
-                HStack {
-                    Text("Date")
-                    Spacer()
-                    Text(dayTitle)
-                        .foregroundStyle(.secondary)
-                }
-
-                HStack {
-                    Text("Country")
-                    Spacer()
-                    Text(countryText)
-                        .foregroundStyle(.secondary)
-                }
-
-                HStack {
-                    Text("Confidence")
-                    Spacer()
-                    Text(confidenceText)
-                        .foregroundStyle(.secondary)
-                }
-
-                if day.isOverride {
-                    Text("This day has a manual override and will always win.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-            }
-
-            EvidenceSection(dayKey: day.dayKey, date: day.date)
-
             Section("Actions") {
                 Button("Override Day") {
                     isShowingOverride = true
@@ -91,6 +60,37 @@ struct PresenceDayDetailView: View {
                     }
                 }
             }
+
+            Section("Summary") {
+                HStack {
+                    Text("Date")
+                    Spacer()
+                    Text(dayTitle)
+                        .foregroundStyle(.secondary)
+                }
+
+                HStack {
+                    Text("Country")
+                    Spacer()
+                    Text(countryText)
+                        .foregroundStyle(.secondary)
+                }
+
+                HStack {
+                    Text("Confidence")
+                    Spacer()
+                    Text(confidenceText)
+                        .foregroundStyle(.secondary)
+                }
+
+                if day.isOverride {
+                    Text("This day has a manual override and will always win.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            EvidenceSection(dayKey: day.dayKey, date: day.date)
         }
         .navigationTitle("Day Details")
         .navigationBarTitleDisplayMode(.inline)
@@ -309,4 +309,3 @@ private struct EvidenceSection: View {
         locationCount: 3
     ))
 }
-

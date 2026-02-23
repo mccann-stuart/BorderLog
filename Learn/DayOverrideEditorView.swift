@@ -38,7 +38,8 @@ struct DayOverrideEditorView: View {
             LocationFormSection(
                 countryName: $draft.countryName,
                 countryCode: $draft.countryCode,
-                region: $draft.region
+                region: $draft.region,
+                style: existingOverride == nil ? .picker : .freeText
             )
 
             Section("Notes") {

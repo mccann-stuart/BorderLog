@@ -11,35 +11,44 @@ import MapKit
 struct WorldMapView: View {
     let visitedCountries: Set<String>
     
-    @State private var cameraPosition = MapCameraPosition.region(
-        MKCoordinateRegion(
-            center: CLLocationCoordinate2D(latitude: 20, longitude: 0),
-            span: MKCoordinateSpan(latitudeDelta: 100, longitudeDelta: 180)
-        )
+    private static let defaultRegion = MKCoordinateRegion(
+        center: CLLocationCoordinate2D(latitude: 20, longitude: 0),
+        span: MKCoordinateSpan(latitudeDelta: 100, longitudeDelta: 180)
     )
+    private static let singleCountrySpan = MKCoordinateSpan(latitudeDelta: 25, longitudeDelta: 35)
+    private static let minimumSpan = MKCoordinateSpan(latitudeDelta: 10, longitudeDelta: 20)
+    
+    @State private var cameraPosition: MapCameraPosition = .region(Self.defaultRegion)
+    @State private var autoZoomTask: Task<Void, Never>?
+    @State private var suppressAutoZoom = false
     
     var body: some View {
         ZStack {
             GeometryReader { proxy in
                 if proxy.size.width > 0 && proxy.size.height > 0 {
-                    // Base map
-                    Map(position: $cameraPosition, interactionModes: .all) {
-                        // Add annotations for visited countries
-                        ForEach(Array(visitedCountries), id: \.self) { code in
-                            if let coordinate = countryCoordinate(for: code) {
-                                Annotation(code, coordinate: coordinate) {
-                                    Circle()
-                                        .fill(.blue)
-                                        .frame(width: 10, height: 10)
-                                        .overlay(
-                                            Circle()
-                                                .stroke(.white, lineWidth: 2)
-                                        )
+                    MapReader { mapProxy in
+                        // Base map
+                        Map(position: $cameraPosition, interactionModes: .all) {
+                            // Add annotations for visited countries
+                            ForEach(Array(visitedCountries), id: \.self) { code in
+                                if let coordinate = countryCoordinate(for: code) {
+                                    Annotation(code, coordinate: coordinate) {
+                                        Circle()
+                                            .fill(.blue)
+                                            .frame(width: 10, height: 10)
+                                            .overlay(
+                                                Circle()
+                                                    .stroke(.white, lineWidth: 2)
+                                            )
+                                    }
                                 }
                             }
                         }
+                        .mapStyle(.standard(elevation: .flat))
+                        .onChange(of: cameraPosition) { _ in
+                            scheduleAutoZoomIfNeeded(using: mapProxy)
+                        }
                     }
-                    .mapStyle(.standard(elevation: .flat))
                 } else {
                     Color.clear
                 }
@@ -65,6 +74,111 @@ struct WorldMapView: View {
                 }
             }
         }
+        .onAppear {
+            updateCamera(for: visitedCountries, animated: false)
+        }
+        .onChange(of: visitedCountries) { newValue in
+            updateCamera(for: newValue, animated: true)
+        }
+    }
+    
+    private func updateCamera(for codes: Set<String>, animated: Bool) {
+        suppressAutoZoom = true
+        autoZoomTask?.cancel()
+        let coordinates = codes.compactMap { countryCoordinate(for: $0) }
+        let region: MKCoordinateRegion
+        
+        if coordinates.isEmpty {
+            region = Self.defaultRegion
+        } else if coordinates.count == 1, let coordinate = coordinates.first {
+            region = MKCoordinateRegion(center: coordinate, span: Self.singleCountrySpan)
+        } else {
+            var minLat = 90.0
+            var maxLat = -90.0
+            var minLon = 180.0
+            var maxLon = -180.0
+            
+            for coordinate in coordinates {
+                minLat = min(minLat, coordinate.latitude)
+                maxLat = max(maxLat, coordinate.latitude)
+                minLon = min(minLon, coordinate.longitude)
+                maxLon = max(maxLon, coordinate.longitude)
+            }
+            
+            let center = CLLocationCoordinate2D(
+                latitude: (minLat + maxLat) / 2,
+                longitude: (minLon + maxLon) / 2
+            )
+            let latDelta = max((maxLat - minLat) * 1.35, Self.minimumSpan.latitudeDelta)
+            let lonDelta = max((maxLon - minLon) * 1.35, Self.minimumSpan.longitudeDelta)
+            let span = MKCoordinateSpan(
+                latitudeDelta: min(latDelta, 160),
+                longitudeDelta: min(lonDelta, 360)
+            )
+            region = MKCoordinateRegion(center: center, span: span)
+        }
+        
+        if animated {
+            withAnimation(.easeInOut(duration: 0.6)) {
+                cameraPosition = .region(region)
+            }
+        } else {
+            cameraPosition = .region(region)
+        }
+        
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.7) {
+            suppressAutoZoom = false
+        }
+    }
+    
+    private func scheduleAutoZoomIfNeeded(using proxy: MapProxy) {
+        guard !suppressAutoZoom else { return }
+        guard !visitedCountries.isEmpty else { return }
+        
+        autoZoomTask?.cancel()
+        autoZoomTask = Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 350_000_000)
+            guard !Task.isCancelled else { return }
+            guard let visibleRegion = proxy.visibleRegion else { return }
+            guard !areAllVisitedCountriesVisible(in: visibleRegion) else { return }
+            updateCamera(for: visitedCountries, animated: true)
+        }
+    }
+    
+    private func areAllVisitedCountriesVisible(in region: MKCoordinateRegion) -> Bool {
+        let coordinates = visitedCountries.compactMap { countryCoordinate(for: $0) }
+        return coordinates.allSatisfy { regionContains(region, coordinate: $0) }
+    }
+    
+    private func regionContains(_ region: MKCoordinateRegion, coordinate: CLLocationCoordinate2D) -> Bool {
+        let halfLat = region.span.latitudeDelta / 2
+        let minLat = region.center.latitude - halfLat
+        let maxLat = region.center.latitude + halfLat
+        guard coordinate.latitude >= minLat && coordinate.latitude <= maxLat else { return false }
+        
+        let halfLon = region.span.longitudeDelta / 2
+        let minLon = region.center.longitude - halfLon
+        let maxLon = region.center.longitude + halfLon
+        
+        if minLon < -180 || maxLon > 180 {
+            let normalized = normalizeLongitude(coordinate.longitude)
+            let normalizedMin = normalizeLongitude(minLon)
+            let normalizedMax = normalizeLongitude(maxLon)
+            
+            if normalizedMin <= normalizedMax {
+                return normalized >= normalizedMin && normalized <= normalizedMax
+            } else {
+                return normalized >= normalizedMin || normalized <= normalizedMax
+            }
+        } else {
+            return coordinate.longitude >= minLon && coordinate.longitude <= maxLon
+        }
+    }
+    
+    private func normalizeLongitude(_ longitude: Double) -> Double {
+        var value = longitude.truncatingRemainder(dividingBy: 360)
+        if value < 0 { value += 360 }
+        return value
     }
 }
 
