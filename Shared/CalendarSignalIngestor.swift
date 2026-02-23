@@ -220,14 +220,16 @@ actor CalendarSignalIngestor {
         // 1. "From A to B"
         // 2. "Flight to B"
         // 3. "A ✈ B"
-        // 4. "LHR - JFK" or "LHR/JFK" (3-letter codes)
+        // 4. "LHR - JFK", "LHR/JFK", "JNB -> LHR", "JNB → LHR" (3-letter codes)
 
         // We use NSRegularExpression for compatibility
         let patternFromTo = try? NSRegularExpression(pattern: "from\\s+(.+?)\\s+to\\s+(.+)", options: [.caseInsensitive])
         let patternTo = try? NSRegularExpression(pattern: "flight\\s+to\\s+(.+)", options: [.caseInsensitive])
         let patternPlane = try? NSRegularExpression(pattern: "(.+?)\\s*✈\\s*(.+)", options: [])
         let patternPlaneEmoji = try? NSRegularExpression(pattern: "(.+?)\\s*✈️\\s*(.+)", options: [])
-        let patternCodes = try? NSRegularExpression(pattern: "\\b([A-Z]{3})\\s*[-/]\\s*([A-Z]{3})\\b", options: [])
+
+        // Updated to include arrows (->, →)
+        let patternCodes = try? NSRegularExpression(pattern: "\\b([A-Z]{3})\\s*(?:[-/→]|->)\\s*([A-Z]{3})\\b", options: [])
 
         var bestFrom: String?
         var bestTo: String?
@@ -239,7 +241,7 @@ actor CalendarSignalIngestor {
 
             // Priority: Find a match that gives BOTH from and to
 
-            // Check "LHR - JFK" or "LHR/JFK"
+            // Check "LHR - JFK", "LHR/JFK", "JNB -> LHR"
             if let p = patternCodes, let match = p.firstMatch(in: text, options: [], range: range) {
                 if match.numberOfRanges >= 3 {
                     return (
