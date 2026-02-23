@@ -10,6 +10,9 @@ import SwiftData
 
 struct PresenceDayDetailView: View {
     let day: PresenceDay
+    
+    @Query(sort: [SortDescriptor(\PresenceDay.date, order: .reverse)]) private var allPresenceDays: [PresenceDay]
+    @ObservedObject private var inferenceActivity = InferenceActivity.shared
 
     @State private var isShowingOverride = false
     @State private var appliedSuggestion: String? = nil
@@ -29,9 +32,28 @@ struct PresenceDayDetailView: View {
     private var confidenceText: String {
         day.confidenceLabel.rawValue.capitalized
     }
+    
+    private var dateRange: (start: Date, end: Date) {
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: Date())
+        let start = calendar.date(byAdding: .year, value: -2, to: today) ?? today
+        return (start, today)
+    }
+    
+    private var recentDayCount: Int {
+        let range = dateRange
+        return allPresenceDays.filter { day in
+            day.date >= range.start && day.date <= range.end
+        }.count
+    }
 
     var body: some View {
         Form {
+            Section {
+                rangeSummary
+                activityStatus
+            }
+
             Section("Actions") {
                 Button("Override Day") {
                     isShowingOverride = true
@@ -142,6 +164,57 @@ struct PresenceDayDetailView: View {
             Text("This will remove the manual override for this day. The day will revert to its inferred location.")
         }
     }
+    
+    private var rangeSummary: some View {
+        let formatter = Date.FormatStyle(date: .abbreviated, time: .omitted)
+        return VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                Label("Last 2 years", systemImage: "calendar")
+                    .font(.subheadline.weight(.semibold))
+                Spacer()
+                Text("\(recentDayCount) days")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            Text("\(dateRange.start.formatted(formatter)) – \(dateRange.end.formatted(formatter))")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            Text("Evidence for this day appears below.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+        .padding(.vertical, 4)
+    }
+    
+    private var activityStatus: some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: 8) {
+                ActivityBadge(
+                    title: "Photo scanning",
+                    systemImage: "photo",
+                    isActive: inferenceActivity.isPhotoScanning
+                )
+                ActivityBadge(
+                    title: "Location inference",
+                    systemImage: "location",
+                    isActive: inferenceActivity.isInferenceRunning
+                )
+            }
+            VStack(alignment: .leading, spacing: 8) {
+                ActivityBadge(
+                    title: "Photo scanning",
+                    systemImage: "photo",
+                    isActive: inferenceActivity.isPhotoScanning
+                )
+                ActivityBadge(
+                    title: "Location inference",
+                    systemImage: "location",
+                    isActive: inferenceActivity.isInferenceRunning
+                )
+            }
+        }
+        .padding(.vertical, 2)
+    }
 
     @Environment(\.modelContext) private var modelContext
 
@@ -187,6 +260,29 @@ struct PresenceDayDetailView: View {
             }
         }
         try? modelContext.save()
+    }
+}
+
+private struct ActivityBadge: View {
+    let title: String
+    let systemImage: String
+    let isActive: Bool
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Image(systemName: systemImage)
+            Text(title)
+            if isActive {
+                ProgressView()
+                    .controlSize(.mini)
+            }
+        }
+        .font(.caption)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+        .background(isActive ? Color.accentColor.opacity(0.12) : Color.secondary.opacity(0.1))
+        .foregroundStyle(isActive ? .primary : .secondary)
+        .clipShape(Capsule())
     }
 }
 
