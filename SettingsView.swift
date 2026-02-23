@@ -60,6 +60,22 @@ struct SettingsView: View {
                     Text("Profile")
                 }
 
+                // MARK: – Privacy
+                Section {
+                    VStack(alignment: .leading, spacing: 10) {
+                        Label("Local-First Storage", systemImage: "lock.shield.fill")
+                            .font(.headline)
+
+                        Text("All your travel data is stored on this device. Nothing is uploaded to any external server.")
+                            .font(.callout)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    .padding(.vertical, 4)
+                } header: {
+                    Text("Privacy")
+                }
+                
                 // MARK: – App Info
                 Section {
                     HStack {
@@ -168,21 +184,7 @@ struct SettingsView: View {
                     Text("Location, photo metadata, and calendar events are used to infer which country you were in on each day. Calendar access is read-only and all processing happens on-device.")
                 }
 
-                // MARK: – Privacy
-                Section {
-                    VStack(alignment: .leading, spacing: 10) {
-                        Label("Local-First Storage", systemImage: "lock.shield.fill")
-                            .font(.headline)
-
-                        Text("All your travel data is stored on this device. Nothing is uploaded to any external server.")
-                            .font(.callout)
-                            .foregroundStyle(.secondary)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-                    .padding(.vertical, 4)
-                } header: {
-                    Text("Privacy")
-                }
+      
 
                 // MARK: – Setup
                 Section {
