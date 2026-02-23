@@ -26,28 +26,26 @@ struct WorldMapView: View {
         ZStack {
             GeometryReader { proxy in
                 if proxy.size.width > 0 && proxy.size.height > 0 {
-                    MapReader { mapProxy in
-                        // Base map
-                        Map(position: $cameraPosition, interactionModes: .all) {
-                            // Add annotations for visited countries
-                            ForEach(Array(visitedCountries), id: \.self) { code in
-                                if let coordinate = countryCoordinate(for: code) {
-                                    Annotation(code, coordinate: coordinate) {
-                                        Circle()
-                                            .fill(.blue)
-                                            .frame(width: 10, height: 10)
-                                            .overlay(
-                                                Circle()
-                                                    .stroke(.white, lineWidth: 2)
-                                            )
-                                    }
+                    // Base map
+                    Map(position: $cameraPosition, interactionModes: .all) {
+                        // Add annotations for visited countries
+                        ForEach(Array(visitedCountries), id: \.self) { code in
+                            if let coordinate = countryCoordinate(for: code) {
+                                Annotation(code, coordinate: coordinate) {
+                                    Circle()
+                                        .fill(.blue)
+                                        .frame(width: 10, height: 10)
+                                        .overlay(
+                                            Circle()
+                                                .stroke(.white, lineWidth: 2)
+                                        )
                                 }
                             }
                         }
-                        .mapStyle(.standard(elevation: .flat))
-                        .onChange(of: cameraPosition) { _ in
-                            scheduleAutoZoomIfNeeded(using: mapProxy)
-                        }
+                    }
+                    .mapStyle(.standard(elevation: .flat))
+                    .onChange(of: cameraPosition) { _ in
+                        scheduleAutoZoomIfNeeded()
                     }
                 } else {
                     Color.clear
@@ -131,7 +129,7 @@ struct WorldMapView: View {
         }
     }
     
-    private func scheduleAutoZoomIfNeeded(using proxy: MapProxy) {
+    private func scheduleAutoZoomIfNeeded() {
         guard !suppressAutoZoom else { return }
         guard !visitedCountries.isEmpty else { return }
         
@@ -139,7 +137,7 @@ struct WorldMapView: View {
         autoZoomTask = Task { @MainActor in
             try? await Task.sleep(nanoseconds: 350_000_000)
             guard !Task.isCancelled else { return }
-            guard let visibleRegion = proxy.visibleRegion else { return }
+            guard let visibleRegion = cameraPosition.region else { return }
             guard !areAllVisitedCountriesVisible(in: visibleRegion) else { return }
             updateCamera(for: visitedCountries, animated: true)
         }
