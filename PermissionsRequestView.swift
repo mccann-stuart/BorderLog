@@ -6,17 +6,20 @@
 import SwiftUI
 import CoreLocation
 import Photos
+import EventKit
 
 struct PermissionsRequestView: View {
     var onComplete: () -> Void
     
     @State private var locationStatus: CLAuthorizationStatus = CLLocationManager().authorizationStatus
     @State private var photoStatus: PHAuthorizationStatus = PHPhotoLibrary.authorizationStatus(for: .readWrite)
+    @State private var calendarStatus: EKAuthorizationStatus = EKEventStore.authorizationStatus(for: .event)
     @State private var locationService = LocationSampleService()
     
     // Track if permissions have been prompted to hide the UI block once completed
     @AppStorage("hasPromptedLocation") private var hasPromptedLocation = false
     @AppStorage("hasPromptedPhotos") private var hasPromptedPhotos = false
+    @AppStorage("hasPromptedCalendar") private var hasPromptedCalendar = false
     
     var body: some View {
         VStack(spacing: 32) {
@@ -72,9 +75,36 @@ struct PermissionsRequestView: View {
                         }
                     }
                 }
+
+                if !hasPromptedCalendar || calendarStatus == .notDetermined || calendarStatus == .writeOnly {
+                    PermissionCard(
+                        icon: "calendar",
+                        title: "Calendar Access",
+                        description: "Reads flight events (e.g. from Flighty) to infer travel dates. BorderLog never writes to your calendar.",
+                        buttonTitle: "Allow Calendar"
+                    ) {
+                        let store = EKEventStore()
+                        if #available(iOS 17.0, *) {
+                            store.requestFullAccessToEvents { _, _ in
+                                DispatchQueue.main.async {
+                                    hasPromptedCalendar = true
+                                    refreshStatus()
+                                }
+                            }
+                        } else {
+                            store.requestAccess(to: .event) { _, _ in
+                                DispatchQueue.main.async {
+                                    hasPromptedCalendar = true
+                                    refreshStatus()
+                                }
+                            }
+                        }
+                    }
+                }
                 
                 if (hasPromptedLocation || locationStatus != .notDetermined) &&
-                   (hasPromptedPhotos || photoStatus != .notDetermined) {
+                   (hasPromptedPhotos || photoStatus != .notDetermined) &&
+                   calendarIsResolved {
                     VStack(spacing: 12) {
                         Image(systemName: "checkmark.circle.fill")
                             .font(.largeTitle)
@@ -89,6 +119,7 @@ struct PermissionsRequestView: View {
             .padding(.horizontal, 24)
             .animation(.easeInOut, value: locationStatus)
             .animation(.easeInOut, value: photoStatus)
+            .animation(.easeInOut, value: calendarStatus)
             
             Spacer()
             
@@ -117,6 +148,16 @@ struct PermissionsRequestView: View {
     private func refreshStatus() {
         locationStatus = CLLocationManager().authorizationStatus
         photoStatus = PHPhotoLibrary.authorizationStatus(for: .readWrite)
+        calendarStatus = EKEventStore.authorizationStatus(for: .event)
+    }
+
+    private var calendarIsResolved: Bool {
+        switch calendarStatus {
+        case .notDetermined, .writeOnly:
+            return false
+        default:
+            return true
+        }
     }
 }
 

@@ -433,6 +433,6 @@ private struct StatCard: View {
 #Preview {
     NavigationStack {
         DashboardView()
-            .modelContainer(for: [Stay.self, DayOverride.self, LocationSample.self, PhotoSignal.self, PresenceDay.self, PhotoIngestState.self, CountryConfig.self], inMemory: true)
+            .modelContainer(for: [Stay.self, DayOverride.self, LocationSample.self, PhotoSignal.self, PresenceDay.self, PhotoIngestState.self, CountryConfig.self, CalendarSignal.self], inMemory: true)
     }
 }

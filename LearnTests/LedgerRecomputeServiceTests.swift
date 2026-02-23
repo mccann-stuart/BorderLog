@@ -12,7 +12,7 @@ final class LedgerRecomputeServiceTests: XCTestCase {
 
     override func setUp() async throws {
         let config = ModelConfiguration(isStoredInMemoryOnly: true)
-        container = try ModelContainer(for: PresenceDay.self, Stay.self, DayOverride.self, LocationSample.self, PhotoSignal.self, configurations: config)
+        container = try ModelContainer(for: PresenceDay.self, Stay.self, DayOverride.self, LocationSample.self, PhotoSignal.self, CalendarSignal.self, configurations: config)
         context = container.mainContext
         service = LedgerRecomputeService(modelContainer: container)
     }
@@ -71,6 +71,70 @@ final class LedgerRecomputeServiceTests: XCTestCase {
         // Without stay, country should be nil or based on other signals. Here nil.
         XCTAssertNil(fetched.first?.countryName)
         XCTAssertEqual(fetched.first?.stayCount, 0)
+    }
+
+    func testFillMissingDaysCreatesContinuousRange() async throws {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+        let asOf = DateComponents(
+            calendar: calendar,
+            timeZone: calendar.timeZone,
+            year: 2026,
+            month: 2,
+            day: 23
+        ).date!
+
+        await service.fillMissingDays(asOf: asOf, calendar: calendar)
+
+        let days = try context.fetch(FetchDescriptor<PresenceDay>())
+        let today = calendar.startOfDay(for: asOf)
+        let start = calendar.date(byAdding: .year, value: -2, to: today)!
+        let expectedKeys = makeDayKeys(from: start, to: today, calendar: calendar)
+
+        XCTAssertEqual(days.count, expectedKeys.count)
+
+        let actualKeys = Set(days.map { $0.dayKey })
+        XCTAssertEqual(actualKeys, Set(expectedKeys))
+
+        let sortedActual = actualKeys.sorted()
+        XCTAssertEqual(sortedActual.first, expectedKeys.first)
+        XCTAssertEqual(sortedActual.last, expectedKeys.last)
+    }
+
+    func testFillMissingDaysIsIdempotent() async throws {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+        let asOf = DateComponents(
+            calendar: calendar,
+            timeZone: calendar.timeZone,
+            year: 2026,
+            month: 2,
+            day: 23
+        ).date!
+
+        await service.fillMissingDays(asOf: asOf, calendar: calendar)
+        let count1 = try context.fetchCount(FetchDescriptor<PresenceDay>())
+
+        await service.fillMissingDays(asOf: asOf, calendar: calendar)
+        let count2 = try context.fetchCount(FetchDescriptor<PresenceDay>())
+
+        XCTAssertEqual(count1, count2)
+    }
+
+    private func makeDayKeys(from start: Date, to end: Date, calendar: Calendar) -> [String] {
+        let timeZone = calendar.timeZone
+        let startDay = calendar.startOfDay(for: start)
+        let endDay = calendar.startOfDay(for: end)
+        guard startDay <= endDay else { return [] }
+
+        var day = startDay
+        var keys: [String] = []
+        while day <= endDay {
+            keys.append(DayKey.make(from: day, timeZone: timeZone))
+            guard let next = calendar.date(byAdding: .day, value: 1, to: day) else { break }
+            day = next
+        }
+        return keys
     }
 }
 #endif

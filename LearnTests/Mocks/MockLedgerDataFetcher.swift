@@ -14,11 +14,13 @@ class MockLedgerDataFetcher: LedgerDataFetching {
     var overrides: [DayOverride] = []
     var locations: [LocationSample] = []
     var photos: [PhotoSignal] = []
+    var calendarSignals: [CalendarSignal] = []
 
     var earliestStayDate: Date?
     var earliestOverrideDate: Date?
     var earliestLocationDate: Date?
     var earliestPhotoDate: Date?
+    var earliestCalendarSignalDate: Date?
 
     var presenceDays: [String: PresenceDay] = [:]
 
@@ -26,7 +28,9 @@ class MockLedgerDataFetcher: LedgerDataFetching {
     var fetchOverridesError: Error?
     var fetchLocationsError: Error?
     var fetchPhotosError: Error?
+    var fetchCalendarSignalsError: Error?
     var fetchPresenceDaysError: Error?
+    var fetchAllPresenceDayKeysError: Error?
     var saveError: Error?
 
     var saveCalled = false
@@ -52,6 +56,11 @@ class MockLedgerDataFetcher: LedgerDataFetching {
         return photos
     }
 
+    func fetchCalendarSignals(from start: Date, to end: Date) throws -> [CalendarSignal] {
+        if let error = fetchCalendarSignalsError { throw error }
+        return calendarSignals
+    }
+
     func fetchEarliestStayDate() throws -> Date? {
         return earliestStayDate
     }
@@ -68,13 +77,17 @@ class MockLedgerDataFetcher: LedgerDataFetching {
         return earliestPhotoDate
     }
 
+    func fetchEarliestCalendarSignalDate() throws -> Date? {
+        return earliestCalendarSignalDate
+    }
+
     func fetchPresenceDays(keys: [String]) throws -> [PresenceDay] {
         if let error = fetchPresenceDaysError { throw error }
         return keys.compactMap { presenceDays[$0] }
     }
 
     func fetchAllPresenceDayKeys() throws -> Set<String> {
-        if let error = fetchPresenceDaysError { throw error }
+        if let error = fetchAllPresenceDayKeysError { throw error }
         return Set(presenceDays.keys)
     }
 
