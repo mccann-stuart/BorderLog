@@ -83,7 +83,8 @@ async function runTest(name, fn) {
     const text = await res.text();
     assert.strictEqual(text, "Internal Server Error");
     assertSecurityHeaders(res);
-    assert.ok(loggedError.includes("R2 Connection Failed"), "Should log specific error");
+    assert.ok(loggedError.includes("Error fetching from R2"), "Should log generic error message");
+    assert.ok(!loggedError.includes("R2 Connection Failed"), "Should NOT log sensitive error details");
   });
 
   await runTest("R2 Key Not Found returns 404 + Security Headers", async () => {
