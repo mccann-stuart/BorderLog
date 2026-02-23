@@ -9,13 +9,21 @@ import SwiftData
 struct CountryDetailView: View {
     let countryName: String
     let countryCode: String?
+    let selectedTimeframe: DashboardView.VisitedCountriesTimeframe
 
     @Environment(\.modelContext) private var modelContext
-    @Query(sort: [SortDescriptor(\PresenceDay.date, order: .forward)]) private var allPresenceDays: [PresenceDay]
+    @Query(sort: [SortDescriptor(\PresenceDay.date, order: .reverse)]) private var allPresenceDays: [PresenceDay]
     @Query private var allCountryConfigs: [CountryConfig]
 
     @State private var maxAllowedDaysText: String = ""
     @State private var showAllDays: Bool = false
+    @State private var ledgerRangeFilter: LedgerRangeFilter = .timeframe
+
+    enum LedgerRangeFilter: String, CaseIterable, Identifiable {
+        case timeframe = "Timeframe"
+        case allTime = "All time"
+        var id: String { rawValue }
+    }
 
     // Days filtered to this country only
     private var countryDays: [PresenceDay] {
@@ -26,6 +34,19 @@ struct CountryDetailView: View {
                 return target == code
             }
             return (day.countryName ?? "") == countryName
+        }
+    }
+
+    private var filteredCountryDays: [PresenceDay] {
+        switch ledgerRangeFilter {
+        case .timeframe:
+            let now = Date()
+            let calendar = Calendar.current
+            return countryDays.filter { day in
+                selectedTimeframe.contains(day.date, now: now, calendar: calendar)
+            }
+        case .allTime:
+            return countryDays
         }
     }
 
@@ -51,15 +72,27 @@ struct CountryDetailView: View {
             }
 
             // ── Daily Ledger ───────────────────────────────────────
-            Section(header: Text("Daily Ledger (\(countryDays.count) days)")) {
-                if countryDays.isEmpty {
+            Section(header: Text("Daily Ledger (\(filteredCountryDays.count) days)")) {
+                Picker("Ledger Range", selection: $ledgerRangeFilter) {
+                    Text(selectedTimeframe.rawValue).tag(LedgerRangeFilter.timeframe)
+                    Text("All time").tag(LedgerRangeFilter.allTime)
+                }
+                .pickerStyle(.segmented)
+
+                if filteredCountryDays.isEmpty {
                     ContentUnavailableView(
-                        "No Days Recorded",
+                        ledgerRangeFilter == .timeframe
+                            ? "No days in selected period"
+                            : "No Days Recorded",
                         systemImage: "calendar.badge.exclamationmark",
-                        description: Text("No presence days found for this country.")
+                        description: Text(
+                            ledgerRangeFilter == .timeframe
+                                ? "Switch to All time to see older days."
+                                : "No presence days found for this country."
+                        )
                     )
                 } else {
-                    let displayed = showAllDays ? countryDays : Array(countryDays.prefix(5))
+                    let displayed = showAllDays ? filteredCountryDays : Array(filteredCountryDays.prefix(5))
                     ForEach(displayed) { day in
                         NavigationLink {
                             PresenceDayDetailView(day: day)
@@ -68,11 +101,11 @@ struct CountryDetailView: View {
                         }
                     }
 
-                    if !showAllDays && countryDays.count > 5 {
+                    if !showAllDays && filteredCountryDays.count > 5 {
                         Button {
                             withAnimation { showAllDays = true }
                         } label: {
-                            Text("See All \(countryDays.count) Days")
+                            Text("See All \(filteredCountryDays.count) Days")
                                 .frame(maxWidth: .infinity)
                         }
                     }
@@ -104,7 +137,11 @@ struct CountryDetailView: View {
 
 #Preview {
     NavigationStack {
-        CountryDetailView(countryName: "France", countryCode: "FR")
+        CountryDetailView(
+            countryName: "France",
+            countryCode: "FR",
+            selectedTimeframe: .last12Months
+        )
             .modelContainer(for: [PresenceDay.self, CountryConfig.self], inMemory: true)
     }
 }
