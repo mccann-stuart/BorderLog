@@ -21,10 +21,12 @@ public actor LedgerRecomputeService {
     }
 
     public func recompute(dayKeys: [String]) async {
-        await MainActor.run { InferenceActivity.shared.beginInference() }
+        var didBeginInference = false
         defer {
-            Task { @MainActor in
-                InferenceActivity.shared.endInference()
+            if didBeginInference {
+                Task { @MainActor in
+                    InferenceActivity.shared.endInference()
+                }
             }
         }
         let calendar = Calendar.current
@@ -110,6 +112,12 @@ public actor LedgerRecomputeService {
             dayKeySet.insert(overrideKey)
         }
 
+        let totalDayKeys = dayKeySet.count
+        await MainActor.run {
+            InferenceActivity.shared.beginInference(totalDays: totalDayKeys)
+        }
+        didBeginInference = true
+
         let results = PresenceInferenceEngine.compute(
             dayKeys: dayKeySet,
             stays: stayInfos,
@@ -118,7 +126,12 @@ public actor LedgerRecomputeService {
             photos: photoInfos,
             calendarSignals: calendarInfos,
             rangeEnd: rangeEnd,
-            calendar: calendar
+            calendar: calendar,
+            progress: { processed, total in
+                Task { @MainActor in
+                    InferenceActivity.shared.updateInferenceProgress(processedDays: processed)
+                }
+            }
         )
 
         do {

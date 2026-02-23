@@ -34,10 +34,14 @@ struct PresenceInferenceEngine {
         photos: [PhotoSignalInfo],
         calendarSignals: [CalendarSignalInfo],
         rangeEnd: Date,
-        calendar: Calendar = .current
+        calendar: Calendar = .current,
+        progress: ((Int, Int) -> Void)? = nil
     ) -> [PresenceDayResult] {
         let timeZone = calendar.timeZone
         var buckets: [String: DayBucket] = [:]
+        let orderedDayKeys = dayKeys.sorted()
+        let totalCount = orderedDayKeys.count
+        let progressStride = 25
 
         func bucket(for dayKey: String) -> DayBucket {
             buckets[dayKey, default: DayBucket()]
@@ -117,9 +121,18 @@ struct PresenceInferenceEngine {
         }
 
         var results: [PresenceDayResult] = []
-        results.reserveCapacity(dayKeys.count)
+        results.reserveCapacity(totalCount)
+        var processedCount = 0
 
-        for dayKey in dayKeys {
+        func appendResult(_ result: PresenceDayResult) {
+            results.append(result)
+            processedCount += 1
+            if processedCount % progressStride == 0 || processedCount == totalCount {
+                progress?(processedCount, totalCount)
+            }
+        }
+
+        for dayKey in orderedDayKeys {
             let bucket = buckets[dayKey] ?? DayBucket()
             let dayTimeZone = bucket.timeZoneId.flatMap { TimeZone(identifier: $0) } ?? timeZone
             let date = DayKey.date(for: dayKey, timeZone: dayTimeZone) ?? calendar.startOfDay(for: rangeEnd)
@@ -148,7 +161,7 @@ struct PresenceInferenceEngine {
                     locationCount: accumulator.locationCount,
                     calendarCount: accumulator.calendarCount
                 )
-                results.append(result)
+                appendResult(result)
                 continue
             }
 
@@ -168,7 +181,7 @@ struct PresenceInferenceEngine {
                     locationCount: 0,
                     calendarCount: 0
                 )
-                results.append(result)
+                appendResult(result)
                 continue
             }
 
@@ -201,7 +214,7 @@ struct PresenceInferenceEngine {
                     locationCount: 0,
                     calendarCount: 0
                 )
-                results.append(result)
+                appendResult(result)
                 continue
             }
 
@@ -226,7 +239,7 @@ struct PresenceInferenceEngine {
                 locationCount: winner.value.locationCount,
                 calendarCount: winner.value.calendarCount
             )
-            results.append(result)
+            appendResult(result)
         }
 
         var sortedResults = results.sorted { $0.date < $1.date }

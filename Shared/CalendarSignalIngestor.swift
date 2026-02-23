@@ -8,7 +8,7 @@
 import Foundation
 import EventKit
 import SwiftData
-import CoreLocation
+import MapKit
 
 @ModelActor
 actor CalendarSignalIngestor {
@@ -18,7 +18,6 @@ actor CalendarSignalIngestor {
     }
 
     private var resolver: CountryResolving?
-    private let geocoder = CLGeocoder()
 
     init(modelContainer: ModelContainer, resolver: CountryResolving) {
         self.modelContainer = modelContainer
@@ -52,6 +51,23 @@ actor CalendarSignalIngestor {
 
         // Fetch events
         let events = store.events(matching: predicate)
+        let totalEvents = events.count
+        let progressUpdateEvery = 10
+        var didBeginScan = false
+        defer {
+            if didBeginScan {
+                Task { @MainActor in
+                    InferenceActivity.shared.endCalendarScan()
+                }
+            }
+        }
+
+        if totalEvents > 0 {
+            await MainActor.run {
+                InferenceActivity.shared.beginCalendarScan(totalEvents: totalEvents)
+            }
+            didBeginScan = true
+        }
 
         var processed = 0
         var touchedDayKeys: Set<String> = []
@@ -65,7 +81,13 @@ actor CalendarSignalIngestor {
             self.resolver = createdResolver
         }
 
-        for event in events {
+        for (index, event) in events.enumerated() {
+            let scannedEvents = index + 1
+            if scannedEvents % progressUpdateEvery == 0 || scannedEvents == totalEvents {
+                await MainActor.run {
+                    InferenceActivity.shared.updateCalendarScanProgress(scannedEvents: scannedEvents)
+                }
+            }
             guard shouldIngest(event) else { continue }
 
             if calendarSignalExists(eventIdentifier: event.eventIdentifier, in: modelContext) {
@@ -108,15 +130,18 @@ actor CalendarSignalIngestor {
                 // Rate limit manually: 1 request per second max
                 try? await Task.sleep(nanoseconds: 1_000_000_000)
 
-                if let placemarks = try? await geocoder.geocodeAddressString(locString),
-                   let placemark = placemarks.first,
-                   let loc = placemark.location {
+                let request = MKLocalSearch.Request()
+                request.naturalLanguageQuery = locString
+                let search = MKLocalSearch(request: request)
 
+                if let response = try? await search.start(),
+                   let item = response.mapItems.first {
+                    let loc = item.location
                     lat = loc.coordinate.latitude
                     long = loc.coordinate.longitude
-                    countryCode = placemark.isoCountryCode
-                    countryName = placemark.country
-                    timeZoneId = placemark.timeZone?.identifier
+                    countryCode = item.addressRepresentations?.region?.identifier
+                    countryName = item.addressRepresentations?.regionName
+                    timeZoneId = item.timeZone?.identifier
                 }
             }
 
