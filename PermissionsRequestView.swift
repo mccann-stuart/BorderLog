@@ -76,11 +76,11 @@ struct PermissionsRequestView: View {
                     }
                 }
 
-                if !hasPromptedCalendar || calendarStatus == .notDetermined {
+                if !hasPromptedCalendar || calendarStatus == .notDetermined || calendarStatus == .writeOnly {
                     PermissionCard(
                         icon: "calendar",
                         title: "Calendar Access",
-                        description: "Scans for flight events (e.g. from Flighty) to infer travel dates.",
+                        description: "Reads flight events (e.g. from Flighty) to infer travel dates. BorderLog never writes to your calendar.",
                         buttonTitle: "Allow Calendar"
                     ) {
                         let store = EKEventStore()
@@ -104,7 +104,7 @@ struct PermissionsRequestView: View {
                 
                 if (hasPromptedLocation || locationStatus != .notDetermined) &&
                    (hasPromptedPhotos || photoStatus != .notDetermined) &&
-                   (hasPromptedCalendar || calendarStatus != .notDetermined) {
+                   calendarIsResolved {
                     VStack(spacing: 12) {
                         Image(systemName: "checkmark.circle.fill")
                             .font(.largeTitle)
@@ -149,6 +149,15 @@ struct PermissionsRequestView: View {
         locationStatus = CLLocationManager().authorizationStatus
         photoStatus = PHPhotoLibrary.authorizationStatus(for: .readWrite)
         calendarStatus = EKEventStore.authorizationStatus(for: .event)
+    }
+
+    private var calendarIsResolved: Bool {
+        switch calendarStatus {
+        case .notDetermined, .writeOnly:
+            return false
+        default:
+            return true
+        }
     }
 }
 

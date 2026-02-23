@@ -160,14 +160,17 @@ actor CalendarSignalIngestor {
     }
 
     private func shouldIngest(_ event: EKEvent) -> Bool {
-        let title = event.title ?? ""
-        let location = event.location ?? ""
+        let candidates = [
+            event.title,
+            event.location,
+            event.structuredLocation?.title,
+            event.notes
+        ].compactMap { $0 }
 
-        if title.contains("✈") || location.contains("✈") {
-            return true
-        }
-        if title.localizedCaseInsensitiveContains("Flight") {
-            return true
+        for text in candidates {
+            if text.contains("✈") || text.localizedCaseInsensitiveContains("Flight") {
+                return true
+            }
         }
         return false
     }

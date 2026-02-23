@@ -95,6 +95,12 @@ struct MainNavigationView: View {
             await captureTodayLocationIfNeeded()
         }
         .task(id: hasCompletedOnboarding) {
+            guard hasCompletedOnboarding, didBootstrapInference else { return }
+            let container = modelContext.container
+            let ingestor = CalendarSignalIngestor(modelContainer: container, resolver: CLGeocoderCountryResolver())
+            _ = await ingestor.ingest(mode: .auto)
+        }
+        .task(id: hasCompletedOnboarding) {
             // Only bootstrap after onboarding completes
             guard hasCompletedOnboarding, !didBootstrapInference else { return }
             didBootstrapInference = true
@@ -103,6 +109,8 @@ struct MainNavigationView: View {
             await recomputeService.recomputeAll()
             let ingestor = PhotoSignalIngestor(modelContainer: container, resolver: CLGeocoderCountryResolver())
             _ = await ingestor.ingest(mode: .sequenced)
+            let calendarIngestor = CalendarSignalIngestor(modelContainer: container, resolver: CLGeocoderCountryResolver())
+            _ = await calendarIngestor.ingest(mode: .manualFullScan)
         }
     }
     
@@ -168,6 +176,6 @@ struct MainNavigationView: View {
 
 #Preview {
     MainNavigationView()
-        .modelContainer(for: [Stay.self, DayOverride.self, LocationSample.self, PhotoSignal.self, PresenceDay.self, PhotoIngestState.self], inMemory: true)
+        .modelContainer(for: [Stay.self, DayOverride.self, LocationSample.self, PhotoSignal.self, PresenceDay.self, PhotoIngestState.self, CalendarSignal.self], inMemory: true)
         .environmentObject(AuthenticationManager())
 }

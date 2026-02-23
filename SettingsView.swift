@@ -165,7 +165,7 @@ struct SettingsView: View {
                 } header: {
                     Text("Data Sources")
                 } footer: {
-                    Text("Location, photo metadata, and calendar events are used to infer which country you were in on each day. All processing happens on-device.")
+                    Text("Location, photo metadata, and calendar events are used to infer which country you were in on each day. Calendar access is read-only and all processing happens on-device.")
                 }
 
                 // MARK: – Privacy
@@ -294,7 +294,13 @@ struct SettingsView: View {
             } label: {
                 Label("Open Settings to Enable Calendar", systemImage: "gear")
             }
-        case .authorized, .fullAccess, .writeOnly:
+        case .writeOnly:
+            Button {
+                openAppSettings()
+            } label: {
+                Label("Open Settings to Allow Calendar Read Access", systemImage: "gear")
+            }
+        case .authorized, .fullAccess:
             EmptyView()
         @unknown default:
             EmptyView()
@@ -414,7 +420,7 @@ struct SettingsView: View {
 
     private var calendarStatusText: String {
         switch calendarStatus {
-        case .authorized, .fullAccess: return "Full Access"
+        case .authorized, .fullAccess: return "Read Access"
         case .writeOnly:               return "Write Only"
         case .denied:                  return "Denied"
         case .restricted:              return "Restricted"
@@ -581,5 +587,5 @@ struct ProfileEditView: View {
 
 #Preview {
     SettingsView()
-        .modelContainer(for: [Stay.self, DayOverride.self, LocationSample.self, PhotoSignal.self, PresenceDay.self, PhotoIngestState.self], inMemory: true)
+        .modelContainer(for: [Stay.self, DayOverride.self, LocationSample.self, PhotoSignal.self, PresenceDay.self, PhotoIngestState.self, CalendarSignal.self], inMemory: true)
 }

@@ -49,15 +49,31 @@ enum BorderLogSchemaV3: VersionedSchema {
     ]
 }
 
+enum BorderLogSchemaV4: VersionedSchema {
+    static var versionIdentifier: Schema.Version = .init(4, 0, 0)
+    static var models: [any PersistentModel.Type] = [
+        Stay.self,
+        DayOverride.self,
+        LocationSample.self,
+        PhotoSignal.self,
+        PresenceDay.self,
+        PhotoIngestState.self,
+        CountryConfig.self,
+        CalendarSignal.self
+    ]
+}
+
 enum BorderLogMigrationPlan: SchemaMigrationPlan {
     static var schemas: [any VersionedSchema.Type] = [
         BorderLogSchemaV1.self,
         BorderLogSchemaV2.self,
-        BorderLogSchemaV3.self
+        BorderLogSchemaV3.self,
+        BorderLogSchemaV4.self
     ]
     static var stages: [MigrationStage] = [
         .lightweight(fromVersion: BorderLogSchemaV1.self, toVersion: BorderLogSchemaV2.self),
-        .lightweight(fromVersion: BorderLogSchemaV2.self, toVersion: BorderLogSchemaV3.self)
+        .lightweight(fromVersion: BorderLogSchemaV2.self, toVersion: BorderLogSchemaV3.self),
+        .lightweight(fromVersion: BorderLogSchemaV3.self, toVersion: BorderLogSchemaV4.self)
     ]
 }
 
@@ -65,7 +81,7 @@ enum ModelContainerProvider {
     private static let logger = Logger(subsystem: "com.MCCANN.Learn", category: "Persistence")
 
     static func makeContainer() -> ModelContainer {
-        let schema = Schema(versionedSchema: BorderLogSchemaV3.self)
+        let schema = Schema(versionedSchema: BorderLogSchemaV4.self)
 
         // Tier 1: App Group shared container (needed for widget access)
         if let appGroupId = AppConfig.appGroupId {

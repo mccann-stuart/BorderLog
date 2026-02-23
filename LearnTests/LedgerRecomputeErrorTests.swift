@@ -19,7 +19,7 @@ final class LedgerRecomputeErrorTests: XCTestCase {
 
     override func setUp() async throws {
         let config = ModelConfiguration(isStoredInMemoryOnly: true)
-        container = try ModelContainer(for: PresenceDay.self, Stay.self, DayOverride.self, LocationSample.self, PhotoSignal.self, configurations: config)
+        container = try ModelContainer(for: PresenceDay.self, Stay.self, DayOverride.self, LocationSample.self, PhotoSignal.self, CalendarSignal.self, configurations: config)
         service = LedgerRecomputeService(modelContainer: container)
         mockFetcher = MockLedgerDataFetcher()
         await service.setMock(mockFetcher)

@@ -138,6 +138,53 @@ public actor LedgerRecomputeService {
         await self.recompute(dayKeys: dayKeys)
     }
 
+    /// Ensures every calendar day from two years ago (rolling) to today
+    /// has a PresenceDay entry in the store. Missing days are inserted as unknown/empty.
+    public func fillMissingDays(asOf: Date = Date(), calendar: Calendar = .current) async {
+        let timeZone = calendar.timeZone
+        let today = calendar.startOfDay(for: asOf)
+        let start = calendar.date(byAdding: .year, value: -2, to: today) ?? today
+
+        let allDayKeys = Set(self.makeDayKeys(from: start, to: today, calendar: calendar))
+
+        let existingKeys: Set<String>
+        do {
+            existingKeys = try dataFetcher.fetchAllPresenceDayKeys()
+        } catch {
+            print("LedgerRecomputeService fillMissingDays fetch error: \(error)")
+            return
+        }
+
+        let missing = allDayKeys.subtracting(existingKeys)
+        guard !missing.isEmpty else { return }
+
+        for dayKey in missing {
+            let date = DayKey.date(for: dayKey, timeZone: timeZone) ?? today
+            let day = PresenceDay(
+                dayKey: dayKey,
+                date: date,
+                timeZoneId: timeZone.identifier,
+                countryCode: nil,
+                countryName: nil,
+                confidence: 0,
+                confidenceLabel: .low,
+                sources: .none,
+                isOverride: false,
+                stayCount: 0,
+                photoCount: 0,
+                locationCount: 0,
+                calendarCount: 0
+            )
+            dataFetcher.insertPresenceDay(day)
+        }
+
+        do {
+            try dataFetcher.save()
+        } catch {
+            print("LedgerRecomputeService fillMissingDays save error: \(error)")
+        }
+    }
+
     private func upsertPresenceDays(_ results: [PresenceDayResult]) throws {
         let keys = results.map { $0.dayKey }
         let existing = try dataFetcher.fetchPresenceDays(keys: keys)
