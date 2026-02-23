@@ -40,8 +40,9 @@ actor PhotoSignalIngestor {
             return 0
         }
 
-        await MainActor.run { InferenceActivity.shared.beginPhotoScan() }
+        var didBeginScan = false
         defer {
+            guard didBeginScan else { return }
             Task { @MainActor in
                 InferenceActivity.shared.endPhotoScan()
             }
@@ -69,14 +70,28 @@ actor PhotoSignalIngestor {
         let assets = PHAsset.fetchAssets(with: .image, options: options)
         let assetCount = assets.count
 
+        if assetCount > 0 {
+            await MainActor.run {
+                InferenceActivity.shared.beginPhotoScan(totalAssets: assetCount)
+            }
+            didBeginScan = true
+        }
+
         var processed = 0
         var touchedDayKeys: Set<String> = []
         let saveEvery = 25
+        let progressUpdateEvery = 25
         var didSetSequencedCheckpoint = false
 
         if assetCount > 0 {
             for index in 0..<assetCount {
                 let asset = assets.object(at: index)
+                let scannedAssets = index + 1
+                if scannedAssets % progressUpdateEvery == 0 || scannedAssets == assetCount {
+                    await MainActor.run {
+                        InferenceActivity.shared.updatePhotoScanProgress(scannedAssets: scannedAssets)
+                    }
+                }
                 guard let creationDate = asset.creationDate,
                       let location = asset.location else {
                     continue

@@ -11,6 +11,7 @@ import SwiftData
 struct DashboardView: View {
     @Query(sort: [SortDescriptor(\PresenceDay.date, order: .reverse)]) private var presenceDays: [PresenceDay]
     @Query private var countryConfigs: [CountryConfig]
+    @ObservedObject private var inferenceActivity = InferenceActivity.shared
     
     @State private var selectedTimeframe: VisitedCountriesTimeframe = .last12Months
     
@@ -97,6 +98,12 @@ struct DashboardView: View {
         ScrollView {
             VStack(spacing: 20) {
                 WorldMapSection(visitedCountries: visitedCountryCodes)
+                if inferenceActivity.isPhotoScanning {
+                    PhotoScanProgressSection(
+                        scanned: inferenceActivity.photoScanScanned,
+                        total: inferenceActivity.photoScanTotal
+                    )
+                }
                 SchengenSummarySection(summary: schengenSummary, unknownDays: unknownSchengenDays)
                 CountriesListSection(countries: countryDaysSummary, selectedTimeframe: $selectedTimeframe)
             }
@@ -124,6 +131,40 @@ private struct WorldMapSection: View {
             .frame(height: 250)
             .cardShell()
             .padding(.horizontal)
+    }
+}
+
+private struct PhotoScanProgressSection: View {
+    let scanned: Int
+    let total: Int
+
+    private var progressFraction: Double {
+        guard total > 0 else { return 0 }
+        let clamped = min(max(scanned, 0), total)
+        return Double(clamped) / Double(total)
+    }
+
+    private var percentText: String {
+        "\(Int((progressFraction * 100).rounded()))%"
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Text("Photo scanning")
+                    .font(.system(.headline, design: .rounded))
+                Spacer()
+                Text(percentText)
+                    .font(.system(.caption, design: .rounded))
+                    .foregroundStyle(.secondary)
+            }
+            ProgressView(value: progressFraction, total: 1)
+                .progressViewStyle(.linear)
+                .tint(.accentColor)
+        }
+        .padding()
+        .cardShell()
+        .padding(.horizontal)
     }
 }
 

@@ -12,20 +12,40 @@ final class InferenceActivity: ObservableObject {
 
     @Published private(set) var isPhotoScanning = false
     @Published private(set) var isInferenceRunning = false
+    @Published private(set) var photoScanScanned = 0
+    @Published private(set) var photoScanTotal = 0
 
     private var photoScanCount = 0
     private var inferenceCount = 0
 
     private init() {}
 
-    func beginPhotoScan() {
+    func beginPhotoScan(totalAssets: Int) {
+        let wasScanning = photoScanCount > 0
         photoScanCount += 1
         isPhotoScanning = true
+        if !wasScanning {
+            photoScanTotal = max(0, totalAssets)
+            photoScanScanned = 0
+        }
+    }
+
+    func updatePhotoScanProgress(scannedAssets: Int) {
+        let clampedScanned = max(0, scannedAssets)
+        if photoScanTotal > 0 {
+            photoScanScanned = min(clampedScanned, photoScanTotal)
+        } else {
+            photoScanScanned = clampedScanned
+        }
     }
 
     func endPhotoScan() {
         photoScanCount = max(0, photoScanCount - 1)
         isPhotoScanning = photoScanCount > 0
+        if !isPhotoScanning {
+            photoScanScanned = 0
+            photoScanTotal = 0
+        }
     }
 
     func beginInference() {
