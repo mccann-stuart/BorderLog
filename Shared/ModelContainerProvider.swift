@@ -75,9 +75,8 @@ enum ModelContainerProvider {
                 logger.info("Using App Group store at group: \(appGroupId, privacy: .public)")
                 return container
             } catch {
-                // Migration errors must NOT silently fall back to memory — that would wipe all data.
-                // Log clearly. We fall through to local store as a recovery path.
-                logger.error("App Group store failed (possible migration issue). Falling back to local store. Error: \(error, privacy: .public)")
+                // Fall through to local store — log but don't crash.
+                logger.error("App Group store failed. Falling back to local store. Error: \(error, privacy: .public)")
             }
         } else {
             logger.warning("AppGroupId missing or empty in Info.plist. Using local store (widget will not share data).")
@@ -90,11 +89,47 @@ enum ModelContainerProvider {
             logger.info("Using local on-disk store.")
             return container
         } catch {
-            // A migration failure here means stored data cannot be opened.
-            // Do NOT fall back to in-memory — that silently wipes all persisted data.
-            // Crash loudly in debug; in production the caller can decide how to handle.
-            logger.critical("Local store migration/creation failed. This is a critical error. Error: \(error, privacy: .public)")
-            fatalError("Could not open or migrate the local SwiftData store: \(error)\n\nDelete and reinstall the app if you are in development.")
+            // Migration or load failure — the store file is corrupt or incompatible.
+            // Recovery: delete the broken store files and create a fresh one.
+            // This loses persisted data but is far better than crashing in production
+            // or silently running on an in-memory store every launch.
+            logger.critical("Local store failed to open/migrate. Attempting recovery by deleting corrupt store. Error: \(error, privacy: .public)")
+            deleteLocalStoreFiles()
+        }
+
+        // Tier 3: Fresh local store after recovery deletion
+        let recoveryConfig = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
+        do {
+            let container = try ModelContainer(for: schema, migrationPlan: BorderLogMigrationPlan.self, configurations: [recoveryConfig])
+            logger.warning("Recovery succeeded — started with a fresh local store. All previous data was lost.")
+            return container
+        } catch {
+            fatalError("Could not create a fresh SwiftData store after recovery. Error: \(error)")
+        }
+    }
+
+    /// Deletes the default SwiftData SQLite store files from the app's Application Support directory.
+    private static func deleteLocalStoreFiles() {
+        let fm = FileManager.default
+        guard let appSupport = fm.urls(for: .applicationSupportDirectory, in: .userDomainMask).first else { return }
+
+        // SwiftData stores files named after the app bundle name (e.g., "Learn.store.sqlite").
+        // Cover both the bundle-name variant and the "default" fallback name.
+        let bundleName = Bundle.main.infoDictionary?["CFBundleName"] as? String ?? "default"
+        let storeNames = ["\(bundleName).store", "default.store"]
+        let sqliteSuffixes = [".sqlite", ".sqlite-shm", ".sqlite-wal"]
+
+        for storeName in storeNames {
+            for suffix in sqliteSuffixes {
+                let url = appSupport.appendingPathComponent(storeName + suffix)
+                guard fm.fileExists(atPath: url.path) else { continue }
+                do {
+                    try fm.removeItem(at: url)
+                    logger.info("Deleted corrupt store file: \(url.lastPathComponent, privacy: .public)")
+                } catch {
+                    logger.error("Failed to delete \(url.lastPathComponent, privacy: .public): \(error, privacy: .public)")
+                }
+            }
         }
     }
 }
