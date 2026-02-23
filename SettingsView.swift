@@ -25,7 +25,7 @@ struct SettingsView: View {
     @State private var locationService = LocationSampleService()
     @AppStorage("didBootstrapInference") private var didBootstrapInference = false
     @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
-    @AppStorage("usePolygonMapView") private var usePolygonMapView = false
+    @AppStorage("usePolygonMapView") private var usePolygonMapView = true
 
     private var dataManager: DataManager {
         DataManager(modelContext: modelContext)

@@ -22,7 +22,7 @@ struct WorldMapView: View {
     @State private var autoZoomTask: Task<Void, Never>?
     @State private var suppressAutoZoom = false
     
-    @AppStorage("usePolygonMapView") private var usePolygonMapView = false
+    @AppStorage("usePolygonMapView") private var usePolygonMapView = true
     @ObservedObject private var polygonLoader = CountryPolygonLoader.shared
     
     var body: some View {
@@ -39,7 +39,7 @@ struct WorldMapView: View {
                                 if let polys = loadedPolygons[CountryCodeNormalizer.normalize(code) ?? code.uppercased()] {
                                     ForEach(0..<polys.count, id: \.self) { polyIdx in
                                         MapPolygon(coordinates: polys[polyIdx].first ?? [])
-                                            .foregroundStyle(.blue.opacity(0.3))
+                                            .foregroundStyle(.blue.opacity(0.2))
                                             .stroke(.blue.opacity(0.8), lineWidth: 1)
                                     }
                                 }
