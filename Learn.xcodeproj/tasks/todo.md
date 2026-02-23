@@ -1,9 +1,9 @@
 # Todo
 
-- [x] Review warning context in `Learn/Shared/AirportCodeResolver.swift` and confirm `airportCodesCSV` isolation
-- [x] Update resolver loading to safely access `airportCodesCSV` across actors
-- [x] Verify the warning is cleared using Xcode diagnostics
+- [ ] Add a calendar read-access helper that handles iOS 17+ vs earlier status values
+- [ ] Update SettingsView calendar button gating to use the helper
+- [ ] Verify via XcodeRefreshCodeIssuesInFile and document results
 
 # Review
 
-- Verified with XcodeRefreshCodeIssuesInFile on `Learn/Shared/AirportCodeResolver.swift` (no issues reported).
+- Pending.
