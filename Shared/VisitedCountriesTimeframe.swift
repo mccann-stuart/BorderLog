@@ -1,6 +1,13 @@
 import Foundation
 
-extension DashboardView.VisitedCountriesTimeframe {
+enum VisitedCountriesTimeframe: String, CaseIterable, Identifiable {
+    case last12Months = "Last 12 Months"
+    case lastYear = "Last Year"
+    case thisYear = "This Year"
+    case last6Months = "Last 6 Months"
+
+    var id: Self { self }
+
     func contains(_ date: Date, now: Date = Date(), calendar: Calendar = .current) -> Bool {
         switch self {
         case .last12Months:

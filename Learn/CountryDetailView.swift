@@ -9,7 +9,7 @@ import SwiftData
 struct CountryDetailView: View {
     let countryName: String
     let countryCode: String?
-    let selectedTimeframe: DashboardView.VisitedCountriesTimeframe
+    let selectedTimeframe: VisitedCountriesTimeframe
 
     @Environment(\.modelContext) private var modelContext
     @Query(sort: [SortDescriptor(\PresenceDay.date, order: .reverse)]) private var allPresenceDays: [PresenceDay]

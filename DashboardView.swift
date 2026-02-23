@@ -15,14 +15,6 @@ struct DashboardView: View {
     
     @State private var selectedTimeframe: VisitedCountriesTimeframe = .last12Months
     
-    enum VisitedCountriesTimeframe: String, CaseIterable, Identifiable {
-        case last12Months = "Last 12 Months"
-        case lastYear = "Last Year"
-        case thisYear = "This Year"
-        case last6Months = "Last 6 Months"
-        var id: Self { self }
-    }
-    
     private var timeframeDays: [PresenceDay] {
         let calendar = Calendar.current
         let now = Date()
@@ -230,9 +222,9 @@ private struct SchengenSummarySection: View {
 private struct CountriesListSection: View {
     let countries: [CountryDaysInfo]
     let warningThreshold: Int
-    @Binding var selectedTimeframe: DashboardView.VisitedCountriesTimeframe
+    @Binding var selectedTimeframe: VisitedCountriesTimeframe
     
-    init(countries: [CountryDaysInfo], warningThreshold: Int = 80, selectedTimeframe: Binding<DashboardView.VisitedCountriesTimeframe>) {
+    init(countries: [CountryDaysInfo], warningThreshold: Int = 80, selectedTimeframe: Binding<VisitedCountriesTimeframe>) {
         self.countries = countries
         self.warningThreshold = warningThreshold
         self._selectedTimeframe = selectedTimeframe
@@ -245,7 +237,7 @@ private struct CountriesListSection: View {
                     .font(.system(.title2, design: .rounded).bold())
                 Spacer()
                 Picker("Timeframe", selection: $selectedTimeframe) {
-                    ForEach(DashboardView.VisitedCountriesTimeframe.allCases) { tf in
+                    ForEach(VisitedCountriesTimeframe.allCases) { tf in
                         Text(tf.rawValue).tag(tf)
                     }
                 }
