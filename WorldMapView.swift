@@ -23,7 +23,7 @@ struct WorldMapView: View {
     @State private var suppressAutoZoom = false
     
     @AppStorage("usePolygonMapView") private var usePolygonMapView = false
-    @State private var polygonLoader = CountryPolygonLoader.shared
+    @ObservedObject private var polygonLoader = CountryPolygonLoader.shared
     
     var body: some View {
         ZStack {
