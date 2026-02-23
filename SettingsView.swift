@@ -12,7 +12,7 @@ import Photos
 
 struct SettingsView: View {
     @Environment(\.modelContext) private var modelContext
-    @Environment(\.dismiss) private var dismiss
+
 
     @State private var isConfirmingReset = false
     @State private var isShowingSeedAlert = false
@@ -21,13 +21,13 @@ struct SettingsView: View {
     @State private var isIngestingPhotos = false
     @State private var locationService = LocationSampleService()
     @AppStorage("didBootstrapInference") private var didBootstrapInference = false
+    @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
 
     private var dataManager: DataManager {
         DataManager(modelContext: modelContext)
     }
 
     var body: some View {
-        NavigationStack {
             Form {
                 // MARK: – Profile / About
                 Section {
@@ -152,6 +152,17 @@ struct SettingsView: View {
                     Text("Privacy")
                 }
 
+                // MARK: – Setup
+                Section {
+                    Button {
+                        hasCompletedOnboarding = false
+                    } label: {
+                        Label("Re-Launch Setup", systemImage: "arrow.clockwise")
+                    }
+                } header: {
+                    Text("Setup")
+                }
+
                 // MARK: – Data Management
                 Section {
                     Button("Reset All Data", role: .destructive) {
@@ -177,11 +188,6 @@ struct SettingsView: View {
             }
             .navigationTitle("Settings")
             .navigationBarTitleDisplayMode(.large)
-            .toolbar {
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Done") { dismiss() }
-                }
-            }
             .confirmationDialog("Delete all local data?", isPresented: $isConfirmingReset) {
                 Button("Delete All", role: .destructive) { resetAllData() }
             } message: {
@@ -193,7 +199,6 @@ struct SettingsView: View {
                 Text("Reset all data before seeding the sample dataset.")
             }
             .onAppear { refreshPermissions() }
-        }
     }
 
     // MARK: – Smart Location Row

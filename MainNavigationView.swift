@@ -8,9 +8,7 @@ struct MainNavigationView: View {
     @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
     
     @State private var selectedTab = 0
-    @State private var isShowingSettings = false
-    @State private var isShowingAccount = false
-    @State private var isPresentingAddOverride = false
+
     @AppStorage("didBootstrapInference") private var didBootstrapInference = false
     @State private var locationService = LocationSampleService()
     @State private var didAttemptLaunchLocationCapture = false
@@ -27,18 +25,6 @@ struct MainNavigationView: View {
                 NavigationStack {
                     DashboardView()
                         .navigationTitle("Dashboard")
-                        .toolbar {
-                            ToolbarItemGroup(placement: .topBarTrailing) {
-                                settingsMenu
-                                
-                                Button {
-                                    isPresentingAddOverride = true
-                                } label: {
-                                    Image(systemName: "plus.circle.fill")
-                                        .font(.title3)
-                                }
-                            }
-                        }
                 }
                 .tag(0)
                 .tabItem {
@@ -47,15 +33,18 @@ struct MainNavigationView: View {
                 
                 NavigationStack {
                     ContentView()
-                        .toolbar {
-                            ToolbarItem(placement: .topBarTrailing) {
-                                settingsMenu
-                            }
-                        }
                 }
                 .tag(1)
                 .tabItem {
                     Label("Details", systemImage: "list.bullet")
+                }
+                
+                NavigationStack {
+                    SettingsView()
+                }
+                .tag(2)
+                .tabItem {
+                    Label("Settings", systemImage: "gearshape.fill")
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -64,17 +53,7 @@ struct MainNavigationView: View {
             OnboardingView()
                 .environmentObject(authManager)
         }
-        .sheet(isPresented: $isShowingSettings) {
-            SettingsView()
-        }
-        .sheet(isPresented: $isShowingAccount) {
-            UserAccountView()
-        }
-        .sheet(isPresented: $isPresentingAddOverride) {
-            NavigationStack {
-                DayOverrideEditorView()
-            }
-        }
+
         .task(id: hasCompletedOnboarding) {
             await captureTodayLocationIfNeeded()
         }
@@ -93,34 +72,7 @@ struct MainNavigationView: View {
         }
     }
     
-    private var settingsMenu: some View {
-        Menu {
-            if AuthenticationManager.isAppleSignInEnabled {
-                Button {
-                    isShowingAccount = true
-                } label: {
-                    Label("Account", systemImage: "person.circle")
-                }
-            }
-            
-            Button {
-                isShowingSettings = true
-            } label: {
-                Label("Settings", systemImage: "gearshape")
-            }
-            
-            Divider()
-            
-            Button {
-                hasCompletedOnboarding = false
-            } label: {
-                Label("Re-Launch Setup", systemImage: "arrow.clockwise")
-            }
-        } label: {
-            Image(systemName: "ellipsis.circle")
-                .font(.title3)
-        }
-    }
+
 
     @MainActor
     private func captureTodayLocationIfNeeded() async {

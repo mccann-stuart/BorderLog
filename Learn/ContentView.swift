@@ -96,11 +96,6 @@ struct ContentView: View {
 
 
 
-                Section("Configuration") {
-                    Text("Schengen membership: hard-coded (M1)")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
             }
             .scrollContentBackground(.hidden)
             .background {
