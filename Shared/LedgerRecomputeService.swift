@@ -108,7 +108,7 @@ public actor LedgerRecomputeService {
         dayKeySet.formUnion(calendarSignals.map { $0.dayKey })
 
         for overrideDay in overrides {
-            let overrideKey = DayKey.make(from: overrideDay.date, timeZone: timeZone)
+            let overrideKey = await DayKey.make(from: overrideDay.date, timeZone: timeZone)
             dayKeySet.insert(overrideKey)
         }
 
@@ -118,7 +118,7 @@ public actor LedgerRecomputeService {
         }
         didBeginInference = true
 
-        let results = PresenceInferenceEngine.compute(
+        let results = await PresenceInferenceEngine.compute(
             dayKeys: dayKeySet,
             stays: stayInfos,
             overrides: overrideInfos,
@@ -136,7 +136,7 @@ public actor LedgerRecomputeService {
 
         do {
             try self.upsertPresenceDays(results)
-            try dataFetcher.save()
+            try await dataFetcher.save()
         } catch {
             print("LedgerRecomputeService save error: \(error)")
             onRecomputeError?(error)
@@ -168,7 +168,7 @@ public actor LedgerRecomputeService {
 
         let existingKeys: Set<String>
         do {
-            existingKeys = try dataFetcher.fetchAllPresenceDayKeys()
+            existingKeys = try await dataFetcher.fetchAllPresenceDayKeys()
         } catch {
             print("LedgerRecomputeService fillMissingDays fetch error: \(error)")
             return
@@ -178,8 +178,8 @@ public actor LedgerRecomputeService {
         guard !missing.isEmpty else { return }
 
         for dayKey in missing {
-            let date = DayKey.date(for: dayKey, timeZone: timeZone) ?? today
-            let day = PresenceDay(
+            let date = await DayKey.date(for: dayKey, timeZone: timeZone) ?? today
+            let day = await PresenceDay(
                 dayKey: dayKey,
                 date: date,
                 timeZoneId: timeZone.identifier,
@@ -194,11 +194,11 @@ public actor LedgerRecomputeService {
                 locationCount: 0,
                 calendarCount: 0
             )
-            dataFetcher.insertPresenceDay(day)
+            await dataFetcher.insertPresenceDay(day)
         }
 
         do {
-            try dataFetcher.save()
+            try await dataFetcher.save()
         } catch {
             print("LedgerRecomputeService fillMissingDays save error: \(error)")
         }

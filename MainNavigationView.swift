@@ -64,8 +64,8 @@ struct MainNavigationView: View {
         .task(id: hasCompletedOnboarding) {
             await bootstrapInferenceIfNeeded()
         }
-        .onChange(of: scenePhase) { phase in
-            guard phase == .active else { return }
+        .onChange(of: scenePhase) { _, newPhase in
+            guard newPhase == .active else { return }
             Task { await bootstrapPhotoScanIfNeeded() }
         }
     }
