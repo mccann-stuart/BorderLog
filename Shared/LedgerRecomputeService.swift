@@ -119,7 +119,13 @@ public actor LedgerRecomputeService {
     public func recomputeAll() async {
         let calendar = Calendar.current
         let today = calendar.startOfDay(for: Date())
-        let earliest = (try? self.earliestSignalDate()) ?? calendar.date(byAdding: .day, value: -30, to: today) ?? today
+
+        let twoYearsAgo = calendar.date(byAdding: .year, value: -2, to: today) ?? today
+        let earliestSignal = try? self.earliestSignalDate()
+
+        // Ensure we cover at least the last 2 years, or earlier if data exists
+        let earliest = [earliestSignal, twoYearsAgo].compactMap { $0 }.min() ?? twoYearsAgo
+
         let dayKeys = self.makeDayKeys(from: earliest, to: today, calendar: calendar)
         await self.recompute(dayKeys: dayKeys)
     }
