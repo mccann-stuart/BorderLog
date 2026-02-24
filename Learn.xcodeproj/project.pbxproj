@@ -530,6 +530,7 @@
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = BorderLog;
 				INFOPLIST_KEY_AppGroupId = "$(APP_GROUP_ID)";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.business";
 				INFOPLIST_KEY_NSCalendarsFullAccessUsageDescription = "BorderLog reads your calendar events to infer travel days. It never writes to your calendar.";
@@ -579,6 +580,7 @@
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = BorderLog;
 				INFOPLIST_KEY_AppGroupId = "$(APP_GROUP_ID)";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.business";
 				INFOPLIST_KEY_NSCalendarsFullAccessUsageDescription = "BorderLog reads your calendar events to infer travel days. It never writes to your calendar.";
