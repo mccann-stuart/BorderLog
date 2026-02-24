@@ -1,5 +1,6 @@
 import Foundation
 import Security
+import os
 
 protocol KeychainHelperProtocol {
     func save(_ data: Data, service: String, account: String)
@@ -9,6 +10,8 @@ protocol KeychainHelperProtocol {
 
 final class KeychainHelper: KeychainHelperProtocol {
     static let standard = KeychainHelper()
+    private static let logger = Logger(subsystem: "com.MCCANN.Border", category: "Keychain")
+
     private init() {}
 
     func save(_ data: Data, service: String, account: String) {
@@ -35,7 +38,7 @@ final class KeychainHelper: KeychainHelperProtocol {
         let status = SecItemAdd(addQuery, nil)
 
         if status != errSecSuccess {
-            print("Error saving to Keychain: \(status)")
+            Self.logger.error("Error saving to Keychain: \(status, privacy: .public)")
         }
     }
 
