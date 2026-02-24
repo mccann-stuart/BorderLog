@@ -28,6 +28,7 @@ final class KeychainHelper: KeychainHelperProtocol {
             kSecClass: kSecClassGenericPassword,
             kSecAttrService: service,
             kSecAttrAccount: account,
+            kSecAttrAccessible: kSecAttrAccessibleWhenUnlocked
         ] as CFDictionary
 
         // Add new item
