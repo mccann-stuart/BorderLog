@@ -32,14 +32,17 @@ actor AirportCodeResolver {
 
         // airportCodesCSV is expected to be available globally from AirportCodesData.swift
         let csv = await MainActor.run { airportCodesCSV }
-        let lines = csv.components(separatedBy: .newlines)
-        for line in lines {
+
+        // Use enumerateLines to avoid allocating an array of all lines (O(N) memory savings)
+        // Data in AirportCodesData.swift is generated clean, so trimming is unnecessary.
+        csv.enumerateLines { line, _ in
             let parts = line.split(separator: ",")
             if parts.count >= 4 {
-                let code = String(parts[0]).trimmingCharacters(in: .whitespacesAndNewlines)
+                // Parse Double directly from Substring to avoid intermediate String allocation
                 if let lat = Double(parts[1]), let lon = Double(parts[2]) {
-                    let country = String(parts[3]).trimmingCharacters(in: .whitespacesAndNewlines)
-                    cache[code] = AirportLocation(lat: lat, lon: lon, country: country)
+                    let code = String(parts[0])
+                    let country = String(parts[3])
+                    self.cache[code] = AirportLocation(lat: lat, lon: lon, country: country)
                 }
             }
         }
