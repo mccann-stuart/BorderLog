@@ -7,3 +7,13 @@
 
 ## Review
 - Verified `Learn/SettingsView.swift` diagnostics via XcodeRefreshCodeIssuesInFile; no issues reported.
+
+## Disputed Date Confidence Delta Update
+- [ ] Update disputed logic to use confidence delta <= 0.5 in `Shared/PresenceInferenceEngine.swift`.
+- [ ] Update `LearnTests/InferenceEngineTests.swift` to pass `calendarSignals: []`.
+- [ ] Add tests for disputed/not disputed based on confidence delta.
+- [ ] Run Learn unit tests on a simulator (`xcodebuild test ...`).
+- [ ] Document results in the Review section.
+
+## Review
+- Pending.

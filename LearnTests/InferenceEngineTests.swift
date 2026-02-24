@@ -56,5 +56,53 @@ final class InferenceEngineTests: XCTestCase {
         XCTAssertNil(results.first?.countryCode)
         XCTAssertEqual(results.first?.confidenceLabel, .low)
     }
+
+    func testDisputedWhenConfidenceDeltaSmall() {
+        let date = day(2026, 2, 15)
+        let dayKey = DayKey.make(from: date, timeZone: calendar.timeZone)
+        let photos = [
+            PhotoSignalInfo(dayKey: dayKey, countryCode: "FR", countryName: "France", timeZoneId: nil),
+            PhotoSignalInfo(dayKey: dayKey, countryCode: "FR", countryName: "France", timeZoneId: nil),
+            PhotoSignalInfo(dayKey: dayKey, countryCode: "ES", countryName: "Spain", timeZoneId: nil)
+        ]
+
+        let results = PresenceInferenceEngine.compute(
+            dayKeys: [dayKey],
+            stays: [],
+            overrides: [],
+            locations: [],
+            photos: photos, calendarSignals: [],
+            rangeEnd: date,
+            calendar: calendar
+        )
+
+        XCTAssertEqual(results.first?.countryCode, "FR")
+        XCTAssertEqual(results.first?.isDisputed, true)
+    }
+
+    func testNotDisputedWhenConfidenceDeltaLarge() {
+        let date = day(2026, 2, 15)
+        let dayKey = DayKey.make(from: date, timeZone: calendar.timeZone)
+        let photos = [
+            PhotoSignalInfo(dayKey: dayKey, countryCode: "FR", countryName: "France", timeZoneId: nil),
+            PhotoSignalInfo(dayKey: dayKey, countryCode: "FR", countryName: "France", timeZoneId: nil),
+            PhotoSignalInfo(dayKey: dayKey, countryCode: "FR", countryName: "France", timeZoneId: nil),
+            PhotoSignalInfo(dayKey: dayKey, countryCode: "FR", countryName: "France", timeZoneId: nil),
+            PhotoSignalInfo(dayKey: dayKey, countryCode: "ES", countryName: "Spain", timeZoneId: nil)
+        ]
+
+        let results = PresenceInferenceEngine.compute(
+            dayKeys: [dayKey],
+            stays: [],
+            overrides: [],
+            locations: [],
+            photos: photos, calendarSignals: [],
+            rangeEnd: date,
+            calendar: calendar
+        )
+
+        XCTAssertEqual(results.first?.countryCode, "FR")
+        XCTAssertEqual(results.first?.isDisputed, false)
+    }
 }
 #endif
