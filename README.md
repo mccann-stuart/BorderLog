@@ -8,6 +8,23 @@ Platforms: iOS (primary), iPadOS (nice-to-have)
 Distribution: App Store
 Pricing: Free (no subscriptions, no paid tiers)
 
+Weekly Changelog
+
+Week of Feb 17–23, 2026
+
+Highlights:
+- Added disputed status inference for presence days, including filters and UI support.
+- Introduced BorderLogSchemaV4 with PresenceDay migration and CountryConfig.
+- Implemented calendar-signal flight inference (airport parsing + route inference).
+- Fixed ledger gaps by ensuring missing days are filled and surfaced in the ledger.
+
+Key PRs:
+- [#81](https://github.com/mccann-stuart/BorderLog/pull/81) Calendar signal flight inference follow-up.
+- [#80](https://github.com/mccann-stuart/BorderLog/pull/80) Calendar signal flight inference.
+- [#79](https://github.com/mccann-stuart/BorderLog/pull/79) Move “Last 2 Years” section adjustments.
+- [#77](https://github.com/mccann-stuart/BorderLog/pull/77) Fix ledger missing days.
+- [#76](https://github.com/mccann-stuart/BorderLog/pull/76) Fix backend log leak.
+
 ⸻
 
 1. Executive Summary

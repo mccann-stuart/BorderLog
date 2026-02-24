@@ -18,3 +18,12 @@
 ## Review (Disputed Delta)
 - `xcodebuild test -scheme Learn -destination 'platform=iOS Simulator,name=iPhone 17 Pro'` failed: "Cannot launch simulated executable: no file found at .../Build/Products/Debug-iphonesimulator/Learn.app". Build emitted existing warnings in `Shared/CountryResolver.swift`, `Shared/PhotoSignalIngestor.swift`, `Shared/CountryPolygonLoader.swift`, and `Shared/LedgerRecomputeService.swift`.
 - Re-run of the same `xcodebuild test` hung with no output; terminated via `kill` after confirming the process was still running.
+
+## Weekly Changelog Update
+- [x] Locate the existing changelog file and confirm its format/sections.
+- [x] Collect this week’s highlights and PR links from git history.
+- [x] Draft the weekly entry, keeping structure consistent with the changelog.
+- [x] Add a brief Review note with verification details.
+
+## Review (Weekly Changelog)
+- Updated the README weekly changelog section for Feb 17–23, 2026 using git history (highlights + PR links). Verified by reading the updated section in `README.md`.
