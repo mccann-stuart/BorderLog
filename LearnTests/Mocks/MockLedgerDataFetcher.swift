@@ -30,7 +30,7 @@ class MockLedgerDataFetcher: LedgerDataFetching {
     var fetchPhotosError: Error?
     var fetchCalendarSignalsError: Error?
     var fetchPresenceDaysError: Error?
-    var fetchAllPresenceDayKeysError: Error?
+    var fetchPresenceDayKeysError: Error?
     var saveError: Error?
 
     var saveCalled = false
@@ -86,9 +86,10 @@ class MockLedgerDataFetcher: LedgerDataFetching {
         return keys.compactMap { presenceDays[$0] }
     }
 
-    func fetchAllPresenceDayKeys() throws -> Set<String> {
-        if let error = fetchAllPresenceDayKeysError { throw error }
-        return Set(presenceDays.keys)
+    func fetchPresenceDayKeys(from start: Date, to end: Date) throws -> Set<String> {
+        if let error = fetchPresenceDayKeysError { throw error }
+        let keys = presenceDays.values.filter { $0.date >= start && $0.date <= end }.map { $0.dayKey }
+        return Set(keys)
     }
 
     func insertPresenceDay(_ day: PresenceDay) {
