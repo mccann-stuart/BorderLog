@@ -11,3 +11,7 @@
 ## CloudKit Entitlements Gating
 - **Pattern**: Enabling CloudKit entitlements and UI without confirming the app’s entitlement set.
 - **Lesson**: Gate CloudKit features behind a flag and enable entitlements only after provisioning is confirmed; keep the code ready but inactive by default.
+
+## AGENTS.md Detection Miss
+- **Pattern**: Reported that `AGENTS.md` did not exist when it actually did.
+- **Lesson**: Always confirm `AGENTS.md` discovery from repo root using `rg --files -g 'AGENTS.md' .` and, if empty, double-check with `find . -name AGENTS.md` before stating it’s missing.

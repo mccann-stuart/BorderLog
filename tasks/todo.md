@@ -9,11 +9,12 @@
 - Verified `Learn/SettingsView.swift` diagnostics via XcodeRefreshCodeIssuesInFile; no issues reported.
 
 ## Disputed Date Confidence Delta Update
-- [ ] Update disputed logic to use confidence delta <= 0.5 in `Shared/PresenceInferenceEngine.swift`.
-- [ ] Update `LearnTests/InferenceEngineTests.swift` to pass `calendarSignals: []`.
-- [ ] Add tests for disputed/not disputed based on confidence delta.
-- [ ] Run Learn unit tests on a simulator (`xcodebuild test ...`).
-- [ ] Document results in the Review section.
+- [x] Update disputed logic to use confidence delta <= 0.5 in `Shared/PresenceInferenceEngine.swift`.
+- [x] Update `LearnTests/InferenceEngineTests.swift` to pass `calendarSignals: []`.
+- [x] Add tests for disputed/not disputed based on confidence delta.
+- [x] Run Learn unit tests on a simulator (`xcodebuild test ...`).
+- [x] Document results in the Review section.
 
-## Review
-- Pending.
+## Review (Disputed Delta)
+- `xcodebuild test -scheme Learn -destination 'platform=iOS Simulator,name=iPhone 17 Pro'` failed: "Cannot launch simulated executable: no file found at .../Build/Products/Debug-iphonesimulator/Learn.app". Build emitted existing warnings in `Shared/CountryResolver.swift`, `Shared/PhotoSignalIngestor.swift`, `Shared/CountryPolygonLoader.swift`, and `Shared/LedgerRecomputeService.swift`.
+- Re-run of the same `xcodebuild test` hung with no output; terminated via `kill` after confirming the process was still running.

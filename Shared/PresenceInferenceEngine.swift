@@ -226,7 +226,7 @@ struct PresenceInferenceEngine {
             if sortedCountries.count > 1 && sortedCountries[1].value.score > 0 {
                 let scoreDelta = winner.value.score - sortedCountries[1].value.score
                 let confidenceDelta = totalScore > 0 ? scoreDelta / totalScore : 0
-                if confidenceDelta <= 3 {
+                if confidenceDelta <= 0.5 {
                     isDisputed = true
                 }
             }
