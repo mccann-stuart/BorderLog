@@ -1,5 +1,9 @@
 # TODO
 
+- [x] Plan: Match New Stay UI to New Override auto-populated location fields.
+- [x] Update StayEditorView location section to use picker + suggestions for new stays.
+- [x] Run Learn tests for New Stay UI change (failed: DataManagerTests.testResetAllDataRemovesData()).
+
 - [x] Plan: Reintroduce Stays UI (Details +, Day Details Add Stay, recompute on stay changes).
 - [x] Update Details + to open Stay editor and add Stay-driven recompute.
 - [x] Add Day Details "Add Stay" action with prefilled multi-day editor.
@@ -18,6 +22,9 @@
 - [x] Verify SettingsView diagnostics.
 
 # Review
+
+- [ ] Pending: New Stay UI auto-populate verification.
+- [ ] Tests failed: `DataManagerTests.testResetAllDataRemovesData()` (xcodebuild iPhone 17 simulator).
 
 - [ ] Pending: Stays UI reintroduction + stay recompute verification.
 

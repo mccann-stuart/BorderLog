@@ -15,3 +15,7 @@
 ## AGENTS.md Detection Miss
 - **Pattern**: Reported that `AGENTS.md` did not exist when it actually did.
 - **Lesson**: Always confirm `AGENTS.md` discovery from repo root using `rg --files -g 'AGENTS.md' .` and, if empty, double-check with `find . -name AGENTS.md` before stating it’s missing.
+
+## Stay Editor Parity
+- **Pattern**: New Stay UI did not auto-populate country fields like New Override.
+- **Lesson**: When adding/editing Stay UI, default to `LocationFormSection` picker mode for new stays so Country, Country Code, and Region stay auto-populated and consistent with overrides.
