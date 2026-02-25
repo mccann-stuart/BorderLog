@@ -26,6 +26,7 @@ struct SettingsView: View {
     @State private var isIngestingPhotos = false
     @State private var isIngestingCalendar = false
     @State private var locationService = LocationSampleService()
+    @State private var widgetLastWriteDate: Date?
     @AppStorage("didBootstrapInference") private var didBootstrapInference = false
     @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
     @AppStorage("usePolygonMapView") private var usePolygonMapView = true
@@ -123,6 +124,20 @@ struct SettingsView: View {
                     }
 
                     locationActionRow
+
+                    HStack {
+                        Label("Widget", systemImage: "square.grid.2x2")
+                        Spacer()
+                        if let widgetLastWriteDate {
+                            Text(widgetLastWriteDate, style: .relative)
+                                .foregroundStyle(.secondary)
+                                .font(.subheadline)
+                        } else {
+                            Text("No recent write")
+                                .foregroundStyle(.secondary)
+                                .font(.subheadline)
+                        }
+                    }
 
                     // Photos
                     HStack {
@@ -290,7 +305,10 @@ struct SettingsView: View {
             } message: {
                 Text(cloudKitDeleteError ?? "Unknown error.")
             }
-            .onAppear { refreshPermissions() }
+            .onAppear {
+                refreshPermissions()
+                refreshWidgetLastWriteDate()
+            }
     }
 
     // MARK: – Smart Location Row
@@ -373,6 +391,16 @@ struct SettingsView: View {
     }
 
     // MARK: – Helpers
+
+    private func refreshWidgetLastWriteDate() {
+        let widgetSourceRaw = LocationSampleSource.widget.rawValue
+        var descriptor = FetchDescriptor<LocationSample>(sortBy: [SortDescriptor(\LocationSample.timestamp, order: .reverse)])
+        descriptor.fetchLimit = 1
+        descriptor.predicate = #Predicate<LocationSample> { sample in
+            sample.sourceRaw == widgetSourceRaw
+        }
+        widgetLastWriteDate = (try? modelContext.fetch(descriptor))?.first?.timestamp
+    }
 
     private func resetAllData() {
         do {

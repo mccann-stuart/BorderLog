@@ -11,11 +11,13 @@ import os
 
 enum AppConfig {
     static let appGroupId: String? = {
-        guard let groupId = Bundle.main.object(forInfoDictionaryKey: "AppGroupId") as? String else {
-            return nil
+        if let groupId = Bundle.main.object(forInfoDictionaryKey: "AppGroupId") as? String {
+            let trimmed = groupId.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !trimmed.isEmpty {
+                return trimmed
+            }
         }
-        let trimmed = groupId.trimmingCharacters(in: .whitespacesAndNewlines)
-        return trimmed.isEmpty ? nil : trimmed
+        return "group.com.MCCANN.Border"
     }()
 
     static let cloudKitContainerId = "iCloud.com.MCCANN.BorderLog"

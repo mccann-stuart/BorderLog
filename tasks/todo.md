@@ -1,10 +1,15 @@
-# Todo
+# TODO
 
-- [x] Inspect `Learn/Learn/Assets.xcassets` for existing app icon set names and catalog structure.
-- [x] Create or rename the app icon set to `AppIcon` (or update the build setting to match) with required contents.
-- [x] Validate the fix by checking Xcode diagnostics or building the project.
+- [x] Confirm how AppGroupId is provided (APP_GROUP_ID build setting or Info.plist value) for app + widget.
+- [x] Add fallback AppGroupId resolution for shared store when Info.plist key is missing/empty.
+- [x] Ensure widget and app read/write the same SwiftData store (App Group container).
+- [x] Verify with Xcode diagnostics/build log and note results.
+- [x] Add Settings > Data Sources indicator for the widget's last write timestamp.
+- [x] Verify SettingsView diagnostics.
 
 # Review
 
-- [x] Confirm the app icon set name matches build settings and no asset catalog errors remain.
-- [ ] Note any follow-up needed for icon sizes or platform variants.
+- [x] Updated AppGroupId fallback to always use `group.com.MCCANN.Border` when Info.plist value is missing/empty.
+- [x] Xcode diagnostics: no issues in `Learn/Shared/ModelContainerProvider.swift`.
+- [x] Added widget last write indicator in Settings/Data Sources, reading latest widget `LocationSample`.
+- [x] Xcode diagnostics: no issues in `Learn/SettingsView.swift`.
