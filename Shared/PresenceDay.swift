@@ -78,4 +78,8 @@ final class PresenceDay {
         get { SignalSourceMask(rawValue: sourcesRaw) }
         set { sourcesRaw = newValue.rawValue }
     }
+
+    var isManuallyModified: Bool {
+        isOverride || stayCount > 0
+    }
 }

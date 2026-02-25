@@ -28,7 +28,7 @@ final class GeocodeThrottleStore {
     }
 
     private init() {
-        if let appGroupId = AppConfig.appGroupId, !appGroupId.isEmpty {
+        if AppConfig.isAppGroupAvailable, let appGroupId = AppConfig.appGroupId, !appGroupId.isEmpty {
             defaults = UserDefaults(suiteName: appGroupId)
         } else {
             defaults = nil

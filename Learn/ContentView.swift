@@ -46,9 +46,9 @@ struct ContentView: View {
                 day.countryCode == nil && day.countryName == nil
             }
         case .manual:
-            return presenceDays.filter { $0.isOverride }
+            return presenceDays.filter { $0.isManuallyModified }
         case .disputed:
-            return presenceDays.filter { $0.isDisputed && !$0.isOverride }
+            return presenceDays.filter { $0.isDisputed && !$0.isManuallyModified }
         }
     }
 

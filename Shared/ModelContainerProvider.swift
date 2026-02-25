@@ -20,11 +20,20 @@ enum AppConfig {
         return "group.com.MCCANN.Border"
     }()
 
+    static var appGroupContainerURL: URL? {
+        guard let appGroupId else { return nil }
+        return FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: appGroupId)
+    }
+
+    static var isAppGroupAvailable: Bool {
+        appGroupContainerURL != nil
+    }
+
     static let cloudKitContainerId = "iCloud.com.MCCANN.BorderLog"
     static let isCloudKitFeatureEnabled = false
 
     static var sharedDefaults: UserDefaults {
-        if let appGroupId = appGroupId, let defaults = UserDefaults(suiteName: appGroupId) {
+        if isAppGroupAvailable, let appGroupId = appGroupId, let defaults = UserDefaults(suiteName: appGroupId) {
             return defaults
         }
         return .standard
@@ -180,7 +189,7 @@ enum ModelContainerProvider {
                 : .none
 
         // Tier 1: App Group shared container (needed for widget access)
-        if let appGroupId = AppConfig.appGroupId {
+        if AppConfig.isAppGroupAvailable, let appGroupId = AppConfig.appGroupId {
             let appGroupConfig = ModelConfiguration(
                 schema: schema,
                 groupContainer: .identifier(appGroupId),

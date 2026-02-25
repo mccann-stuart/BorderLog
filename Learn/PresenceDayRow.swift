@@ -54,6 +54,13 @@ struct PresenceDayRow: View {
                         .padding(.vertical, 2)
                         .background(Color.accentColor.opacity(0.15))
                         .clipShape(Capsule())
+                } else if day.stayCount > 0 {
+                    Text("Stay")
+                        .font(.system(.caption, design: .rounded))
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(Color.green.opacity(0.15))
+                        .clipShape(Capsule())
                 }
 
                 if Calendar.current.isDateInToday(day.date) {

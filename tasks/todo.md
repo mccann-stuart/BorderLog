@@ -1,5 +1,16 @@
 # TODO
 
+- [x] Plan: Treat stay-backed days as manual + editable from Day Details.
+- [x] Add PresenceDay.isManuallyModified and update manual/disputed filters.
+- [x] Add Stay badge for stay-backed days in ledger rows.
+- [x] Make stays in Day Details tappable to edit.
+- [ ] Run Learn tests for stay-manual/Day Details changes.
+
+- [x] Plan: Fix CFPreferences App Group warning by gating App Group defaults on container availability.
+- [x] Add App Group availability check and use it for shared defaults + SwiftData group container.
+- [x] Update GeocodeThrottleStore to avoid suite defaults when App Group container is unavailable.
+- [x] Build Learn scheme (generic iOS) and capture diagnostics.
+
 - [x] Plan: Match New Stay UI to New Override auto-populated location fields.
 - [x] Update StayEditorView location section to use picker + suggestions for new stays.
 - [x] Run Learn tests for New Stay UI change (failed: DataManagerTests.testResetAllDataRemovesData()).
@@ -22,6 +33,9 @@
 - [x] Verify SettingsView diagnostics.
 
 # Review
+
+- [ ] Pending: CFPreferences App Group warning fix verification (runtime log check).
+- [x] Build: `xcodebuild -project Learn.xcodeproj -scheme Learn -destination 'generic/platform=iOS' build`.
 
 - [ ] Pending: New Stay UI auto-populate verification.
 - [ ] Tests failed: `DataManagerTests.testResetAllDataRemovesData()` (xcodebuild iPhone 17 simulator).

@@ -243,12 +243,16 @@ private struct EvidenceSection: View {
                         .foregroundStyle(.secondary)
                 } else {
                     ForEach(overlapping) { stay in
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(stay.countryName)
-                                .font(.headline)
-                            Text(dateRangeText(for: stay))
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
+                        NavigationLink {
+                            StayEditorView(stay: stay)
+                        } label: {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(stay.countryName)
+                                    .font(.headline)
+                                Text(dateRangeText(for: stay))
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
                         }
                     }
                 }

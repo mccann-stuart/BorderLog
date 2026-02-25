@@ -70,12 +70,12 @@ struct DailyLedgerView: View {
                 }
             }
             if showManualOnly {
-                if day.isOverride {
+                if day.isManuallyModified {
                     matches = true
                 }
             }
             if showDisputedOnly {
-                if day.isDisputed && !day.isOverride {
+                if day.isDisputed && !day.isManuallyModified {
                     matches = true
                 }
             }
