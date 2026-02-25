@@ -36,6 +36,12 @@ struct SettingsView: View {
         DataManager(modelContext: modelContext)
     }
 
+    private enum DataStoreStatus {
+        case cloudKit
+        case local
+        case temporary
+    }
+
     var body: some View {
             Form {
                 // MARK: – Profile / About
@@ -195,6 +201,14 @@ struct SettingsView: View {
                             }
                         }
                         .disabled(isIngestingCalendar)
+                    }
+
+                    HStack {
+                        Label("Data Store", systemImage: "externaldrive")
+                        Spacer()
+                        Text(dataStoreLabel)
+                            .foregroundStyle(dataStoreColor)
+                            .font(.subheadline)
                     }
                 } header: {
                     Text("Data Sources")
@@ -484,6 +498,37 @@ struct SettingsView: View {
         let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"
         let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "1"
         return "\(version) (\(build))"
+    }
+
+    private var dataStoreLabel: String {
+        switch dataStoreStatus {
+        case .cloudKit:
+            return "iCloud/CloudKit"
+        case .local:
+            return "Local App storage"
+        case .temporary:
+            return "Temporary data store (failure mode)"
+        }
+    }
+
+    private var dataStoreColor: Color {
+        switch dataStoreStatus {
+        case .temporary:
+            return .red
+        case .cloudKit, .local:
+            return .green
+        }
+    }
+
+    private var dataStoreStatus: DataStoreStatus {
+        let configurations = modelContext.container.configurations
+        if configurations.contains(where: { $0.isStoredInMemoryOnly }) {
+            return .temporary
+        }
+        if configurations.contains(where: { $0.cloudKitContainerIdentifier != nil }) {
+            return .cloudKit
+        }
+        return .local
     }
 
     private var locationStatusText: String {
