@@ -15,6 +15,7 @@ struct ContentView: View {
 
     @Environment(\.modelContext) private var modelContext
     @Query(sort: [SortDescriptor(\DayOverride.date, order: .reverse)]) private var overrides: [DayOverride]
+    @Query(sort: [SortDescriptor(\Stay.enteredOn, order: .reverse)]) private var stays: [Stay]
     @Query(sort: [SortDescriptor(\PresenceDay.date, order: .reverse)]) private var presenceDays: [PresenceDay]
     @EnvironmentObject private var authManager: AuthenticationManager
     @ObservedObject private var inferenceActivity = InferenceActivity.shared
@@ -31,7 +32,7 @@ struct ContentView: View {
         var id: String { rawValue }
     }
 
-    @State private var isPresentingAddOverride = false
+    @State private var isPresentingAddStay = false
     @State private var isShowingSeedAlert = false
     @State private var schengenState = SchengenState()
     @State private var ledgerFilter: LedgerFilter = .all
@@ -133,24 +134,25 @@ struct ContentView: View {
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button {
-                        isPresentingAddOverride = true
+                        isPresentingAddStay = true
                     } label: {
                         Image(systemName: "plus.circle.fill")
                             .font(.title)
                     }
-                    .accessibilityLabel("Add Day Override")
+                    .accessibilityLabel("Add Stay")
                 }
             }
-            .sheet(isPresented: $isPresentingAddOverride) {
+            .sheet(isPresented: $isPresentingAddStay) {
                 NavigationStack {
-                    DayOverrideEditorView()
+                    StayEditorView()
                 }
             }
         }
         .task(id: overrides) {
-            await schengenState.update(stays: [], overrides: overrides)
-            let recomputeService = LedgerRecomputeService(modelContainer: modelContext.container)
-            await recomputeService.recomputeAll()
+            await refreshLedger()
+        }
+        .task(id: stays) {
+            await refreshLedger()
         }
     }
 
@@ -216,6 +218,13 @@ struct ContentView: View {
         } catch {
             Self.logger.error("Failed to reset data: \(error, privacy: .public)")
         }
+    }
+
+    @MainActor
+    private func refreshLedger() async {
+        await schengenState.update(stays: stays, overrides: overrides)
+        let recomputeService = LedgerRecomputeService(modelContainer: modelContext.container)
+        await recomputeService.recomputeAll()
     }
 
     private func seedSampleData() {

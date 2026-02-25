@@ -213,7 +213,7 @@ struct SettingsView: View {
                 } header: {
                     Text("Data Sources")
                 } footer: {
-                    Text("Location, photo metadata, and calendar events are used to infer which country you were in on each day. Calendar access is read-only and all processing happens on-device.")
+                    Text("Location, photo metadata, and read-only calendar events are used to infer which country you were in each day. All processing happens on-device, with Apple Cloud APIs/MapKit used only to resolve geo locations. No data is stored on any server or outside the app.")
                 }
 
       
@@ -553,8 +553,8 @@ struct SettingsView: View {
 
     private var photoStatusText: String {
         switch photoStatus {
-        case .authorized:  return "Full Access"
-        case .limited:     return "Limited"
+        case .authorized:  return "Geo Location Access"
+        case .limited:     return "Limited photos"
         case .denied:      return "Denied"
         case .restricted:  return "Restricted"
         case .notDetermined: return "Not Set"

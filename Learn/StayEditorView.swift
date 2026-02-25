@@ -20,9 +20,23 @@ struct StayEditorView: View {
 
     private let noteCharacterLimit = 1000
 
-    init(stay: Stay? = nil) {
+    init(
+        stay: Stay? = nil,
+        presetEntry: Date? = nil,
+        presetExit: Date? = nil,
+        presetCountryName: String? = nil,
+        presetCountryCode: String? = nil,
+        forceExitDate: Bool = false
+    ) {
         self.existingStay = stay
-        _draft = State(initialValue: StayDraft(stay: stay))
+        _draft = State(initialValue: StayDraft(
+            stay: stay,
+            presetEntry: presetEntry,
+            presetExit: presetExit,
+            presetCountryName: presetCountryName,
+            presetCountryCode: presetCountryCode,
+            forceExitDate: forceExitDate
+        ))
     }
 
     var body: some View {
@@ -226,7 +240,14 @@ private struct StayDraft {
     var exitedOn: Date
     var notes: String
 
-    init(stay: Stay?) {
+    init(
+        stay: Stay?,
+        presetEntry: Date? = nil,
+        presetExit: Date? = nil,
+        presetCountryName: String? = nil,
+        presetCountryCode: String? = nil,
+        forceExitDate: Bool = false
+    ) {
         if let stay {
             self.countryName = stay.countryName
             self.countryCode = stay.countryCode ?? ""
@@ -236,12 +257,22 @@ private struct StayDraft {
             self.exitedOn = stay.exitedOn ?? stay.enteredOn
             self.notes = stay.notes
         } else {
-            self.countryName = ""
-            self.countryCode = ""
-            self.region = .schengen
-            self.enteredOn = Date()
-            self.hasExitDate = false
-            self.exitedOn = Date()
+            let entryDate = presetEntry ?? Date()
+            let trimmedCode = (presetCountryCode ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+            let shouldSetExitDate = forceExitDate || presetExit != nil
+
+            self.countryName = presetCountryName ?? ""
+            self.countryCode = presetCountryCode ?? ""
+            if trimmedCode.isEmpty {
+                self.region = .other
+            } else if SchengenMembers.isMember(trimmedCode) {
+                self.region = .schengen
+            } else {
+                self.region = .nonSchengen
+            }
+            self.enteredOn = entryDate
+            self.hasExitDate = shouldSetExitDate
+            self.exitedOn = shouldSetExitDate ? (presetExit ?? entryDate) : entryDate
             self.notes = ""
         }
     }

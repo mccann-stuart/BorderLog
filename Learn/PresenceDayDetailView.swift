@@ -12,6 +12,7 @@ struct PresenceDayDetailView: View {
     let day: PresenceDay
 
     @State private var isShowingOverride = false
+    @State private var isShowingAddStay = false
     @State private var appliedSuggestion: String? = nil
     @State private var isShowingDeleteAlert = false
 
@@ -33,6 +34,9 @@ struct PresenceDayDetailView: View {
     var body: some View {
         Form {
             Section("Actions") {
+                Button("Add Stay") {
+                    isShowingAddStay = true
+                }
                 Button("Override Day") {
                     isShowingOverride = true
                 }
@@ -130,6 +134,16 @@ struct PresenceDayDetailView: View {
                     presetDate: day.date,
                     presetCountryName: day.countryName,
                     presetCountryCode: day.countryCode
+                )
+            }
+        }
+        .sheet(isPresented: $isShowingAddStay) {
+            NavigationStack {
+                StayEditorView(
+                    presetEntry: day.date,
+                    presetCountryName: day.countryName,
+                    presetCountryCode: day.countryCode,
+                    forceExitDate: true
                 )
             }
         }

@@ -1,5 +1,11 @@
 # TODO
 
+- [x] Plan: Reintroduce Stays UI (Details +, Day Details Add Stay, recompute on stay changes).
+- [x] Update Details + to open Stay editor and add Stay-driven recompute.
+- [x] Add Day Details "Add Stay" action with prefilled multi-day editor.
+- [x] Extend StayEditorView presets for entry/exit/country and force exit.
+- [ ] Run tests for Learn scheme (iPhone 15 simulator).
+
 - [x] Add data store status row in Settings (Data Sources).
 - [x] Derive data store label/color from ModelContainer configurations.
 - [x] Validate build compiles (SettingsView).
@@ -12,6 +18,8 @@
 - [x] Verify SettingsView diagnostics.
 
 # Review
+
+- [ ] Pending: Stays UI reintroduction + stay recompute verification.
 
 - [x] Data store status row added with configuration-based label + color.
 - [x] Xcode build: `xcodebuild -project Learn.xcodeproj -scheme Learn -destination 'generic/platform=iOS' build`.
