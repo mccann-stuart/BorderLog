@@ -14,6 +14,7 @@ function assertSecurityHeaders(res) {
   assert.strictEqual(res.headers.get("Content-Security-Policy"), "default-src 'none'; frame-ancestors 'none'; sandbox", "Missing Content-Security-Policy");
   assert.strictEqual(res.headers.get("X-Frame-Options"), "DENY", "Missing X-Frame-Options");
   assert.strictEqual(res.headers.get("Referrer-Policy"), "strict-origin-when-cross-origin", "Missing Referrer-Policy");
+  assert.strictEqual(res.headers.get("Permissions-Policy"), "accelerometer=(), camera=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), payment=(), usb=(), interest-cohort=()", "Missing Permissions-Policy");
 }
 
 // Helper to run test
