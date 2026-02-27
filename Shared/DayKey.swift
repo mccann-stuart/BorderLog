@@ -11,9 +11,8 @@ enum DayKey {
     static let format = "yyyy-MM-dd"
 
     static func make(from date: Date, timeZone: TimeZone) -> String {
-        var calendar = Calendar(identifier: .gregorian)
-        calendar.timeZone = timeZone
-        let components = calendar.dateComponents([.year, .month, .day], from: date)
+        let cal = calendar(for: timeZone)
+        let components = cal.dateComponents([.year, .month, .day], from: date)
 
         guard let y = components.year, let m = components.month, let d = components.day else {
             return formatter(for: timeZone).string(from: date)
@@ -28,12 +27,26 @@ enum DayKey {
            let y = Int(parts[0]),
            let m = Int(parts[1]),
            let d = Int(parts[2]) {
-            var calendar = Calendar(identifier: .gregorian)
-            calendar.timeZone = timeZone
+            let cal = calendar(for: timeZone)
             let components = DateComponents(year: y, month: m, day: d)
-            return calendar.date(from: components)
+            return cal.date(from: components)
         }
         return formatter(for: timeZone).date(from: dayKey)
+    }
+
+    private static func calendar(for timeZone: TimeZone) -> Calendar {
+        let key = "DayKeyCalendar_" + timeZone.identifier
+        let dictionary = Thread.current.threadDictionary
+
+        if let calendar = dictionary[key] as? Calendar {
+            return calendar
+        }
+
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = timeZone
+
+        dictionary[key] = calendar
+        return calendar
     }
 
     private static func formatter(for timeZone: TimeZone) -> DateFormatter {
