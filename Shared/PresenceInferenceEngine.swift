@@ -306,25 +306,31 @@ struct PresenceInferenceEngine {
         }
 
         // Second pass: add suggestions to unknown days
+        // Optimization: Precalculate known backward and forward suggestions in O(N) to avoid O(N^2) nested loops
+        var backwardSuggestions: [(code: String, name: String)?] = Array(repeating: nil, count: sortedResults.count)
+        var lastKnown: (code: String, name: String)? = nil
+        for i in 0..<sortedResults.count {
+            backwardSuggestions[i] = lastKnown
+            if let code = sortedResults[i].countryCode, let name = sortedResults[i].countryName {
+                lastKnown = (code, name)
+            }
+        }
+
+        var forwardSuggestions: [(code: String, name: String)?] = Array(repeating: nil, count: sortedResults.count)
+        lastKnown = nil
+        if sortedResults.count > 0 {
+            for i in stride(from: sortedResults.count - 1, through: 0, by: -1) {
+                forwardSuggestions[i] = lastKnown
+                if let code = sortedResults[i].countryCode, let name = sortedResults[i].countryName {
+                    lastKnown = (code, name)
+                }
+            }
+        }
+
         for i in 0..<sortedResults.count {
             if sortedResults[i].countryCode == nil || sortedResults[i].confidence == 0 {
-                // Scan backward for a known day
-                var backwardSuggestion: (code: String, name: String)?
-                for j in stride(from: i - 1, through: 0, by: -1) {
-                    if let code = sortedResults[j].countryCode, let name = sortedResults[j].countryName {
-                        backwardSuggestion = (code, name)
-                        break
-                    }
-                }
-
-                // Scan forward for a known day
-                var forwardSuggestion: (code: String, name: String)?
-                for j in stride(from: i + 1, to: sortedResults.count, by: 1) {
-                    if let code = sortedResults[j].countryCode, let name = sortedResults[j].countryName {
-                        forwardSuggestion = (code, name)
-                        break
-                    }
-                }
+                let backwardSuggestion = backwardSuggestions[i]
+                let forwardSuggestion = forwardSuggestions[i]
 
                 var suggestions: [(code: String, name: String)] = []
                 if let bg = backwardSuggestion {
