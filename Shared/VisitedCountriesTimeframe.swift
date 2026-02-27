@@ -5,6 +5,7 @@ enum VisitedCountriesTimeframe: String, CaseIterable, Identifiable {
     case lastYear = "Last Year"
     case thisYear = "This Year"
     case last6Months = "Last 6 Months"
+    case twoYearsPrior = "Two Years Prior"
 
     var id: Self { self }
 
@@ -23,6 +24,11 @@ enum VisitedCountriesTimeframe: String, CaseIterable, Identifiable {
             guard let startOfThisYear = calendar.date(from: calendar.dateComponents([.year], from: now)),
                   let startOfLastYear = calendar.date(byAdding: .year, value: -1, to: startOfThisYear) else { return true }
             return date >= startOfLastYear && date < startOfThisYear
+        case .twoYearsPrior:
+            guard let startOfThisYear = calendar.date(from: calendar.dateComponents([.year], from: now)),
+                  let startOfLastYear = calendar.date(byAdding: .year, value: -1, to: startOfThisYear),
+                  let startOfTwoYearsAgo = calendar.date(byAdding: .year, value: -2, to: startOfThisYear) else { return true }
+            return date >= startOfTwoYearsAgo && date < startOfLastYear
         }
     }
 }

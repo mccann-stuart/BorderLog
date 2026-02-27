@@ -1,5 +1,15 @@
 # TODO
 
+- [x] Plan: Add "Two Years Prior" visited countries timeframe (calendar year two years ago).
+- [x] Update VisitedCountriesTimeframe enum + contains logic.
+- [ ] Verify UI picker shows "Two Years Prior" (Dashboard + Country Detail).
+- [x] Run Learn tests for "Two Years Prior" timeframe change.
+
+- [ ] Plan: Scan repo for VisitedCountriesTimeframe or visited countries filter logic beyond DashboardView.swift and Shared/VisitedCountriesTimeframe.swift.
+- [ ] Search codebase for VisitedCountriesTimeframe/visited countries filter references.
+- [ ] Review any matches outside the two specified files and capture implications.
+- [ ] Report findings.
+
 - [x] Plan: Treat stay-backed days as manual + editable from Day Details.
 - [x] Add PresenceDay.isManuallyModified and update manual/disputed filters.
 - [x] Add Stay badge for stay-backed days in ledger rows.
@@ -33,6 +43,11 @@
 - [x] Verify SettingsView diagnostics.
 
 # Review
+
+- [ ] Pending: "Two Years Prior" UI verification (Dashboard + Country Detail).
+- [ ] Pending: "Two Years Prior" tests (`xcodebuild -project Learn.xcodeproj -scheme Learn -destination 'platform=iOS Simulator,name=iPhone 15' test`).
+- [ ] Tests failed: missing iPhone 15 simulator for "Two Years Prior" tests.
+- [ ] Tests failed: `DataManagerTests.testResetAllDataRemovesData()` on iPhone 17 simulator.
 
 - [ ] Pending: CFPreferences App Group warning fix verification (runtime log check).
 - [x] Build: `xcodebuild -project Learn.xcodeproj -scheme Learn -destination 'generic/platform=iOS' build`.
