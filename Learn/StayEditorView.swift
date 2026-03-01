@@ -112,7 +112,19 @@ struct StayEditorView: View {
         .confirmationDialog("Delete this stay?", isPresented: $isConfirmingDelete) {
             Button("Delete", role: .destructive) {
                 if let existingStay {
+                    let deletedRange = normalizedStayRange(
+                        enteredOn: existingStay.enteredOn,
+                        exitedOn: existingStay.exitedOn
+                    )
                     modelContext.delete(existingStay)
+                    do {
+                        try modelContext.save()
+                        recomputeImpactedStayRange(deletedRange)
+                        dismiss()
+                    } catch {
+                        print("Failed to delete stay: \(error)")
+                    }
+                    return
                 }
                 dismiss()
             }
@@ -239,6 +251,10 @@ struct StayEditorView: View {
         let normalizedCode = CountryCodeNormalizer.normalize(trimmedCode)
         let trimmedNotes = draft.notes.trimmingCharacters(in: .whitespacesAndNewlines)
         let exitDate = draft.hasExitDate ? draft.exitedOn : nil
+        let previousRange = existingStay.map {
+            normalizedStayRange(enteredOn: $0.enteredOn, exitedOn: $0.exitedOn)
+        }
+        let newRange = normalizedStayRange(enteredOn: draft.enteredOn, exitedOn: exitDate)
 
         if let existingStay {
             existingStay.countryName = trimmedCountry
@@ -259,7 +275,15 @@ struct StayEditorView: View {
             modelContext.insert(stay)
         }
 
-        dismiss()
+        do {
+            try modelContext.save()
+            if let impactedRange = mergedRange(previous: previousRange, current: newRange) {
+                recomputeImpactedStayRange(impactedRange)
+            }
+            dismiss()
+        } catch {
+            print("Failed to save stay: \(error)")
+        }
     }
 
     private func overlapSummary(for overlaps: [Stay], calendar: Calendar) -> String {
@@ -271,6 +295,58 @@ struct StayEditorView: View {
         }
         let suffix = overlaps.count > 3 ? "\n- and \(overlaps.count - 3) more" : ""
         return "This stay overlaps with existing entries:\n" + lines.joined(separator: "\n") + suffix
+    }
+
+    private func normalizedStayRange(enteredOn: Date, exitedOn: Date?) -> (start: Date, end: Date) {
+        let calendar = Calendar.current
+        let start = calendar.startOfDay(for: enteredOn)
+        let today = calendar.startOfDay(for: Date())
+        let end = min(calendar.startOfDay(for: exitedOn ?? today), today)
+        return (start: start, end: max(start, end))
+    }
+
+    private func mergedRange(
+        previous: (start: Date, end: Date)?,
+        current: (start: Date, end: Date)?
+    ) -> (start: Date, end: Date)? {
+        switch (previous, current) {
+        case let (.some(old), .some(new)):
+            return (start: min(old.start, new.start), end: max(old.end, new.end))
+        case let (.some(old), .none):
+            return old
+        case let (.none, .some(new)):
+            return new
+        case (.none, .none):
+            return nil
+        }
+    }
+
+    private func recomputeImpactedStayRange(_ range: (start: Date, end: Date)) {
+        let dayKeys = makeDayKeys(from: range.start, to: range.end)
+        guard !dayKeys.isEmpty else { return }
+
+        let container = modelContext.container
+        Task {
+            let service = LedgerRecomputeService(modelContainer: container)
+            await service.recompute(dayKeys: dayKeys)
+        }
+    }
+
+    private func makeDayKeys(from start: Date, to end: Date) -> [String] {
+        let calendar = Calendar.current
+        let timeZone = calendar.timeZone
+        let startDay = calendar.startOfDay(for: start)
+        let endDay = calendar.startOfDay(for: end)
+        guard startDay <= endDay else { return [] }
+
+        var day = startDay
+        var keys: [String] = []
+        while day <= endDay {
+            keys.append(DayKey.make(from: day, timeZone: timeZone))
+            guard let next = calendar.date(byAdding: .day, value: 1, to: day) else { break }
+            day = next
+        }
+        return keys
     }
 }
 

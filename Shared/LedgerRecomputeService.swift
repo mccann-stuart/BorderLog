@@ -29,13 +29,32 @@ public actor LedgerRecomputeService {
                 }
             }
         }
+        guard !dayKeys.isEmpty else { return }
+
         let calendar = Calendar.current
         let timeZone = calendar.timeZone
-        var dayKeySet = Set(dayKeys)
+        let scope: (start: Date, end: Date, dayKeys: [String])
+        do {
+            guard let expandedScope = try self.makeImpactedScope(
+                seedDayKeys: Set(dayKeys),
+                timeZone: timeZone,
+                calendar: calendar
+            ) else {
+                return
+            }
+            scope = expandedScope
+        } catch {
+            print("LedgerRecomputeService scope error: \(error)")
+            onRecomputeError?(error)
+            return
+        }
 
-        let dateRange = self.dateRange(for: dayKeySet, timeZone: timeZone, calendar: calendar)
-        let rangeStart = calendar.date(byAdding: .day, value: -1, to: dateRange.start) ?? dateRange.start
-        let rangeEnd = calendar.date(byAdding: .day, value: 1, to: dateRange.end) ?? dateRange.end
+        let dayKeySet = Set(scope.dayKeys)
+        guard !dayKeySet.isEmpty else { return }
+
+        // Fetch one day on each side so timestamp-based evidence near midnight is available.
+        let rangeStart = calendar.date(byAdding: .day, value: -1, to: scope.start) ?? scope.start
+        let rangeEnd = calendar.date(byAdding: .day, value: 1, to: scope.end) ?? scope.end
 
         let stays: [Stay]
         let overrides: [DayOverride]
@@ -103,15 +122,6 @@ public actor LedgerRecomputeService {
             )
         }
 
-        dayKeySet.formUnion(locations.map { $0.dayKey })
-        dayKeySet.formUnion(photos.map { $0.dayKey })
-        dayKeySet.formUnion(calendarSignals.map { $0.dayKey })
-
-        for overrideDay in overrides {
-            let overrideKey = await DayKey.make(from: overrideDay.date, timeZone: timeZone)
-            dayKeySet.insert(overrideKey)
-        }
-
         let totalDayKeys = dayKeySet.count
         await MainActor.run {
             InferenceActivity.shared.beginInference(totalDays: totalDayKeys)
@@ -125,7 +135,7 @@ public actor LedgerRecomputeService {
             locations: locationInfos,
             photos: photoInfos,
             calendarSignals: calendarInfos,
-            rangeEnd: rangeEnd,
+            rangeEnd: scope.end,
             calendar: calendar,
             progress: { processed, total in
                 Task { @MainActor in
@@ -272,11 +282,49 @@ public actor LedgerRecomputeService {
         return keys
     }
 
-    private func dateRange(for dayKeys: Set<String>, timeZone: TimeZone, calendar: Calendar) -> (start: Date, end: Date) {
-        let dates = dayKeys.compactMap { DayKey.date(for: $0, timeZone: timeZone) }
-        let start = dates.min() ?? calendar.startOfDay(for: Date())
-        let end = dates.max() ?? calendar.startOfDay(for: Date())
-        return (start, end)
+    private func makeImpactedScope(
+        seedDayKeys: Set<String>,
+        timeZone: TimeZone,
+        calendar: Calendar
+    ) throws -> (start: Date, end: Date, dayKeys: [String])? {
+        let mutationDates = seedDayKeys.compactMap { dayKey -> Date? in
+            guard let date = DayKey.date(for: dayKey, timeZone: timeZone) else { return nil }
+            return calendar.startOfDay(for: date)
+        }
+        guard let mutationStart = mutationDates.min(), let mutationEnd = mutationDates.max() else {
+            return nil
+        }
+
+        let paddingDays = 8
+        let paddedStart = calendar.date(byAdding: .day, value: -paddingDays, to: mutationStart) ?? mutationStart
+        let paddedEnd = calendar.date(byAdding: .day, value: paddingDays, to: mutationEnd) ?? mutationEnd
+
+        let today = calendar.startOfDay(for: Date())
+        let lowerBound = try self.coverageLowerBound(today: today, calendar: calendar)
+
+        var scopeStart = max(paddedStart, lowerBound)
+        var scopeEnd = min(paddedEnd, today)
+        guard scopeStart <= scopeEnd else { return nil }
+
+        if let leftAnchor = try dataFetcher.fetchNearestKnownPresenceDay(before: scopeStart) {
+            scopeStart = max(calendar.startOfDay(for: leftAnchor.date), lowerBound)
+        }
+        if let rightAnchor = try dataFetcher.fetchNearestKnownPresenceDay(after: scopeEnd) {
+            scopeEnd = min(calendar.startOfDay(for: rightAnchor.date), today)
+        }
+        guard scopeStart <= scopeEnd else { return nil }
+
+        return (
+            start: scopeStart,
+            end: scopeEnd,
+            dayKeys: makeDayKeys(from: scopeStart, to: scopeEnd, calendar: calendar)
+        )
+    }
+
+    private func coverageLowerBound(today: Date, calendar: Calendar) throws -> Date {
+        let twoYearsAgo = calendar.date(byAdding: .year, value: -2, to: today) ?? today
+        let earliestSignal = try earliestSignalDate().map { calendar.startOfDay(for: $0) }
+        return [earliestSignal, twoYearsAgo].compactMap { $0 }.min() ?? twoYearsAgo
     }
 
     private func earliestSignalDate() throws -> Date? {

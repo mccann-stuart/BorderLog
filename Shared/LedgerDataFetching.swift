@@ -23,6 +23,8 @@ protocol LedgerDataFetching {
 
     func fetchPresenceDays(keys: [String]) throws -> [PresenceDay]
     func fetchPresenceDayKeys(from start: Date, to end: Date) throws -> Set<String>
+    func fetchNearestKnownPresenceDay(before date: Date) throws -> PresenceDay?
+    func fetchNearestKnownPresenceDay(after date: Date) throws -> PresenceDay?
     func insertPresenceDay(_ day: PresenceDay)
 
     func save() throws
@@ -123,6 +125,28 @@ struct RealLedgerDataFetcher: LedgerDataFetching {
         )
         let days = try modelContext.fetch(descriptor)
         return Set(days.map { $0.dayKey })
+    }
+
+    func fetchNearestKnownPresenceDay(before date: Date) throws -> PresenceDay? {
+        var descriptor = FetchDescriptor<PresenceDay>(
+            predicate: #Predicate { day in
+                day.date < date && (day.countryCode != nil || day.countryName != nil)
+            },
+            sortBy: [SortDescriptor(\.date, order: .reverse)]
+        )
+        descriptor.fetchLimit = 1
+        return try modelContext.fetch(descriptor).first
+    }
+
+    func fetchNearestKnownPresenceDay(after date: Date) throws -> PresenceDay? {
+        var descriptor = FetchDescriptor<PresenceDay>(
+            predicate: #Predicate { day in
+                day.date > date && (day.countryCode != nil || day.countryName != nil)
+            },
+            sortBy: [SortDescriptor(\.date, order: .forward)]
+        )
+        descriptor.fetchLimit = 1
+        return try modelContext.fetch(descriptor).first
     }
 
     func insertPresenceDay(_ day: PresenceDay) {

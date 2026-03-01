@@ -92,6 +92,22 @@ class MockLedgerDataFetcher: LedgerDataFetching {
         return Set(keys)
     }
 
+    func fetchNearestKnownPresenceDay(before date: Date) throws -> PresenceDay? {
+        presenceDays.values
+            .filter { day in
+                day.date < date && (day.countryCode != nil || day.countryName != nil)
+            }
+            .max(by: { $0.date < $1.date })
+    }
+
+    func fetchNearestKnownPresenceDay(after date: Date) throws -> PresenceDay? {
+        presenceDays.values
+            .filter { day in
+                day.date > date && (day.countryCode != nil || day.countryName != nil)
+            }
+            .min(by: { $0.date < $1.date })
+    }
+
     func insertPresenceDay(_ day: PresenceDay) {
         insertPresenceDayCalled = true
         presenceDays[day.dayKey] = day

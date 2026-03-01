@@ -64,6 +64,13 @@ final class LocationSampleService: NSObject, CLLocationManagerDelegate {
         )
         modelContext.insert(sample)
 
+        do {
+            try modelContext.save()
+        } catch {
+            print("LocationSampleService save error: \(error)")
+            return sample
+        }
+
         let container = modelContext.container
         let recomputeService = LedgerRecomputeService(modelContainer: container)
         await recomputeService.recompute(dayKeys: [dayKey])
@@ -127,6 +134,15 @@ final class LocationSampleService: NSObject, CLLocationManagerDelegate {
             )
             modelContext.insert(sample)
             storedSamples.append(sample)
+        }
+
+        if modelContext.hasChanges {
+            do {
+                try modelContext.save()
+            } catch {
+                print("LocationSampleService burst save error: \(error)")
+                return storedSamples.first
+            }
         }
 
         if !dayKeys.isEmpty {
