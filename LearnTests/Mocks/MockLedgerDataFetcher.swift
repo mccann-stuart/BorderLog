@@ -35,6 +35,7 @@ class MockLedgerDataFetcher: LedgerDataFetching {
 
     var saveCalled = false
     var insertPresenceDayCalled = false
+    var insertedPresenceDayKeys: [String] = []
 
     func fetchStays(from start: Date, to end: Date) throws -> [Stay] {
         if let error = fetchStaysError { throw error }
@@ -110,6 +111,7 @@ class MockLedgerDataFetcher: LedgerDataFetching {
 
     func insertPresenceDay(_ day: PresenceDay) {
         insertPresenceDayCalled = true
+        insertedPresenceDayKeys.append(day.dayKey)
         presenceDays[day.dayKey] = day
     }
 

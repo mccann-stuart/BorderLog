@@ -121,6 +121,70 @@ final class LedgerRecomputeServiceTests: XCTestCase {
         XCTAssertEqual(count1, count2)
     }
 
+    func testRecomputeExpandsSeedByDependencyPadding() async throws {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+
+        let mock = MockLedgerDataFetcher()
+        await service.setMock(mock)
+
+        let seedDate = date(2026, 1, 10, calendar: calendar)
+        let seedKey = DayKey.make(from: seedDate, timeZone: calendar.timeZone)
+        await service.recompute(dayKeys: [seedKey])
+
+        let expectedStart = calendar.date(byAdding: .day, value: -8, to: seedDate)!
+        let expectedEnd = calendar.date(byAdding: .day, value: 8, to: seedDate)!
+        let expectedKeys = Set(makeDayKeys(from: expectedStart, to: expectedEnd, calendar: calendar))
+
+        XCTAssertEqual(Set(mock.insertedPresenceDayKeys), expectedKeys)
+    }
+
+    func testRecomputeExpandsToNearestKnownAnchors() async throws {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+
+        let mock = MockLedgerDataFetcher()
+        await service.setMock(mock)
+
+        let seedDate = date(2026, 1, 10, calendar: calendar)
+        let seedKey = DayKey.make(from: seedDate, timeZone: calendar.timeZone)
+
+        let leftAnchorDate = date(2025, 12, 28, calendar: calendar)
+        let rightAnchorDate = date(2026, 1, 24, calendar: calendar)
+        let leftAnchorKey = DayKey.make(from: leftAnchorDate, timeZone: calendar.timeZone)
+        let rightAnchorKey = DayKey.make(from: rightAnchorDate, timeZone: calendar.timeZone)
+
+        mock.presenceDays[leftAnchorKey] = knownPresenceDay(dayKey: leftAnchorKey, date: leftAnchorDate, timeZoneId: calendar.timeZone.identifier)
+        mock.presenceDays[rightAnchorKey] = knownPresenceDay(dayKey: rightAnchorKey, date: rightAnchorDate, timeZoneId: calendar.timeZone.identifier)
+
+        await service.recompute(dayKeys: [seedKey])
+
+        let expectedKeys = Set(makeDayKeys(from: leftAnchorDate, to: rightAnchorDate, calendar: calendar))
+        XCTAssertEqual(Set(mock.insertedPresenceDayKeys), expectedKeys)
+    }
+
+    func testRecomputeClampsExpandedScopeToToday() async throws {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+
+        let mock = MockLedgerDataFetcher()
+        await service.setMock(mock)
+
+        let today = calendar.startOfDay(for: Date())
+        let seedKey = DayKey.make(from: today, timeZone: calendar.timeZone)
+        let futureAnchorDate = calendar.date(byAdding: .day, value: 30, to: today)!
+        let futureAnchorKey = DayKey.make(from: futureAnchorDate, timeZone: calendar.timeZone)
+        mock.presenceDays[futureAnchorKey] = knownPresenceDay(dayKey: futureAnchorKey, date: futureAnchorDate, timeZoneId: calendar.timeZone.identifier)
+
+        await service.recompute(dayKeys: [seedKey])
+
+        let insertedDates = mock.insertedPresenceDayKeys.compactMap {
+            DayKey.date(for: $0, timeZone: calendar.timeZone).map { calendar.startOfDay(for: $0) }
+        }
+        XCTAssertFalse(insertedDates.isEmpty)
+        XCTAssertEqual(insertedDates.max(), today)
+    }
+
     private func makeDayKeys(from start: Date, to end: Date, calendar: Calendar) -> [String] {
         let timeZone = calendar.timeZone
         let startDay = calendar.startOfDay(for: start)
@@ -135,6 +199,28 @@ final class LedgerRecomputeServiceTests: XCTestCase {
             day = next
         }
         return keys
+    }
+
+    private func date(_ year: Int, _ month: Int, _ day: Int, calendar: Calendar) -> Date {
+        DateComponents(calendar: calendar, timeZone: calendar.timeZone, year: year, month: month, day: day).date!
+    }
+
+    private func knownPresenceDay(dayKey: String, date: Date, timeZoneId: String) -> PresenceDay {
+        PresenceDay(
+            dayKey: dayKey,
+            date: date,
+            timeZoneId: timeZoneId,
+            countryCode: "FR",
+            countryName: "France",
+            confidence: 1.0,
+            confidenceLabel: .high,
+            sources: .stay,
+            isOverride: false,
+            stayCount: 1,
+            photoCount: 0,
+            locationCount: 0,
+            calendarCount: 0
+        )
     }
 }
 #endif
