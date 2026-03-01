@@ -17,13 +17,12 @@ struct PresenceDayRow: View {
     }
 
     private var dayText: String {
-        let formatter = DateFormatter()
-        formatter.calendar = Calendar(identifier: .gregorian)
-        formatter.locale = .current
-        formatter.timeZone = dayTimeZone
-        formatter.dateStyle = .medium
-        formatter.timeStyle = .none
-        return formatter.string(from: day.date)
+        // ⚡ Bolt Optimization: Use lightweight Date.FormatStyle instead of expensive DateFormatter
+        // This prevents allocating a new DateFormatter every time this row view re-renders,
+        // which significantly improves scrolling performance in long lists.
+        var style = Date.FormatStyle.dateTime.year().month().day()
+        style.timeZone = dayTimeZone
+        return day.date.formatted(style)
     }
 
     private var countryText: String {
