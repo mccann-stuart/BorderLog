@@ -237,6 +237,7 @@ public actor LedgerRecomputeService {
                 existing.photoCount = result.photoCount
                 existing.locationCount = result.locationCount
                 existing.calendarCount = result.calendarCount
+                existing.isDisputed = result.isDisputed
                 existing.suggestedCountryCode1 = result.suggestedCountryCode1
                 existing.suggestedCountryName1 = result.suggestedCountryName1
                 existing.suggestedCountryCode2 = result.suggestedCountryCode2
@@ -256,6 +257,7 @@ public actor LedgerRecomputeService {
                     photoCount: result.photoCount,
                     locationCount: result.locationCount,
                     calendarCount: result.calendarCount,
+                    isDisputed: result.isDisputed,
                     suggestedCountryCode1: result.suggestedCountryCode1,
                     suggestedCountryName1: result.suggestedCountryName1,
                     suggestedCountryCode2: result.suggestedCountryCode2,

@@ -47,7 +47,7 @@ struct PresenceDayDetailView: View {
                 }
             }
 
-            if day.countryCode == nil, let code1 = day.suggestedCountryCode1, let name1 = day.suggestedCountryName1 {
+            if (day.countryCode == nil || day.isDisputed), let code1 = day.suggestedCountryCode1, let name1 = day.suggestedCountryName1 {
                 Section("Suggestions") {
                     Button(action: {
                         applySuggestion(code: code1, name: name1)
@@ -113,6 +113,18 @@ struct PresenceDayDetailView: View {
                     Text("Confidence")
                     Spacer()
                     Text(confidenceText)
+                        .foregroundStyle(.secondary)
+                }
+
+                if day.isDisputed && !day.isManuallyModified {
+                    HStack {
+                        Text("Dispute")
+                        Spacer()
+                        Label("Conflicting evidence", systemImage: "exclamationmark.triangle.fill")
+                            .foregroundStyle(.orange)
+                    }
+                    Text("Signals conflict for this day. Review evidence and apply an override if needed.")
+                        .font(.caption)
                         .foregroundStyle(.secondary)
                 }
 

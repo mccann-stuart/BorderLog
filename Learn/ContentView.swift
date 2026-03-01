@@ -66,6 +66,16 @@ struct ContentView: View {
         }.count
     }
 
+    private var disputedDayCount: Int {
+        let range = dateRange
+        return presenceDays.filter { day in
+            day.date >= range.start &&
+            day.date <= range.end &&
+            day.isDisputed &&
+            !day.isManuallyModified
+        }.count
+    }
+
     var body: some View {
         NavigationStack {
             List {
@@ -170,6 +180,14 @@ struct ContentView: View {
             Text("\(dateRange.start.formatted(formatter)) – \(dateRange.end.formatted(formatter))")
                 .font(.caption)
                 .foregroundStyle(.secondary)
+            HStack {
+                Label("Disputed", systemImage: "exclamationmark.triangle.fill")
+                    .foregroundStyle(disputedDayCount > 0 ? Color.orange : Color.secondary)
+                Spacer()
+                Text("\(disputedDayCount)")
+                    .foregroundStyle(disputedDayCount > 0 ? Color.orange : Color.secondary)
+            }
+            .font(.caption)
             Text("Click each day for evidence of location")
                 .font(.caption)
                 .foregroundStyle(.secondary)

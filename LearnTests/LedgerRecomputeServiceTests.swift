@@ -185,6 +185,67 @@ final class LedgerRecomputeServiceTests: XCTestCase {
         XCTAssertEqual(insertedDates.max(), today)
     }
 
+    func testRecomputePersistsDisputedFlagWhenUpdatingExistingPresenceDay() async throws {
+        let calendar = Calendar.current
+        let seedDate = calendar.startOfDay(for: Date())
+        let seedKey = DayKey.make(from: seedDate, timeZone: calendar.timeZone)
+
+        let mock = MockLedgerDataFetcher()
+        await service.setMock(mock)
+
+        mock.presenceDays[seedKey] = PresenceDay(
+            dayKey: seedKey,
+            date: seedDate,
+            timeZoneId: calendar.timeZone.identifier,
+            countryCode: "FR",
+            countryName: "France",
+            confidence: 0.5,
+            confidenceLabel: .medium,
+            sources: [.photo],
+            isOverride: false,
+            stayCount: 0,
+            photoCount: 1,
+            locationCount: 0,
+            calendarCount: 0,
+            isDisputed: false
+        )
+
+        mock.photos = [
+            makePhotoSignal(day: seedDate, dayKey: seedKey, countryCode: "FR", countryName: "France", assetIdHash: "asset-1"),
+            makePhotoSignal(day: seedDate, dayKey: seedKey, countryCode: "FR", countryName: "France", assetIdHash: "asset-2"),
+            makePhotoSignal(day: seedDate, dayKey: seedKey, countryCode: "ES", countryName: "Spain", assetIdHash: "asset-3")
+        ]
+
+        await service.recompute(dayKeys: [seedKey])
+
+        let updated = mock.presenceDays[seedKey]
+        XCTAssertNotNil(updated)
+        XCTAssertEqual(updated?.countryCode, "FR")
+        XCTAssertEqual(updated?.isDisputed, true)
+    }
+
+    func testRecomputePersistsDisputedFlagWhenInsertingPresenceDay() async throws {
+        let calendar = Calendar.current
+        let seedDate = calendar.startOfDay(for: Date())
+        let seedKey = DayKey.make(from: seedDate, timeZone: calendar.timeZone)
+
+        let mock = MockLedgerDataFetcher()
+        await service.setMock(mock)
+
+        mock.photos = [
+            makePhotoSignal(day: seedDate, dayKey: seedKey, countryCode: "FR", countryName: "France", assetIdHash: "asset-11"),
+            makePhotoSignal(day: seedDate, dayKey: seedKey, countryCode: "FR", countryName: "France", assetIdHash: "asset-12"),
+            makePhotoSignal(day: seedDate, dayKey: seedKey, countryCode: "ES", countryName: "Spain", assetIdHash: "asset-13")
+        ]
+
+        await service.recompute(dayKeys: [seedKey])
+
+        let inserted = mock.presenceDays[seedKey]
+        XCTAssertNotNil(inserted)
+        XCTAssertEqual(inserted?.countryCode, "FR")
+        XCTAssertEqual(inserted?.isDisputed, true)
+    }
+
     private func makeDayKeys(from start: Date, to end: Date, calendar: Calendar) -> [String] {
         let timeZone = calendar.timeZone
         let startDay = calendar.startOfDay(for: start)
@@ -220,6 +281,20 @@ final class LedgerRecomputeServiceTests: XCTestCase {
             photoCount: 0,
             locationCount: 0,
             calendarCount: 0
+        )
+    }
+
+    private func makePhotoSignal(day: Date, dayKey: String, countryCode: String, countryName: String, assetIdHash: String) -> PhotoSignal {
+        let timestamp = Calendar.current.date(byAdding: .hour, value: 12, to: day) ?? day
+        return PhotoSignal(
+            timestamp: timestamp,
+            latitude: 0,
+            longitude: 0,
+            assetIdHash: assetIdHash,
+            timeZoneId: Calendar.current.timeZone.identifier,
+            dayKey: dayKey,
+            countryCode: countryCode,
+            countryName: countryName
         )
     }
 }

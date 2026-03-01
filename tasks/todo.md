@@ -72,17 +72,48 @@
 
 # Task Plan (Data Layer Hardening Implementation)
 
-- [ ] Update `DataManager` reset/seed behavior and fix `DataManagerTests` schema + assertions.
-- [ ] Convert ingestion APIs to throwing (`PhotoSignalIngestor`, `CalendarSignalIngestor`, `LocationSampleService`) and remove silent save failures.
-- [ ] Update ingestion call sites (`SettingsView`, widget provider) to handle throwing APIs and surface errors.
-- [ ] Harden `ModelContainerProvider` recovery to non-destructive defaults with quarantine-based recovery and remove forced `try!`.
-- [ ] Optimize ingestion hotspots (calendar stale lookup index + photo preloaded hash dedupe set).
-- [ ] Add/expand tests for fetcher boundaries, calendar parsing core, photo dedupe/save behavior, and recovery helpers.
-- [ ] Run full `LearnTests` suite and targeted regressions; record results and residual risk.
+- [x] Update `DataManager` reset/seed behavior and fix `DataManagerTests` schema + assertions.
+- [x] Convert ingestion APIs to throwing (`PhotoSignalIngestor`, `CalendarSignalIngestor`, `LocationSampleService`) and remove silent save failures.
+- [x] Update ingestion call sites (`SettingsView`, widget provider) to handle throwing APIs and surface errors.
+- [x] Harden `ModelContainerProvider` recovery to non-destructive defaults with quarantine-based recovery and remove forced `try!`.
+- [x] Optimize ingestion hotspots (calendar stale lookup index + photo preloaded hash dedupe set).
+- [x] Add/expand tests for fetcher boundaries, calendar parsing core, photo dedupe/save behavior, and recovery helpers.
+- [x] Run full `LearnTests` suite and targeted regressions; record results and residual risk.
 
 ## Review (Data Layer Hardening Implementation)
 
-- Pending.
+- Implemented full reset/seed hardening in `DataManager` and `DataManagerTests`: reset now deletes `CalendarSignal` and `CountryConfig`, save is explicit before recompute kickoff, and reset/seed tests now use the full schema and assert all relevant entities are cleared.
+- Converted ingestion persistence APIs to fail-fast throwing flows:
+  - `PhotoSignalIngestor.ingest(mode:)` and `CalendarSignalIngestor.ingest(mode:)` are now `async throws -> Int`.
+  - `LocationSampleService.captureAndStore(...)` and `captureAndStoreBurst(...)` are now `async throws -> LocationSample?`.
+  - Removed silent `try? save` semantics and replaced with explicit throwing behavior.
+- Updated callers to handle throwing ingestion/location capture paths while preserving existing UX:
+  - `SettingsView` rescan actions now use `do/catch`, `defer` for busy flags, and alert surfaced error messages.
+  - Widget timeline provider catches burst-capture errors and continues with the latest persisted sample.
+  - Main app bootstrap/background callers updated to handle thrown ingestion/capture errors.
+- Hardened container recovery strategy in `ModelContainerProvider`:
+  - Removed unconditional App Group cleanup at normal startup.
+  - Replaced immediate destructive recreation with quarantine-first recovery.
+  - Added explicit heuristics to gate destructive recreation attempts.
+  - Replaced in-memory fallback `try!` with deterministic explicit fallback error handling.
+- Addressed ingest scalability bottlenecks:
+  - Calendar ingest now preloads existing signals into in-memory indexes to avoid per-event full-table operations.
+  - Photo ingest now prefetches existing hash set for the ingest window and avoids per-asset existence fetches.
+- Added high-risk tests:
+  - `RealLedgerDataFetcherTests`
+  - `CalendarFlightParsingTests` (new extracted parsing core)
+  - `PhotoSignalIngestorCoreTests`
+  - `ModelContainerProviderRecoveryTests`
+  - Expanded `DataManagerTests` and updated location concurrency tests for throwing signatures.
+- Verification:
+  - Targeted regression run:
+    - `xcodebuild test -project Learn.xcodeproj -scheme Learn -destination 'platform=iOS Simulator,name=iPhone 17' -only-testing:LearnTests/DataManagerTests -only-testing:LearnTests/RealLedgerDataFetcherTests -only-testing:LearnTests/CalendarFlightParsingTests -only-testing:LearnTests/PhotoSignalIngestorCoreTests -only-testing:LearnTests/ModelContainerProviderRecoveryTests -only-testing:LearnTests/LedgerRecomputeServiceTests -only-testing:LearnTests/LedgerRecomputeErrorTests -only-testing:LearnTests/LedgerRangeTests -only-testing:LearnTests/LocationConcurrencyTests -only-testing:LearnTests/PhotoSignalIngestorDateRangeTests`
+    - Result: **TEST SUCCEEDED**.
+  - Full suite run:
+    - `xcodebuild test -project Learn.xcodeproj -scheme Learn -destination 'platform=iOS Simulator,name=iPhone 17' -only-testing:LearnTests`
+    - Result: **TEST SUCCEEDED**.
+- Residual risk:
+  - Existing non-blocking actor-isolation warnings outside this change set remain in ledger recompute-related code paths; no test failures or runtime regressions were observed in this implementation.
 
 ---
 
@@ -103,11 +134,33 @@
 
 # Task Plan (PresenceInferenceEngine Dispute Threshold Review)
 
-- [ ] Inspect current dispute logic in `Shared/PresenceInferenceEngine.swift` and enumerate thresholds/formulas.
-- [ ] Inspect dispute-related tests in `LearnTests/InferenceEngineTests.swift` and map covered scenarios.
-- [ ] Propose 2-3 simple, low-risk ways to increase disputed day count with concrete formulas and implementation points.
-- [ ] Document tradeoffs and recommendation rationale in the final response.
+- [x] Inspect current dispute logic in `Shared/PresenceInferenceEngine.swift` and enumerate thresholds/formulas.
+- [x] Inspect dispute-related tests in `LearnTests/InferenceEngineTests.swift` and map covered scenarios.
+- [x] Propose 2-3 simple, low-risk ways to increase disputed day count with concrete formulas and implementation points.
+- [x] Document tradeoffs and recommendation rationale in the final response.
 
 ## Review (PresenceInferenceEngine Dispute Threshold Review)
+
+- Current dispute formula is `isDisputed = ((winnerScore - runnerUpScore) / totalScore) <= 0.5` when at least two countries have non-zero score.
+- Confidence label thresholds are independent of dispute status (`high >= 6`, `medium >= 3`, else `low`), and unknown days are produced when `winnerScore < 1.0`.
+- Test coverage in `InferenceEngineTests` verifies basic dispute/non-dispute behavior for photo-only signal mixes, but does not cover persistence of `isDisputed` through recompute/upsert.
+- Verification run:
+  - `xcodebuild -project Learn.xcodeproj -scheme Learn -destination 'platform=iOS Simulator,name=iPhone 17' -only-testing:LearnTests/InferenceEngineTests test`
+  - Result: **TEST SUCCEEDED**.
+
+---
+
+# Task Plan (Dispute Surfacing: Persistence Fix + Simple Visibility)
+
+- [ ] Fix `PresenceDay.isDisputed` persistence in `Shared/LedgerRecomputeService.swift` for both update and insert upsert paths.
+- [ ] Add dispute visibility chip in `Learn/PresenceDayRow.swift` for non-manual disputed days.
+- [ ] Add dispute count surface in `Learn/ContentView.swift` and include it in the range summary UI.
+- [ ] Add dispute count in `Learn/DailyLedgerView.swift` and update filter label to `Show Disputed (N)`.
+- [ ] Add dispute summary callout + unknown-or-disputed suggestion gate in `Learn/PresenceDayDetailView.swift`.
+- [ ] Add/extend unit coverage in `LearnTests/LedgerRecomputeServiceTests.swift` for disputed persistence on update and insert.
+- [ ] Run targeted tests (`LedgerRecomputeServiceTests`, `InferenceEngineTests`) and full `LearnTests` suite.
+- [ ] Record review notes, outcomes, and residual risk.
+
+## Review (Dispute Surfacing: Persistence Fix + Simple Visibility)
 
 - Pending.

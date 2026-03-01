@@ -61,6 +61,16 @@ struct PresenceDayRow: View {
                         .clipShape(Capsule())
                 }
 
+                if day.isDisputed && !day.isManuallyModified {
+                    Label("Disputed", systemImage: "exclamationmark.triangle.fill")
+                        .font(.system(.caption, design: .rounded))
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(Color.orange.opacity(0.18))
+                        .foregroundStyle(.orange)
+                        .clipShape(Capsule())
+                }
+
                 if Calendar.current.isDateInToday(day.date) {
                     Text("Today")
                         .font(.system(.caption, design: .rounded))

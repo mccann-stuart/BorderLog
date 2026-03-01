@@ -40,6 +40,10 @@ struct DailyLedgerView: View {
             .sorted { $0.date > $1.date }
     }
 
+    private var disputedDayCount: Int {
+        recentDays.filter { $0.isDisputed && !$0.isManuallyModified }.count
+    }
+
     private var anyFilterActive: Bool {
         showUnknownOnly || showLowConfidenceOnly || showMediumConfidenceOnly || showManualOnly || showDisputedOnly
     }
@@ -119,7 +123,7 @@ struct DailyLedgerView: View {
                         }
                     }
                     Toggle("Show Unknown", isOn: $showUnknownOnly)
-                    Toggle("Show Disputed", isOn: $showDisputedOnly)
+                    Toggle("Show Disputed (\(disputedDayCount))", isOn: $showDisputedOnly)
                     Toggle("Show Low Confidence", isOn: $showLowConfidenceOnly)
                     Toggle("Show Medium Confidence", isOn: $showMediumConfidenceOnly)
                     Toggle("Show Manually Marked", isOn: $showManualOnly)
