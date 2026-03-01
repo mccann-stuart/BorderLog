@@ -152,15 +152,34 @@
 
 # Task Plan (Dispute Surfacing: Persistence Fix + Simple Visibility)
 
-- [ ] Fix `PresenceDay.isDisputed` persistence in `Shared/LedgerRecomputeService.swift` for both update and insert upsert paths.
-- [ ] Add dispute visibility chip in `Learn/PresenceDayRow.swift` for non-manual disputed days.
-- [ ] Add dispute count surface in `Learn/ContentView.swift` and include it in the range summary UI.
-- [ ] Add dispute count in `Learn/DailyLedgerView.swift` and update filter label to `Show Disputed (N)`.
-- [ ] Add dispute summary callout + unknown-or-disputed suggestion gate in `Learn/PresenceDayDetailView.swift`.
-- [ ] Add/extend unit coverage in `LearnTests/LedgerRecomputeServiceTests.swift` for disputed persistence on update and insert.
-- [ ] Run targeted tests (`LedgerRecomputeServiceTests`, `InferenceEngineTests`) and full `LearnTests` suite.
-- [ ] Record review notes, outcomes, and residual risk.
+- [x] Fix `PresenceDay.isDisputed` persistence in `Shared/LedgerRecomputeService.swift` for both update and insert upsert paths.
+- [x] Add dispute visibility chip in `Learn/PresenceDayRow.swift` for non-manual disputed days.
+- [x] Add dispute count surface in `Learn/ContentView.swift` and include it in the range summary UI.
+- [x] Add dispute count in `Learn/DailyLedgerView.swift` and update filter label to `Show Disputed (N)`.
+- [x] Add dispute summary callout + unknown-or-disputed suggestion gate in `Learn/PresenceDayDetailView.swift`.
+- [x] Add/extend unit coverage in `LearnTests/LedgerRecomputeServiceTests.swift` for disputed persistence on update and insert.
+- [x] Run targeted tests (`LedgerRecomputeServiceTests`, `InferenceEngineTests`) and full `LearnTests` suite.
+- [x] Record review notes, outcomes, and residual risk.
 
 ## Review (Dispute Surfacing: Persistence Fix + Simple Visibility)
 
-- Pending.
+- Fixed disputed persistence in `LedgerRecomputeService.upsertPresenceDays(...)`:
+  - Existing row path now sets `existing.isDisputed = result.isDisputed`.
+  - Insert path now passes `isDisputed: result.isDisputed` into `PresenceDay(...)`.
+- Added lightweight dispute visibility in UI:
+  - `PresenceDayRow` now renders a `Disputed` warning capsule for `isDisputed && !isManuallyModified`.
+  - `ContentView` now computes and displays `disputedDayCount` in the 2-year summary block.
+  - `DailyLedgerView` now computes `disputedDayCount` and shows `Show Disputed (N)` in filter menu.
+  - `PresenceDayDetailView` now shows dispute status in Summary and enables Suggestions for unknown or disputed days (when suggestion fields exist).
+- Added regression coverage in `LedgerRecomputeServiceTests`:
+  - `testRecomputePersistsDisputedFlagWhenUpdatingExistingPresenceDay`
+  - `testRecomputePersistsDisputedFlagWhenInsertingPresenceDay`
+- Verification:
+  - Targeted:
+    - `xcodebuild -project Learn.xcodeproj -scheme Learn -destination 'platform=iOS Simulator,name=iPhone 17' -only-testing:LearnTests/LedgerRecomputeServiceTests -only-testing:LearnTests/InferenceEngineTests test`
+    - Result: **TEST SUCCEEDED**.
+  - Full suite:
+    - `xcodebuild -project Learn.xcodeproj -scheme Learn -destination 'platform=iOS Simulator,name=iPhone 17' -only-testing:LearnTests test`
+    - Result: **TEST SUCCEEDED**.
+- Residual risk:
+  - Existing non-blocking actor-isolation warnings in `LedgerRecomputeService`/related types remain unchanged in this task.
