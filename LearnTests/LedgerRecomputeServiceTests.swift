@@ -160,7 +160,7 @@ final class LedgerRecomputeServiceTests: XCTestCase {
         await service.recompute(dayKeys: [seedKey])
 
         let expectedKeys = Set(makeDayKeys(from: leftAnchorDate, to: rightAnchorDate, calendar: calendar))
-        XCTAssertEqual(Set(mock.insertedPresenceDayKeys), expectedKeys)
+        XCTAssertEqual(Set(mock.presenceDays.keys), expectedKeys)
     }
 
     func testRecomputeClampsExpandedScopeToToday() async throws {

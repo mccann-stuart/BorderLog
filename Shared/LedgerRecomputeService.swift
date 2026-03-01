@@ -304,7 +304,18 @@ public actor LedgerRecomputeService {
 
         var scopeStart = max(paddedStart, lowerBound)
         var scopeEnd = min(paddedEnd, today)
-        guard scopeStart <= scopeEnd else { return nil }
+        if scopeStart > scopeEnd {
+            // Clamp out-of-bound seeds to the nearest valid in-range day.
+            if mutationEnd < lowerBound {
+                scopeStart = lowerBound
+                scopeEnd = lowerBound
+            } else if mutationStart > today {
+                scopeStart = today
+                scopeEnd = today
+            } else {
+                return nil
+            }
+        }
 
         if let leftAnchor = try dataFetcher.fetchNearestKnownPresenceDay(before: scopeStart) {
             scopeStart = max(calendar.startOfDay(for: leftAnchor.date), lowerBound)
