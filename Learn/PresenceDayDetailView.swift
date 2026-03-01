@@ -186,7 +186,12 @@ struct PresenceDayDetailView: View {
             )
             modelContext.insert(newOverride)
         }
-        try? modelContext.save()
+        do {
+            try modelContext.save()
+            recomputeImpactedDay(normalizedDate)
+        } catch {
+            print("Failed to save override suggestion: \(error)")
+        }
     }
 
     private func deleteOverride() {
@@ -200,7 +205,22 @@ struct PresenceDayDetailView: View {
                 modelContext.delete(match)
             }
         }
-        try? modelContext.save()
+        do {
+            try modelContext.save()
+            recomputeImpactedDay(normalizedDate)
+        } catch {
+            print("Failed to delete override: \(error)")
+        }
+    }
+
+    private func recomputeImpactedDay(_ date: Date) {
+        let calendar = Calendar.current
+        let dayKey = DayKey.make(from: calendar.startOfDay(for: date), timeZone: calendar.timeZone)
+        let container = modelContext.container
+        Task {
+            let service = LedgerRecomputeService(modelContainer: container)
+            await service.recompute(dayKeys: [dayKey])
+        }
     }
 }
 

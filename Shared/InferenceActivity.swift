@@ -30,6 +30,36 @@ final class InferenceActivity: ObservableObject {
 
     private init() {}
 
+    var isRefreshInProgress: Bool {
+        isPhotoScanning ||
+            isCalendarScanning ||
+            isInferenceRunning ||
+            isLocationBatching ||
+            isGeoLookupPaused
+    }
+
+    var refreshStatusText: String {
+        if isInferenceRunning {
+            return "Refreshing data: updating daily ledger \(percentText(scanned: inferenceProgress, total: inferenceTotal))."
+        }
+        if isPhotoScanning {
+            return "Refreshing data: scanning photos \(percentText(scanned: photoScanScanned, total: photoScanTotal))."
+        }
+        if isCalendarScanning {
+            return "Refreshing data: scanning calendar \(percentText(scanned: calendarScanScanned, total: calendarScanTotal))."
+        }
+        if isLocationBatching && isGeoLookupPaused {
+            return "Refreshing data: batching locations and waiting for geo lookups."
+        }
+        if isLocationBatching {
+            return "Refreshing data: batching locations."
+        }
+        if isGeoLookupPaused {
+            return "Refreshing data: waiting for geo lookup capacity."
+        }
+        return "Refreshing data."
+    }
+
     func beginPhotoScan(totalAssets: Int) {
         let wasScanning = photoScanCount > 0
         photoScanCount += 1
@@ -129,5 +159,12 @@ final class InferenceActivity: ObservableObject {
             inferenceProgress = 0
             inferenceTotal = 0
         }
+    }
+
+    private func percentText(scanned: Int, total: Int) -> String {
+        guard total > 0 else { return "in progress" }
+        let clamped = min(max(scanned, 0), total)
+        let percent = Int((Double(clamped) / Double(total) * 100).rounded())
+        return "\(percent)%"
     }
 }

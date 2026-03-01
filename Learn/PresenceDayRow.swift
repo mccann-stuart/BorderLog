@@ -17,13 +17,11 @@ struct PresenceDayRow: View {
     }
 
     private var dayText: String {
-        let formatter = DateFormatter()
-        formatter.calendar = Calendar(identifier: .gregorian)
-        formatter.locale = .current
-        formatter.timeZone = dayTimeZone
-        formatter.dateStyle = .medium
-        formatter.timeStyle = .none
-        return formatter.string(from: day.date)
+        // Optimization: Use iOS 15+ FormatStyle API instead of allocating an expensive DateFormatter
+        // per row render. FormatStyle is a lightweight value type.
+        var format = Date.FormatStyle(date: .medium, time: .none)
+        format.timeZone = dayTimeZone
+        return day.date.formatted(format)
     }
 
     private var countryText: String {

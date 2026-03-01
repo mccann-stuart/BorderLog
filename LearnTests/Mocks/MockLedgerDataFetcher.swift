@@ -35,6 +35,7 @@ class MockLedgerDataFetcher: LedgerDataFetching {
 
     var saveCalled = false
     var insertPresenceDayCalled = false
+    var insertedPresenceDayKeys: [String] = []
 
     func fetchStays(from start: Date, to end: Date) throws -> [Stay] {
         if let error = fetchStaysError { throw error }
@@ -92,8 +93,25 @@ class MockLedgerDataFetcher: LedgerDataFetching {
         return Set(keys)
     }
 
+    func fetchNearestKnownPresenceDay(before date: Date) throws -> PresenceDay? {
+        presenceDays.values
+            .filter { day in
+                day.date < date && (day.countryCode != nil || day.countryName != nil)
+            }
+            .max(by: { $0.date < $1.date })
+    }
+
+    func fetchNearestKnownPresenceDay(after date: Date) throws -> PresenceDay? {
+        presenceDays.values
+            .filter { day in
+                day.date > date && (day.countryCode != nil || day.countryName != nil)
+            }
+            .min(by: { $0.date < $1.date })
+    }
+
     func insertPresenceDay(_ day: PresenceDay) {
         insertPresenceDayCalled = true
+        insertedPresenceDayKeys.append(day.dayKey)
         presenceDays[day.dayKey] = day
     }
 

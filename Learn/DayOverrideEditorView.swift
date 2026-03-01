@@ -78,7 +78,16 @@ struct DayOverrideEditorView: View {
         .confirmationDialog("Delete this override?", isPresented: $isConfirmingDelete) {
             Button("Delete", role: .destructive) {
                 if let existingOverride {
+                    let deletedDate = existingOverride.date
                     modelContext.delete(existingOverride)
+                    do {
+                        try modelContext.save()
+                        recomputeImpactedOverrideDays([deletedDate])
+                        dismiss()
+                    } catch {
+                        print("Failed to delete override: \(error)")
+                    }
+                    return
                 }
                 dismiss()
             }
@@ -170,6 +179,15 @@ struct DayOverrideEditorView: View {
     }
 
     private func applySave(replacing: DayOverride?) {
+        var impactedDates = Set<Date>()
+        if let existingOverride {
+            impactedDates.insert(existingOverride.date)
+        }
+        impactedDates.insert(draft.date)
+        if let replacing {
+            impactedDates.insert(replacing.date)
+        }
+
         if let replacing {
             modelContext.delete(replacing)
         }
@@ -196,7 +214,33 @@ struct DayOverrideEditorView: View {
             modelContext.insert(newOverride)
         }
 
-        dismiss()
+        do {
+            try modelContext.save()
+            recomputeImpactedOverrideDays(impactedDates)
+            dismiss()
+        } catch {
+            print("Failed to save override: \(error)")
+        }
+    }
+
+    private func recomputeImpactedOverrideDays(_ dates: Set<Date>) {
+        let dayKeys = makeDayKeys(for: dates)
+        guard !dayKeys.isEmpty else { return }
+
+        let container = modelContext.container
+        Task {
+            let service = LedgerRecomputeService(modelContainer: container)
+            await service.recompute(dayKeys: dayKeys)
+        }
+    }
+
+    private func makeDayKeys(for dates: Set<Date>) -> [String] {
+        let calendar = Calendar.current
+        let timeZone = calendar.timeZone
+        return Array(Set(dates.map { date in
+            let normalized = calendar.startOfDay(for: date)
+            return DayKey.make(from: normalized, timeZone: timeZone)
+        }))
     }
 }
 

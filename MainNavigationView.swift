@@ -53,6 +53,11 @@ struct MainNavigationView: View {
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .safeAreaInset(edge: .top, spacing: 8) {
+                RefreshStatusBannerView()
+                    .padding(.horizontal, 12)
+                    .padding(.top, 4)
+            }
         }
         .fullScreenCover(isPresented: .init(get: { !hasCompletedOnboarding }, set: { _ in })) {
             OnboardingView()
@@ -169,6 +174,34 @@ struct MainNavigationView: View {
             try? await Task.sleep(nanoseconds: 200_000_000)
         }
         return PHPhotoLibrary.authorizationStatus(for: .readWrite)
+    }
+}
+
+private struct RefreshStatusBannerView: View {
+    @ObservedObject private var inferenceActivity = InferenceActivity.shared
+
+    var body: some View {
+        if inferenceActivity.isRefreshInProgress {
+            HStack(spacing: 10) {
+                ProgressView()
+                    .controlSize(.small)
+                Text(inferenceActivity.refreshStatusText)
+                    .font(.caption.weight(.semibold))
+                    .lineLimit(2)
+                    .multilineTextAlignment(.leading)
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
+            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .strokeBorder(Color.accentColor.opacity(0.2), lineWidth: 1)
+            }
+            .shadow(color: Color.black.opacity(0.06), radius: 5, y: 1)
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel("Data refresh in progress. \(inferenceActivity.refreshStatusText)")
+        }
     }
 }
 

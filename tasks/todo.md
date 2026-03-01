@@ -1,10 +1,15 @@
 # TODO
 
-- [ ] Plan: Update weekly changelog for week of Feb 24–Mar 1, 2026.
-- [ ] Review git history (week window) and extract repo-supported highlights.
-- [ ] Collect merged PR links for the same window.
-- [ ] Update README Weekly Changelog block using existing format.
-- [ ] Verify README diff against git history evidence.
+- [x] Plan: Locate shared UI components/modifiers for top banners, chips, and loading status.
+- [x] Search `Learn/` and `Shared/` for existing reusable banner/chip/loading views and modifiers.
+- [x] Identify best integration point for a reusable refresh banner view.
+- [x] Summarize concise file references and rationale.
+
+- [x] Plan: Add shared refresh-in-progress UI indicator across existing pages.
+- [x] Define shared "data refresh in progress" state API on `InferenceActivity`.
+- [x] Implement reusable top banner component for refresh progress status.
+- [x] Attach banner to main navigation so Dashboard, Details, and Settings show refresh state.
+- [x] Validate build compiles for modified SwiftUI files.
 
 - [x] Plan: Add "Two Years Prior" visited countries timeframe (calendar year two years ago).
 - [x] Update VisitedCountriesTimeframe enum + contains logic.
@@ -70,3 +75,5 @@
 - [x] Xcode diagnostics: no issues in `Learn/Shared/ModelContainerProvider.swift`.
 - [x] Added widget last write indicator in Settings/Data Sources, reading latest widget `LocationSample`.
 - [x] Xcode diagnostics: no issues in `Learn/SettingsView.swift`.
+- [x] Repo scan complete for banner/chip/loading reuse points; refresh status banner is implemented and hosted from `MainNavigationView.swift`.
+- [x] Build: `xcodebuild -project Learn.xcodeproj -scheme Learn -destination 'generic/platform=iOS' build` after refresh-banner integration.
