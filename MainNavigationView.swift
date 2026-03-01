@@ -139,7 +139,11 @@ struct MainNavigationView: View {
         await bootstrapPhotoScanIfNeeded()
 
         let calendarIngestor = CalendarSignalIngestor(modelContainer: container, resolver: CLGeocoderCountryResolver())
-        _ = try? await calendarIngestor.ingest(mode: .auto)
+        do {
+            _ = try await calendarIngestor.ingest(mode: .auto)
+        } catch {
+            print("MainNavigationView calendar auto ingest failed: \(error)")
+        }
     }
 
     @MainActor
@@ -159,7 +163,11 @@ struct MainNavigationView: View {
         guard needsPhotoBootstrap() else { return }
 
         let ingestor = PhotoSignalIngestor(modelContainer: modelContext.container, resolver: CLGeocoderCountryResolver())
-        _ = try? await ingestor.ingest(mode: .sequenced)
+        do {
+            _ = try await ingestor.ingest(mode: .sequenced)
+        } catch {
+            print("MainNavigationView photo bootstrap ingest failed: \(error)")
+        }
     }
 
     @MainActor
