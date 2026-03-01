@@ -83,3 +83,31 @@
 ## Review (Data Layer Hardening Implementation)
 
 - Pending.
+
+---
+
+# Task Plan (PresenceDay Dispute Visibility Audit)
+
+- [x] Scan `ContentView`, `DailyLedgerView`, `PresenceDayRow`, and `PresenceDayDetailView` for existing dispute-related UI.
+- [x] Identify smallest UI-only changes that expose `PresenceDay.isDisputed` without schema changes.
+- [x] Prepare a 3-change proposal with exact file paths and line blocks.
+- [x] Document review notes with rationale and risk.
+
+## Review (PresenceDay Dispute Visibility Audit)
+
+- Confirmed dispute state exists in model (`PresenceDay.isDisputed`) and is currently filterable in `ContentView` and `DailyLedgerView`.
+- Found the core visibility gap: list rows and detail summary do not explicitly label disputed days; dispute suggestions are also gated to unknown-country days only.
+- Selected three smallest changes that keep existing schema and data flow: row badge, detail dispute status/suggestions visibility, and list-level dispute count exposure in filters.
+
+---
+
+# Task Plan (PresenceInferenceEngine Dispute Threshold Review)
+
+- [ ] Inspect current dispute logic in `Shared/PresenceInferenceEngine.swift` and enumerate thresholds/formulas.
+- [ ] Inspect dispute-related tests in `LearnTests/InferenceEngineTests.swift` and map covered scenarios.
+- [ ] Propose 2-3 simple, low-risk ways to increase disputed day count with concrete formulas and implementation points.
+- [ ] Document tradeoffs and recommendation rationale in the final response.
+
+## Review (PresenceInferenceEngine Dispute Threshold Review)
+
+- Pending.
