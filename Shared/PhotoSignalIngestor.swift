@@ -20,6 +20,7 @@ actor PhotoSignalIngestor {
     }
 
     private var resolver: CountryResolving?
+    internal var saveContextOverride: (@Sendable () throws -> Void)?
 
     struct IngestQueryConfig {
         let startDate: Date
@@ -34,7 +35,7 @@ actor PhotoSignalIngestor {
         self.resolver = resolver
     }
 
-    func ingest(mode: IngestMode) async -> Int {
+    func ingest(mode: IngestMode) async throws -> Int {
         let status = PHPhotoLibrary.authorizationStatus(for: .readWrite)
         guard status == .authorized || status == .limited else {
             return 0
@@ -70,6 +71,7 @@ actor PhotoSignalIngestor {
 
         let assets = PHAsset.fetchAssets(with: .image, options: options)
         let assetCount = assets.count
+        var existingAssetHashes = try fetchExistingAssetIdHashes(config: config)
 
         if assetCount > 0 {
             await MainActor.run {
@@ -99,7 +101,7 @@ actor PhotoSignalIngestor {
                 }
 
                 let assetIdHash = Self.hashAssetId(asset.localIdentifier)
-                if Self.photoSignalExists(assetIdHash: assetIdHash, in: modelContext) {
+                if existingAssetHashes.contains(assetIdHash) {
                     continue
                 }
 
@@ -132,6 +134,7 @@ actor PhotoSignalIngestor {
                     countryName: resolution?.countryName
                 )
                 modelContext.insert(signal)
+                existingAssetHashes.insert(assetIdHash)
                 touchedDayKeys.insert(dayKey)
 
                 if mode != .sequenced {
@@ -146,7 +149,7 @@ actor PhotoSignalIngestor {
                 processed += 1
 
                 if processed % saveEvery == 0, modelContext.hasChanges {
-                    try? modelContext.save()
+                    try saveContextIfNeeded()
                 }
             }
         }
@@ -156,9 +159,7 @@ actor PhotoSignalIngestor {
             state.lastFullScanAt = now
         }
 
-        if modelContext.hasChanges {
-            try? modelContext.save()
-        }
+        try saveContextIfNeeded()
 
         if !touchedDayKeys.isEmpty {
             let recomputeService = LedgerRecomputeService(modelContainer: modelContainer)
@@ -203,10 +204,32 @@ actor PhotoSignalIngestor {
         return state
     }
 
-    private static func photoSignalExists(assetIdHash: String, in modelContext: ModelContext) -> Bool {
-        let descriptor = FetchDescriptor<PhotoSignal>(predicate: #Predicate { $0.assetIdHash == assetIdHash })
-        let count = (try? modelContext.fetchCount(descriptor)) ?? 0
-        return count > 0
+    private func fetchExistingAssetIdHashes(config: IngestQueryConfig) throws -> Set<String> {
+        let startDate = config.startDate
+        let descriptor: FetchDescriptor<PhotoSignal>
+        if let endDate = config.endDate {
+            descriptor = FetchDescriptor<PhotoSignal>(
+                predicate: #Predicate { signal in
+                    signal.timestamp >= startDate && signal.timestamp <= endDate
+                }
+            )
+        } else {
+            descriptor = FetchDescriptor<PhotoSignal>(
+                predicate: #Predicate { signal in
+                    signal.timestamp >= startDate
+                }
+            )
+        }
+        return Set(try modelContext.fetch(descriptor).map(\.assetIdHash))
+    }
+
+    private func saveContextIfNeeded() throws {
+        guard modelContext.hasChanges else { return }
+        if let saveContextOverride {
+            try saveContextOverride()
+        } else {
+            try modelContext.save()
+        }
     }
 
     private static func hashAssetId(_ identifier: String) -> String {

@@ -100,10 +100,14 @@ struct MainNavigationView: View {
             // If fetching fails, still attempt a best-effort capture.
         }
 
-        _ = await locationService.captureAndStoreBurst(
-            source: .app,
-            modelContext: modelContext
-        )
+        do {
+            _ = try await locationService.captureAndStoreBurst(
+                source: .app,
+                modelContext: modelContext
+            )
+        } catch {
+            // Keep launch flow resilient if location persistence fails.
+        }
     }
 
     @MainActor
@@ -123,7 +127,11 @@ struct MainNavigationView: View {
             await bootstrapPhotoScanIfNeeded()
 
             let calendarIngestor = CalendarSignalIngestor(modelContainer: container, resolver: CLGeocoderCountryResolver())
-            _ = await calendarIngestor.ingest(mode: .manualFullScan)
+            do {
+                _ = try await calendarIngestor.ingest(mode: .manualFullScan)
+            } catch {
+                return
+            }
             didBootstrapInference = true
             return
         }
@@ -131,7 +139,7 @@ struct MainNavigationView: View {
         await bootstrapPhotoScanIfNeeded()
 
         let calendarIngestor = CalendarSignalIngestor(modelContainer: container, resolver: CLGeocoderCountryResolver())
-        _ = await calendarIngestor.ingest(mode: .auto)
+        _ = try? await calendarIngestor.ingest(mode: .auto)
     }
 
     @MainActor
@@ -151,7 +159,7 @@ struct MainNavigationView: View {
         guard needsPhotoBootstrap() else { return }
 
         let ingestor = PhotoSignalIngestor(modelContainer: modelContext.container, resolver: CLGeocoderCountryResolver())
-        _ = await ingestor.ingest(mode: .sequenced)
+        _ = try? await ingestor.ingest(mode: .sequenced)
     }
 
     @MainActor

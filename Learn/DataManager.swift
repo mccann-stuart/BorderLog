@@ -35,8 +35,13 @@ struct DataManager {
         try modelContext.delete(model: DayOverride.self)
         try modelContext.delete(model: LocationSample.self)
         try modelContext.delete(model: PhotoSignal.self)
+        try modelContext.delete(model: CalendarSignal.self)
         try modelContext.delete(model: PresenceDay.self)
         try modelContext.delete(model: PhotoIngestState.self)
+        try modelContext.delete(model: CountryConfig.self)
+        if modelContext.hasChanges {
+            try modelContext.save()
+        }
         Self.logger.info("All data reset.")
     }
 
@@ -120,6 +125,10 @@ struct DataManager {
             countryName: "France"
         )
         modelContext.insert(samplePhoto)
+
+        if modelContext.hasChanges {
+            try modelContext.save()
+        }
 
         let container = modelContext.container
         Task {

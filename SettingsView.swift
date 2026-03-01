@@ -25,6 +25,7 @@ struct SettingsView: View {
     @State private var calendarStatus: EKAuthorizationStatus = EKEventStore.authorizationStatus(for: .event)
     @State private var isIngestingPhotos = false
     @State private var isIngestingCalendar = false
+    @State private var ingestionError: String?
     @State private var locationService = LocationSampleService()
     @State private var widgetLastWriteDate: Date?
     @AppStorage("didBootstrapInference") private var didBootstrapInference = false
@@ -317,6 +318,11 @@ struct SettingsView: View {
             } message: {
                 Text(cloudKitDeleteError ?? "Unknown error.")
             }
+            .alert("Ingestion failed", isPresented: ingestionErrorPresented) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text(ingestionError ?? "Unknown error.")
+            }
             .onAppear {
                 refreshPermissions()
                 refreshWidgetLastWriteDate()
@@ -465,20 +471,28 @@ struct SettingsView: View {
     private func rescanPhotos() {
         isIngestingPhotos = true
         let container = modelContext.container
-        Task {
-            let ingestor = PhotoSignalIngestor(modelContainer: container, resolver: CLGeocoderCountryResolver())
-            _ = await ingestor.ingest(mode: .sequenced)
-            await MainActor.run { isIngestingPhotos = false }
+        Task { @MainActor in
+            defer { isIngestingPhotos = false }
+            do {
+                let ingestor = PhotoSignalIngestor(modelContainer: container, resolver: CLGeocoderCountryResolver())
+                _ = try await ingestor.ingest(mode: .sequenced)
+            } catch {
+                ingestionError = error.localizedDescription
+            }
         }
     }
 
     private func rescanCalendar() {
         isIngestingCalendar = true
         let container = modelContext.container
-        Task {
-            let ingestor = CalendarSignalIngestor(modelContainer: container, resolver: CLGeocoderCountryResolver())
-            _ = await ingestor.ingest(mode: .manualFullScan)
-            await MainActor.run { isIngestingCalendar = false }
+        Task { @MainActor in
+            defer { isIngestingCalendar = false }
+            do {
+                let ingestor = CalendarSignalIngestor(modelContainer: container, resolver: CLGeocoderCountryResolver())
+                _ = try await ingestor.ingest(mode: .manualFullScan)
+            } catch {
+                ingestionError = error.localizedDescription
+            }
         }
     }
 
@@ -595,6 +609,13 @@ struct SettingsView: View {
         Binding(
             get: { cloudKitDeleteError != nil },
             set: { if !$0 { cloudKitDeleteError = nil } }
+        )
+    }
+
+    private var ingestionErrorPresented: Binding<Bool> {
+        Binding(
+            get: { ingestionError != nil },
+            set: { if !$0 { ingestionError = nil } }
         )
     }
 }

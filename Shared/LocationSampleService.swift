@@ -36,7 +36,7 @@ final class LocationSampleService: NSObject, CLLocationManagerDelegate {
         source: LocationSampleSource,
         modelContext: ModelContext,
         resolver: CountryResolving? = nil
-    ) async -> LocationSample? {
+    ) async throws -> LocationSample? {
         let resolver = resolver ?? CLGeocoderCountryResolver()
         let status = manager.authorizationStatus
         guard status == .authorizedWhenInUse || status == .authorizedAlways else {
@@ -68,7 +68,7 @@ final class LocationSampleService: NSObject, CLLocationManagerDelegate {
             try modelContext.save()
         } catch {
             print("LocationSampleService save error: \(error)")
-            return sample
+            throw error
         }
 
         let container = modelContext.container
@@ -85,7 +85,7 @@ final class LocationSampleService: NSObject, CLLocationManagerDelegate {
         maxSamples: Int = 6,
         maxDuration: TimeInterval = 8,
         maxSampleAge: TimeInterval = 120
-    ) async -> LocationSample? {
+    ) async throws -> LocationSample? {
         let resolver = resolver ?? CLGeocoderCountryResolver()
         let status = manager.authorizationStatus
         guard status == .authorizedWhenInUse || status == .authorizedAlways else {
@@ -141,7 +141,7 @@ final class LocationSampleService: NSObject, CLLocationManagerDelegate {
                 try modelContext.save()
             } catch {
                 print("LocationSampleService burst save error: \(error)")
-                return storedSamples.first
+                throw error
             }
         }
 

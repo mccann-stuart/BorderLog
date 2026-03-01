@@ -18,6 +18,7 @@ actor CalendarSignalIngestor {
     }
 
     private var resolver: CountryResolving?
+    internal var saveContextOverride: (@Sendable () throws -> Void)?
 
     init(modelContainer: ModelContainer, resolver: CountryResolving) {
         self.modelContainer = modelContainer
@@ -26,7 +27,7 @@ actor CalendarSignalIngestor {
         self.resolver = resolver
     }
 
-    func ingest(mode: IngestMode) async -> Int {
+    func ingest(mode: IngestMode) async throws -> Int {
         let store = EKEventStore()
 
         let status = EKEventStore.authorizationStatus(for: .event)
@@ -77,6 +78,11 @@ actor CalendarSignalIngestor {
 
         var processed = 0
         var touchedDayKeys: Set<String> = []
+        let existingSignals = try modelContext.fetch(FetchDescriptor<CalendarSignal>())
+        var existingSignalByIdentifier: [String: CalendarSignal] = [:]
+        for signal in existingSignals {
+            existingSignalByIdentifier[signal.eventIdentifier] = signal
+        }
 
         let activeResolver: CountryResolving
         if let storedResolver = self.resolver {
@@ -99,21 +105,20 @@ actor CalendarSignalIngestor {
             let endId = id + "#end"
             var signalsCreatedOrDeleted = 0
 
-            guard shouldIngest(event) else { 
-                let descriptor = FetchDescriptor<CalendarSignal>()
-                if let signals = try? modelContext.fetch(descriptor) {
-                    let stales = signals.filter { $0.eventIdentifier == id || $0.eventIdentifier == endId }
-                    for stale in stales {
-                        touchedDayKeys.insert(stale.dayKey)
-                        modelContext.delete(stale)
-                        signalsCreatedOrDeleted += 1
-                    }
+            guard shouldIngest(event) else {
+                for staleIdentifier in [id, endId] {
+                    guard let stale = existingSignalByIdentifier.removeValue(forKey: staleIdentifier) else { continue }
+                    touchedDayKeys.insert(stale.dayKey)
+                    modelContext.delete(stale)
+                    signalsCreatedOrDeleted += 1
                 }
                 if signalsCreatedOrDeleted > 0 {
                     processed += 1
-                    if processed % 10 == 0 { try? modelContext.save() }
+                    if processed % 10 == 0 {
+                        try saveContextIfNeeded()
+                    }
                 }
-                continue 
+                continue
             }
             guard let startDate = event.startDate else { continue }
 
@@ -151,8 +156,8 @@ actor CalendarSignalIngestor {
 
             // 1. Create Start Signal
             if startLocationString != nil || startCoordinate != nil {
-                if !calendarSignalExists(eventIdentifier: id, in: modelContext) {
-                    if await resolveAndCreateSignal(
+                if existingSignalByIdentifier[id] == nil {
+                    if let signal = await resolveAndCreateSignal(
                         locationString: startLocationString,
                         coordinate: startCoordinate,
                         date: startDate,
@@ -161,17 +166,17 @@ actor CalendarSignalIngestor {
                         activeResolver: activeResolver
                     ) {
                         signalsCreatedOrDeleted += 1
-                        let dayKey = await DayKey.make(from: startDate, timeZone: event.timeZone ?? .current)
-                        touchedDayKeys.insert(dayKey)
+                        touchedDayKeys.insert(signal.dayKey)
+                        existingSignalByIdentifier[id] = signal
                     }
                 }
             }
 
             // 2. Create End Signal (Destination)
             if let to = parsedTo {
-                if !calendarSignalExists(eventIdentifier: endId, in: modelContext) {
+                if existingSignalByIdentifier[endId] == nil {
                     let nextDay = calendar.date(byAdding: .day, value: 1, to: startDate) ?? event.endDate ?? startDate
-                    if await resolveAndCreateSignal(
+                    if let signal = await resolveAndCreateSignal(
                         locationString: to,
                         coordinate: nil, // Destination usually just string unless we parsed it from somewhere else
                         date: nextDay, // Signal at arrival on the next day
@@ -180,8 +185,8 @@ actor CalendarSignalIngestor {
                         activeResolver: activeResolver
                     ) {
                         signalsCreatedOrDeleted += 1
-                        let dayKey = await DayKey.make(from: nextDay, timeZone: event.timeZone ?? .current)
-                        touchedDayKeys.insert(dayKey)
+                        touchedDayKeys.insert(signal.dayKey)
+                        existingSignalByIdentifier[endId] = signal
                     }
                 }
             }
@@ -189,14 +194,12 @@ actor CalendarSignalIngestor {
             if signalsCreatedOrDeleted > 0 {
                 processed += 1
                 if processed % 10 == 0 {
-                     try? modelContext.save()
+                    try saveContextIfNeeded()
                 }
             }
         }
 
-        if modelContext.hasChanges {
-            try? modelContext.save()
-        }
+        try saveContextIfNeeded()
 
         if !touchedDayKeys.isEmpty {
             let recomputeService = LedgerRecomputeService(modelContainer: modelContainer)
@@ -207,115 +210,17 @@ actor CalendarSignalIngestor {
     }
 
     private func shouldIngest(_ event: EKEvent) -> Bool {
-        let candidates = [
-            event.title,
-            event.location,
-            event.structuredLocation?.title,
-            event.notes
-        ].compactMap { $0 }
-
-        for text in candidates {
-            if text.localizedCaseInsensitiveContains("Friend:") {
-                return false
-            }
-        }
-
-        for text in candidates {
-            if text.contains("✈") || text.localizedCaseInsensitiveContains("Flight") {
-                return true
-            }
-        }
-        return false
-    }
-
-    private func calendarSignalExists(eventIdentifier: String, in modelContext: ModelContext) -> Bool {
-        let descriptor = FetchDescriptor<CalendarSignal>(predicate: #Predicate { $0.eventIdentifier == eventIdentifier })
-        let count = (try? modelContext.fetchCount(descriptor)) ?? 0
-        return count > 0
+        let snapshot = CalendarEventTextSnapshot(
+            title: event.title,
+            location: event.location,
+            structuredLocationTitle: event.structuredLocation?.title,
+            notes: event.notes
+        )
+        return CalendarFlightParsing.shouldIngest(event: snapshot)
     }
 
     private func parseFlightInfo(_ event: EKEvent) -> (from: String?, to: String?) {
-        let title = event.title ?? ""
-        let notes = event.notes ?? ""
-
-        let candidates = [title, notes]
-
-        // Patterns
-        // 1. "From A to B"
-        // 2. "Flight to B"
-        // 3. "A ✈ B"
-        // 4. "LHR - JFK", "LHR/JFK", "JNB -> LHR", "JNB → LHR" (3-letter codes)
-
-        // We use NSRegularExpression for compatibility
-        let patternFromTo = try? NSRegularExpression(pattern: "from\\s+(.+?)\\s+to\\s+(.+)", options: [.caseInsensitive])
-        let patternTo = try? NSRegularExpression(pattern: "flight\\s+to\\s+(.+)", options: [.caseInsensitive])
-        let patternPlane = try? NSRegularExpression(pattern: "(.+?)\\s*✈\\s*(.+)", options: [])
-        let patternPlaneEmoji = try? NSRegularExpression(pattern: "(.+?)\\s*✈️\\s*(.+)", options: [])
-
-        // Updated to include arrows (->, →)
-        let patternCodes = try? NSRegularExpression(pattern: "\\b([A-Z]{3})\\s*(?:[-/→]|->)\\s*([A-Z]{3})\\b", options: [])
-
-        let bestFrom: String? = nil
-        var bestTo: String? = nil
-
-        for text in candidates {
-            if text.isEmpty { continue }
-            let nsString = text as NSString
-            let range = NSRange(location: 0, length: nsString.length)
-
-            // Priority: Find a match that gives BOTH from and to
-
-            // Check "LHR - JFK", "LHR/JFK", "JNB -> LHR"
-            if let p = patternCodes, let match = p.firstMatch(in: text, options: [], range: range) {
-                if match.numberOfRanges >= 3 {
-                    return (
-                        nsString.substring(with: match.range(at: 1)),
-                        nsString.substring(with: match.range(at: 2))
-                    )
-                }
-            }
-
-            // Check "A ✈ B"
-            if let p = patternPlane, let match = p.firstMatch(in: text, options: [], range: range) {
-                if match.numberOfRanges >= 3 {
-                    return (
-                        nsString.substring(with: match.range(at: 1)).trimmingCharacters(in: .whitespacesAndNewlines),
-                        nsString.substring(with: match.range(at: 2)).trimmingCharacters(in: .whitespacesAndNewlines)
-                    )
-                }
-            }
-
-            if let p = patternPlaneEmoji, let match = p.firstMatch(in: text, options: [], range: range) {
-                if match.numberOfRanges >= 3 {
-                    return (
-                        nsString.substring(with: match.range(at: 1)).trimmingCharacters(in: .whitespacesAndNewlines),
-                        nsString.substring(with: match.range(at: 2)).trimmingCharacters(in: .whitespacesAndNewlines)
-                    )
-                }
-            }
-
-            // Check "From A to B"
-            if let p = patternFromTo, let match = p.firstMatch(in: text, options: [], range: range) {
-                if match.numberOfRanges >= 3 {
-                    return (
-                        nsString.substring(with: match.range(at: 1)).trimmingCharacters(in: .whitespacesAndNewlines),
-                        nsString.substring(with: match.range(at: 2)).trimmingCharacters(in: .whitespacesAndNewlines)
-                    )
-                }
-            }
-
-            // Check "Flight to B" (Only yields 'to')
-            // Don't return immediately, try to find a better match in other candidates
-            if bestTo == nil {
-                if let p = patternTo, let match = p.firstMatch(in: text, options: [], range: range) {
-                    if match.numberOfRanges >= 2 {
-                        bestTo = nsString.substring(with: match.range(at: 1)).trimmingCharacters(in: .whitespacesAndNewlines)
-                    }
-                }
-            }
-        }
-
-        return (bestFrom, bestTo)
+        CalendarFlightParsing.parseFlightInfo(title: event.title, notes: event.notes)
     }
 
     private func resolveAndCreateSignal(
@@ -325,9 +230,9 @@ actor CalendarSignalIngestor {
         eventIdentifier: String,
         event: EKEvent,
         activeResolver: CountryResolving
-    ) async -> Bool {
+    ) async -> CalendarSignal? {
         guard coordinate != nil || (locationString != nil && !locationString!.isEmpty) else {
-            return false
+            return nil
         }
 
         var countryCode: String?
@@ -373,7 +278,7 @@ actor CalendarSignalIngestor {
             }
         }
 
-        guard let validCountryCode = countryCode else { return false }
+        guard let validCountryCode = countryCode else { return nil }
 
         let eventTimeZone = event.timeZone ?? TimeZone(identifier: timeZoneId ?? "") ?? TimeZone.current
         let dayKey = await DayKey.make(from: date, timeZone: eventTimeZone)
@@ -392,6 +297,15 @@ actor CalendarSignalIngestor {
         )
 
         modelContext.insert(signal)
-        return true
+        return signal
+    }
+
+    private func saveContextIfNeeded() throws {
+        guard modelContext.hasChanges else { return }
+        if let saveContextOverride {
+            try saveContextOverride()
+        } else {
+            try modelContext.save()
+        }
     }
 }

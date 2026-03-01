@@ -42,13 +42,17 @@ struct BorderLogWidgetProvider: TimelineProvider {
             let modelContext = ModelContext(container)
 
             let service = LocationSampleService()
-            _ = await service.captureAndStoreBurst(
-                source: .widget,
-                modelContext: modelContext,
-                maxSamples: 6,
-                maxDuration: 8,
-                maxSampleAge: 120
-            )
+            do {
+                _ = try await service.captureAndStoreBurst(
+                    source: .widget,
+                    modelContext: modelContext,
+                    maxSamples: 6,
+                    maxDuration: 8,
+                    maxSampleAge: 120
+                )
+            } catch {
+                // Keep widget timeline generation resilient if capture/persistence fails.
+            }
 
             let latest = Self.latestSample(from: modelContext)
             let country = latest?.countryName ?? latest?.countryCode ?? "Unknown"

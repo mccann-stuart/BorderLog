@@ -200,12 +200,19 @@ enum ModelContainerProvider {
                 logger.info("Using App Group store at group: \(appGroupId, privacy: .public)")
                 return container
             } catch {
-                logger.error("App Group store migration failed. Deleting and retrying. Error: \(error, privacy: .public)")
-                cleanupAppGroupStore(appGroupId: appGroupId)
-                // Retry App Group after cleanup
-                if let container = try? ModelContainer(for: schema, migrationPlan: BorderLogMigrationPlan.self, configurations: [appGroupConfig]) {
-                    logger.info("App Group store recreated after cleanup.")
-                    return container
+                logger.error("App Group store open failed. Attempting quarantine recovery. Error: \(error, privacy: .public)")
+                if let appGroupRoot = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: appGroupId) {
+                    let appGroupSupport = appGroupRoot.appendingPathComponent("Library/Application Support")
+                    if let recovered = recoverByQuarantiningStore(
+                        schema: schema,
+                        configuration: appGroupConfig,
+                        storeDirectory: appGroupSupport,
+                        storeNames: ["default.store", "Learn.store", "BorderLog.store"],
+                        initialError: error,
+                        contextLabel: "App Group"
+                    ) {
+                        return recovered
+                    }
                 }
             }
         }
@@ -219,12 +226,6 @@ enum ModelContainerProvider {
             return makeInMemoryContainer(schema: schema)
         }
 
-        // First, clean up any corrupt App Group store files we know about.
-        // The AppGroupId may be missing from Info.plist but the entitlement can still
-        // cause SwiftData to route to the App Group path as its "default" store.
-        let knownGroupId = "group.com.MCCANN.Border"
-        cleanupAppGroupStore(appGroupId: knownGroupId)
-
         let storeURL = appSupport.appendingPathComponent("BorderLog.store")
         let localConfig = ModelConfiguration(schema: schema, url: storeURL, cloudKitDatabase: cloudKitDatabase)
         do {
@@ -232,33 +233,163 @@ enum ModelContainerProvider {
             logger.info("Using local sandbox store at: \(storeURL.lastPathComponent, privacy: .public)")
             return container
         } catch {
-            // Corrupt or unmigratable local store — delete and recreate fresh.
-            logger.critical("Local store failed. Deleting and recreating. Error: \(error, privacy: .public)")
-            deleteStoreFiles(in: appSupport, named: "BorderLog.store")
+            logger.error("Local store open failed. Attempting quarantine recovery. Error: \(error, privacy: .public)")
+            if let recovered = recoverByQuarantiningStore(
+                schema: schema,
+                configuration: localConfig,
+                storeDirectory: appSupport,
+                storeNames: ["BorderLog.store"],
+                initialError: error,
+                contextLabel: "Local"
+            ) {
+                return recovered
+            }
         }
 
-        // Tier 3: Fresh local store after wiping corrupt files
-        do {
-            let container = try ModelContainer(for: schema, migrationPlan: BorderLogMigrationPlan.self, configurations: [localConfig])
-            logger.warning("Recovery succeeded — fresh local store at \(storeURL.lastPathComponent, privacy: .public). Previous data was lost.")
-            return container
-        } catch {
-            logger.critical("All store options failed. Falling back to in-memory store. Error: \(error, privacy: .public)")
-            return makeInMemoryContainer(schema: schema)
-        }
+        logger.critical("All persistent store options failed. Falling back to in-memory store.")
+        return makeInMemoryContainer(schema: schema)
     }
 
     private static func makeInMemoryContainer(schema: Schema) -> ModelContainer {
         let memConfig = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
-        return try! ModelContainer(for: schema, configurations: [memConfig])
+        do {
+            return try ModelContainer(for: schema, configurations: [memConfig])
+        } catch {
+            logger.critical("In-memory store init failed. Attempting temporary file-backed fallback. Error: \(error, privacy: .public)")
+            do {
+                return try makeTemporaryFallbackContainer(schema: schema)
+            } catch {
+                fatalError("Unable to initialize any SwiftData container: \(error)")
+            }
+        }
     }
 
-    /// Deletes the App Group SwiftData store files for the given group identifier.
-    private static func cleanupAppGroupStore(appGroupId: String) {
-        guard let root = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: appGroupId) else { return }
-        let dir = root.appendingPathComponent("Library/Application Support")
-        deleteStoreFiles(in: dir, named: "default.store")
-        deleteStoreFiles(in: dir, named: "Learn.store")
+    private static func makeTemporaryFallbackContainer(schema: Schema) throws -> ModelContainer {
+        let fallbackDirectory = FileManager.default.temporaryDirectory
+        let fallbackStoreName = "BorderLog.fallback.store"
+        deleteStoreFiles(in: fallbackDirectory, named: fallbackStoreName)
+        let fallbackURL = fallbackDirectory.appendingPathComponent(fallbackStoreName)
+        let fallbackConfig = ModelConfiguration(schema: schema, url: fallbackURL, cloudKitDatabase: .none)
+        let container = try ModelContainer(for: schema, configurations: [fallbackConfig])
+        logger.warning("Using temporary file-backed fallback store: \(fallbackStoreName, privacy: .public)")
+        return container
+    }
+
+    private static func recoverByQuarantiningStore(
+        schema: Schema,
+        configuration: ModelConfiguration,
+        storeDirectory: URL,
+        storeNames: [String],
+        initialError: Error,
+        contextLabel: String
+    ) -> ModelContainer? {
+        guard shouldAttemptRecovery(for: initialError) else {
+            logger.error("\(contextLabel, privacy: .public) store failure does not match recovery heuristics; skipping destructive paths.")
+            return nil
+        }
+
+        let quarantineTag = Self.quarantineTag()
+        var quarantinedAny = false
+        for storeName in storeNames {
+            quarantinedAny = quarantineStoreFiles(in: storeDirectory, named: storeName, quarantineTag: quarantineTag) || quarantinedAny
+        }
+        guard quarantinedAny else {
+            logger.error("\(contextLabel, privacy: .public) recovery skipped; no store files available to quarantine.")
+            return nil
+        }
+
+        do {
+            let container = try ModelContainer(for: schema, migrationPlan: BorderLogMigrationPlan.self, configurations: [configuration])
+            logger.warning("\(contextLabel, privacy: .public) store recovered by quarantining prior files with tag \(quarantineTag, privacy: .public).")
+            return container
+        } catch {
+            logger.error("\(contextLabel, privacy: .public) quarantine recovery failed. Error: \(error, privacy: .public)")
+            guard shouldDeleteAfterRecoveryFailure(for: error) else {
+                return nil
+            }
+
+            logger.error("\(contextLabel, privacy: .public) failure matches corruption heuristics; deleting active store files and retrying once.")
+            for storeName in storeNames {
+                deleteStoreFiles(in: storeDirectory, named: storeName)
+            }
+
+            do {
+                let container = try ModelContainer(for: schema, migrationPlan: BorderLogMigrationPlan.self, configurations: [configuration])
+                logger.warning("\(contextLabel, privacy: .public) store recreated after quarantine + corruption-confirmed delete.")
+                return container
+            } catch {
+                logger.critical("\(contextLabel, privacy: .public) store recreation failed after delete. Error: \(error, privacy: .public)")
+                return nil
+            }
+        }
+    }
+
+    internal static func shouldAttemptRecovery(for error: Error) -> Bool {
+        let message = String(describing: error).lowercased()
+        let keywords = [
+            "migration",
+            "incompatible",
+            "schema",
+            "model",
+            "sqlite",
+            "database",
+            "corrupt",
+            "corruption",
+            "malformed",
+            "cannot open",
+            "i/o"
+        ]
+        return keywords.contains(where: { message.contains($0) })
+    }
+
+    internal static func shouldDeleteAfterRecoveryFailure(for error: Error) -> Bool {
+        let message = String(describing: error).lowercased()
+        let corruptionIndicators = [
+            "database disk image is malformed",
+            "disk image is malformed",
+            "not a database",
+            "file is encrypted or is not a database",
+            "corrupt",
+            "corruption",
+            "malformed",
+            "i/o error"
+        ]
+        return corruptionIndicators.contains(where: { message.contains($0) })
+    }
+
+    private static func quarantineTag() -> String {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        let raw = formatter.string(from: Date())
+        return raw
+            .replacingOccurrences(of: ":", with: "")
+            .replacingOccurrences(of: "-", with: "")
+            .replacingOccurrences(of: ".", with: "")
+            .replacingOccurrences(of: "Z", with: "Z")
+    }
+
+    /// Moves a named SwiftData store and sidecar files to quarantine files.
+    /// Returns true if at least one file was quarantined.
+    @discardableResult
+    internal static func quarantineStoreFiles(in directory: URL, named storeName: String, quarantineTag: String) -> Bool {
+        let fm = FileManager.default
+        var movedAny = false
+        for suffix in ["", "-wal", "-shm"] {
+            let sourceURL = directory.appendingPathComponent(storeName + suffix)
+            guard fm.fileExists(atPath: sourceURL.path) else { continue }
+            let destinationURL = directory.appendingPathComponent("\(storeName)\(suffix).quarantine-\(quarantineTag)")
+            do {
+                if fm.fileExists(atPath: destinationURL.path) {
+                    try fm.removeItem(at: destinationURL)
+                }
+                try fm.moveItem(at: sourceURL, to: destinationURL)
+                movedAny = true
+                logger.warning("Quarantined store file: \(sourceURL.lastPathComponent, privacy: .public)")
+            } catch {
+                logger.error("Failed to quarantine \(sourceURL.lastPathComponent, privacy: .public): \(error, privacy: .public)")
+            }
+        }
+        return movedAny
     }
 
     /// Deletes a named SwiftData store and its -wal/-shm sidecar files from the given directory.
