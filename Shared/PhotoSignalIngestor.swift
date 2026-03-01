@@ -204,7 +204,7 @@ actor PhotoSignalIngestor {
         return state
     }
 
-    private func fetchExistingAssetIdHashes(config: IngestQueryConfig) throws -> Set<String> {
+    internal func fetchExistingAssetIdHashes(config: IngestQueryConfig) throws -> Set<String> {
         let startDate = config.startDate
         let descriptor: FetchDescriptor<PhotoSignal>
         if let endDate = config.endDate {
@@ -223,13 +223,32 @@ actor PhotoSignalIngestor {
         return Set(try modelContext.fetch(descriptor).map(\.assetIdHash))
     }
 
-    private func saveContextIfNeeded() throws {
+    internal func saveContextIfNeeded() throws {
         guard modelContext.hasChanges else { return }
         if let saveContextOverride {
             try saveContextOverride()
         } else {
             try modelContext.save()
         }
+    }
+
+    internal func addTestSignal(assetIdHash: String, timestamp: Date = Date()) {
+        let dayKey = DayKey.make(from: timestamp, timeZone: .current)
+        let signal = PhotoSignal(
+            timestamp: timestamp,
+            latitude: 0,
+            longitude: 0,
+            assetIdHash: assetIdHash,
+            timeZoneId: TimeZone.current.identifier,
+            dayKey: dayKey,
+            countryCode: "GB",
+            countryName: "United Kingdom"
+        )
+        modelContext.insert(signal)
+    }
+
+    internal func setSaveOverride(_ override: (@Sendable () throws -> Void)?) {
+        saveContextOverride = override
     }
 
     private static func hashAssetId(_ identifier: String) -> String {

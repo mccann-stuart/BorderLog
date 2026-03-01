@@ -26,8 +26,8 @@ final class LocationConcurrencyTests: XCTestCase {
         let container = ModelContainerProvider.makeContainer()
 
         // Create concurrent tasks
-        async let result1 = service.captureAndStore(source: .app, modelContext: container.mainContext)
-        async let result2 = service.captureAndStore(source: .app, modelContext: container.mainContext)
+        async let result1: LocationSample? = try? await service.captureAndStore(source: .app, modelContext: container.mainContext)
+        async let result2: LocationSample? = try? await service.captureAndStore(source: .app, modelContext: container.mainContext)
 
         // Await both results. If the race condition exists and causes a hang,
         // this test will timeout (fail).
