@@ -4,4 +4,8 @@
    <FileRef
       location = "self:">
    </FileRef>
+   <Group
+      location = "group:tasks 3"
+      name = "tasks 3">
+   </Group>
 </Workspace>

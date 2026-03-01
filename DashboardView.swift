@@ -12,6 +12,7 @@ struct DashboardView: View {
     @Query(sort: [SortDescriptor(\PresenceDay.date, order: .reverse)]) private var presenceDays: [PresenceDay]
     @Query private var countryConfigs: [CountryConfig]
     @ObservedObject private var inferenceActivity = InferenceActivity.shared
+    @AppStorage("showSchengenDashboardSection") private var showSchengenDashboardSection = true
     
     @State private var selectedTimeframe: VisitedCountriesTimeframe = .last12Months
     
@@ -95,7 +96,9 @@ struct DashboardView: View {
                         isGeoLookupPaused: inferenceActivity.isGeoLookupPaused
                     )
                 }
-                SchengenSummarySection(summary: schengenSummary, unknownDays: unknownSchengenDays)
+                if showSchengenDashboardSection {
+                    SchengenSummarySection(summary: schengenSummary, unknownDays: unknownSchengenDays)
+                }
                 CountriesListSection(countries: countryDaysSummary, selectedTimeframe: $selectedTimeframe)
             }
             .padding(.vertical)

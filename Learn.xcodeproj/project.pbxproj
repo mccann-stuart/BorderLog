@@ -42,6 +42,7 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		4B5701C42F4D1A450076D9DE /* todo.md */ = {isa = PBXFileReference; lastKnownFileType = text; path = todo.md; sourceTree = "<group>"; };
 		4B98CC742F4A075D0095FA69 /* Learn.xctestplan */ = {isa = PBXFileReference; lastKnownFileType = text; path = Learn.xctestplan; sourceTree = "<group>"; };
 		4B9C85CC2F426E1000C510A8 /* DashboardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardView.swift; sourceTree = "<group>"; };
 		4B9C85CE2F426E3900C510A8 /* WorldMapView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorldMapView.swift; sourceTree = "<group>"; };
@@ -135,11 +136,12 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
-		4B5701C32F4D1A450076D9DE /* tasks 2 */ = {
+		4B5701C32F4D1A450076D9DE /* tasks */ = {
 			isa = PBXGroup;
 			children = (
+				4B5701C42F4D1A450076D9DE /* todo.md */,
 			);
-			path = "tasks 2";
+			path = tasks;
 			sourceTree = "<group>";
 		};
 		4BF474B22F3FAB7A0026C07A = {
@@ -161,7 +163,7 @@
 				4B9C85D02F426E4C00C510A8 /* SettingsView.swift */,
 				4B9C85D22F426E5C00C510A8 /* UserAccountView.swift */,
 				4B9C85D42F426E7A00C510A8 /* MainNavigationView.swift */,
-				4B5701C32F4D1A450076D9DE /* tasks 2 */,
+				4B5701C32F4D1A450076D9DE /* tasks */,
 			);
 			sourceTree = "<group>";
 			usesTabs = 0;

@@ -30,6 +30,7 @@ struct SettingsView: View {
     @AppStorage("didBootstrapInference") private var didBootstrapInference = false
     @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
     @AppStorage("usePolygonMapView") private var usePolygonMapView = true
+    @AppStorage("showSchengenDashboardSection") private var showSchengenDashboardSection = true
     @AppStorage("cloudKitSyncEnabled", store: AppConfig.sharedDefaults) private var cloudKitSyncEnabled = false
 
     private var dataManager: DataManager {
@@ -273,16 +274,13 @@ struct SettingsView: View {
 
                 // MARK: – Configuration
                 Section {
-                    HStack {
+                    Toggle(isOn: $showSchengenDashboardSection) {
                         Label("Schengen Zone", systemImage: "map")
-                        Spacer()
-                        Text("Built-in")
-                            .foregroundStyle(.secondary)
                     }
                 } header: {
                     Text("Configuration")
                 } footer: {
-                    Text("Schengen membership data is bundled with the app and updated with each release.")
+                    Text("Schengen membership data is bundled with the app and updated with each release. This toggle controls visibility of the Schengen 90/180 card on Dashboard.")
                 }
             }
             .scrollContentBackground(.hidden)

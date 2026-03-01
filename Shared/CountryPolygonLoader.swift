@@ -9,21 +9,21 @@ import Combine
 import zlib
 
 /// Simple GeoJSON models
-private struct FeatureCollection: Decodable {
+nonisolated private struct FeatureCollection: Decodable {
     let features: [Feature]
 }
 
-private struct Feature: Decodable {
+nonisolated private struct Feature: Decodable {
     let id: String?
     let geometry: Geometry
 }
 
-private struct Geometry: Decodable {
+nonisolated private struct Geometry: Decodable {
     let type: String
     let coordinates: AnyCodableCoordinates
 }
 
-private struct AnyCodableCoordinates: Decodable {
+nonisolated private struct AnyCodableCoordinates: Decodable {
     var rawPolygons: [[[[Double]]]] = []
 
     init(from decoder: Decoder) throws {
@@ -84,7 +84,7 @@ final class CountryPolygonLoader: ObservableObject {
 
             for feature in collection.features {
                 guard let alpha3 = feature.id,
-                      let alpha2 = Self.alpha3ToAlpha2[alpha3] else { continue }
+                      let alpha2 = alpha3ToAlpha2[alpha3] else { continue }
 
                 var countryPolygons: [[[CLLocationCoordinate2D]]] = []
                 for polygon in feature.geometry.coordinates.rawPolygons {
@@ -109,7 +109,9 @@ final class CountryPolygonLoader: ObservableObject {
         }
     }
 
-    private static let alpha3ToAlpha2: [String: String] = [
+}
+
+private let alpha3ToAlpha2: [String: String] = [
         "AFG": "AF", "ALA": "AX", "ALB": "AL", "DZA": "DZ", "ASM": "AS",
         "AND": "AD", "AGO": "AO", "AIA": "AI", "ATA": "AQ", "ATG": "AG",
         "ARG": "AR", "ARM": "AM", "ABW": "AW", "AUS": "AU", "AUT": "AT",
@@ -161,7 +163,6 @@ final class CountryPolygonLoader: ObservableObject {
         "VEN": "VE", "VNM": "VN", "VGB": "VG", "VIR": "VI", "WLF": "WF",
         "ESH": "EH", "YEM": "YE", "ZMB": "ZM", "ZWE": "ZW",
     ]
-}
 
 extension Data {
     func decompressZlib() throws -> Data {

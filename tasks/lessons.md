@@ -19,3 +19,11 @@
 ## Stay Editor Parity
 - **Pattern**: New Stay UI did not auto-populate country fields like New Override.
 - **Lesson**: When adding/editing Stay UI, default to `LocationFormSection` picker mode for new stays so Country, Country Code, and Region stay auto-populated and consistent with overrides.
+
+## Unnecessary Plan Confirmation
+- **Pattern**: Asked for explicit plan confirmation despite the user requesting to stop asking.
+- **Lesson**: After writing a plan, proceed unless the user explicitly requests a pause; avoid extra confirmation prompts.
+
+## Build Prompting
+- **Pattern**: Asked whether to run builds after being told not to ask again.
+- **Lesson**: Do not ask about running builds; only run if explicitly requested.

@@ -19,6 +19,7 @@
 	⁃	﻿﻿Diff behavior between main and your changes when relevant
 	⁃	﻿﻿Ask yourself: "Would a staff engineer approve this?"
 	⁃	﻿﻿Run tests, check Logs, demonstrate correctness
+	⁃	﻿﻿Do not ask the user about running builds; proceed without prompting unless explicitly requested
 ### 5. Demand Elegance (Balanced)
 	⁃	﻿﻿For non-trivial changes: pause and ask, "Is there a more elegant way?"
 	⁃	﻿﻿If a fix feels hacky: "Knowing everything I know now, implement the elegant solution."
@@ -31,7 +32,7 @@
 	⁃	﻿﻿Go fix failing CI tests without being told how
 ## Task Management
 	1	﻿﻿﻿**Plan First**: Write a plan to "tasks/todo.md" with checkable items
-	2	﻿﻿﻿**Verify Plan**: Check in before starting implementation
+	2	﻿﻿﻿**Verify Plan**: Proceed after writing the plan unless the user explicitly asks to pause
 	3	﻿﻿﻿**Track Progress**: Mark items complete as you go
 	4	﻿﻿﻿**Explain Changes**: High-level summary at each step
 	5	﻿﻿﻿**Document Results**: Add review section to 'tasks/todo.md"

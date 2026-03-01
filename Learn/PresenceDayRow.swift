@@ -19,7 +19,7 @@ struct PresenceDayRow: View {
     private var dayText: String {
         // Optimization: Use iOS 15+ FormatStyle API instead of allocating an expensive DateFormatter
         // per row render. FormatStyle is a lightweight value type.
-        var format = Date.FormatStyle(date: .medium, time: .none)
+        var format = Date.FormatStyle(date: .abbreviated, time: .omitted)
         format.timeZone = dayTimeZone
         return day.date.formatted(format)
     }
