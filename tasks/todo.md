@@ -1,5 +1,11 @@
 # TODO
 
+- [ ] Plan: Update weekly changelog for week of Feb 24–Mar 1, 2026.
+- [ ] Review git history (week window) and extract repo-supported highlights.
+- [ ] Collect merged PR links for the same window.
+- [ ] Update README Weekly Changelog block using existing format.
+- [ ] Verify README diff against git history evidence.
+
 - [x] Plan: Add "Two Years Prior" visited countries timeframe (calendar year two years ago).
 - [x] Update VisitedCountriesTimeframe enum + contains logic.
 - [ ] Verify UI picker shows "Two Years Prior" (Dashboard + Country Detail).
