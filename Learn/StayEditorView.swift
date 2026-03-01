@@ -7,9 +7,11 @@
 
 import SwiftUI
 import SwiftData
+import os
 
 struct StayEditorView: View {
     @Environment(\.modelContext) private var modelContext
+    private static let logger = Logger(subsystem: "com.MCCANN.Border", category: "StayEditorView")
     @Environment(\.dismiss) private var dismiss
     @Query private var presenceDays: [PresenceDay]
 
@@ -220,7 +222,7 @@ struct StayEditorView: View {
         do {
             potentialOverlaps = try modelContext.fetch(descriptor)
         } catch {
-             print("Fetch failed: \(error)")
+             Self.logger.error("Failed to fetch potential overlaps: \(error, privacy: .public)")
              potentialOverlaps = []
         }
 

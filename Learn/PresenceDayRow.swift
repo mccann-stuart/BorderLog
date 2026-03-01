@@ -17,12 +17,11 @@ struct PresenceDayRow: View {
     }
 
     private var dayText: String {
-        // ⚡ Bolt Optimization: Use lightweight Date.FormatStyle instead of expensive DateFormatter
-        // This prevents allocating a new DateFormatter every time this row view re-renders,
-        // which significantly improves scrolling performance in long lists.
-        var style = Date.FormatStyle.dateTime.year().month().day()
-        style.timeZone = dayTimeZone
-        return day.date.formatted(style)
+        // Optimization: Use iOS 15+ FormatStyle API instead of allocating an expensive DateFormatter
+        // per row render. FormatStyle is a lightweight value type.
+        var format = Date.FormatStyle(date: .medium, time: .none)
+        format.timeZone = dayTimeZone
+        return day.date.formatted(format)
     }
 
     private var countryText: String {
