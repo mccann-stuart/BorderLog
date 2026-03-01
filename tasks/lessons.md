@@ -27,3 +27,7 @@
 ## Build Prompting
 - **Pattern**: Asked whether to run builds after being told not to ask again.
 - **Lesson**: Do not ask about running builds; only run if explicitly requested.
+
+## Simulator Destination Selection
+- **Pattern**: Used a simulator destination name that was not available in the current Xcode runtime list.
+- **Lesson**: Before build/test runs, either target `Any iOS Simulator Device` or pick an explicit destination from `xcodebuild`’s reported available destinations (in this environment, `iPhone 17`), and avoid parallel build/test invocations that can lock the same build database.

@@ -533,6 +533,7 @@ Enable expatriates, digital nomads, and frequent international travelers to accu
 - Widget location capture + ingestion
 - Photo signal ingestion
 - Daily ledger generation + confidence + explainability UI
+- Dashboard Schengen 90/180 card visibility toggle controlled from Settings
 
 ## M2 plan
 1. Add SwiftData schema v2 with `LocationSample`, `PhotoSignal`, `PresenceDay`, and `PhotoIngestState`, plus a lightweight migration.
@@ -550,6 +551,7 @@ Enable expatriates, digital nomads, and frequent international travelers to accu
 13. Extend data reset/seed to include new models and optional sample ledger.
 14. Add unit tests for inference scoring, day-key bucketing, unknown-day behavior, and Schengen ledger summary.
 15. Keep README and in-app setup copy aligned with M2 inference capabilities.
+16. Add a persisted Settings toggle to show/hide the Dashboard Schengen 90/180 card.
 
 ## Run
 Open `Learn.xcodeproj` in Xcode and run the iOS app target.
