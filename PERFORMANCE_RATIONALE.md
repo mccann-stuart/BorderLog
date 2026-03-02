@@ -95,6 +95,35 @@ let descriptor = FetchDescriptor<PresenceDay>(
 - **Theoretical**: String interpolation and component extraction are orders of magnitude faster than `DateFormatter`.
 - **Benchmark**: Similar optimizations in Swift typically yield >10x speedup for simple formats.
 
+# Performance Optimization Rationale: FetchDescriptor for Relevant Stays in PresenceDayDetailView
+
+## Current State
+In `PresenceDayDetailView`, the `EvidenceSection` previously fetched all `Stay` records from the database and filtered them in-memory to find those overlapping with the current day:
+```swift
+var stayFetch = FetchDescriptor<Stay>()
+stayFetch.sortBy = [SortDescriptor(\.enteredOn, order: .reverse)]
+stays = try modelContext.fetch(stayFetch)
+// Later filtered in memory via a computed property
+```
+
+## Problem
+1. **Inefficient Data Loading**: Fetching the entire `Stay` table is O(N) in memory and I/O, where N is the total number of stays.
+2. **Computational Overhead**: Iterating over all stays in memory to filter them requires O(N) CPU time, bypassing database optimizations.
+
+## Optimization
+Replace the full fetch with a `FetchDescriptor` using a `#Predicate` to filter overlapping stays at the database level:
+```swift
+let stayPredicate = #Predicate<Stay> { target in
+    target.enteredOn < nextDayStart && (target.exitedOn ?? distantFuture) >= startOfDay
+}
+var stayFetch = FetchDescriptor<Stay>(predicate: stayPredicate)
+overlappingStays = try modelContext.fetch(stayFetch)
+```
+
+## Verification
+- **Reduced I/O and Memory**: The database query now retrieves only the records overlapping with the specific day. Complexity drops from O(N) to O(K), where K is the number of stays on that day (typically very small).
+- **Improved Performance**: Leverages database-level filtering, reducing main thread processing and avoiding unnecessary object instantiation.
+
 # Performance Optimization Rationale: Reusing FormatStyle vs Allocating DateFormatter
 
 ## Current State
