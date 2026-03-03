@@ -10,6 +10,25 @@ Pricing: Free (no subscriptions, no paid tiers)
 
 Weekly Changelog
 
+Week of Feb 24-Mar 1, 2026
+
+Highlights:
+- Hardened security posture across app and backend, including App Sandbox enablement, keychain protections, safer logging, and permissions policy headers.
+- Reduced date and ledger overhead by optimizing DayKey handling, presence-day fetches, and date formatting in UI-heavy paths.
+- Improved country resolution and data-entry ergonomics with AirportCodeResolver memory improvements plus expanded stays/settings UX updates.
+
+Key PRs:
+- [#93](https://github.com/mccann-stuart/BorderLog/pull/93) Optimize `PresenceDayRow` date formatting.
+- [#92](https://github.com/mccann-stuart/BorderLog/pull/92) Replace raw `print` logging with `os.Logger`.
+- [#89](https://github.com/mccann-stuart/BorderLog/pull/89) Cache `Calendar` instances in `DayKey`.
+- [#88](https://github.com/mccann-stuart/BorderLog/pull/88) Enable App Sandbox for app and widget.
+- [#87](https://github.com/mccann-stuart/BorderLog/pull/87) Add backend `Permissions-Policy` header.
+- [#84](https://github.com/mccann-stuart/BorderLog/pull/84) Optimize `AirportCodeResolver` memory usage.
+- [#83](https://github.com/mccann-stuart/BorderLog/pull/83) Optimize presence-day fetch performance.
+- [#82](https://github.com/mccann-stuart/BorderLog/pull/82) Keychain security hardening.
+
+⸻
+
 Week of Feb 17–23, 2026
 
 Highlights:
