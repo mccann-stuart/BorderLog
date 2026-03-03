@@ -259,7 +259,7 @@ private struct SchengenSummarySection: View {
     
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Schengen 90 stays valid for a rolling 180 days")
+            Text("Schengen 90 stays in a rolling 180 days")
                 .font(.system(.title2, design: .rounded).bold())
             
             HStack(spacing: 16) {
