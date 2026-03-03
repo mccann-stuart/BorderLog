@@ -1,3 +1,19 @@
+# Task Plan (Weekly Changelog: Feb 24-Mar 1, 2026)
+
+- [x] Confirm existing Weekly Changelog format in `README.md` and load prior automation memory to avoid duplication.
+- [x] Collect repo-backed highlights and merged PR links for Feb 24-Mar 1, 2026 from `git log`.
+- [x] Update `README.md` Weekly Changelog with a new week entry using the same simple structure.
+- [x] Verify the new entry contains only history-supported items and consistent formatting.
+- [x] Add review notes for this run.
+
+## Review (Weekly Changelog: Feb 24-Mar 1, 2026)
+
+- Added a new weekly changelog block at the top of `README.md` for Feb 24-Mar 1, 2026 using the existing `Highlights` + `Key PRs` format.
+- Sourced all PR links from merge commits in repo history for that week (`#82`, `#83`, `#84`, `#87`, `#88`, `#89`, `#92`, `#93`), excluding non-product automation PR `#94`.
+- Kept highlights constrained to themes directly supported by commit history in the same date window: security hardening, performance optimization, and UX/data-entry improvements.
+
+---
+
 # Task Plan
 
 - [x] Identify the exact Sendable warning site in CountryPolygonLoader and decide on the safest fix
