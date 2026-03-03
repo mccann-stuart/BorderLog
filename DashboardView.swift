@@ -259,8 +259,13 @@ private struct SchengenSummarySection: View {
     
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Schengen 90 stays in a rolling 180 days")
-                .font(.system(.title2, design: .rounded).bold())
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Schengen")
+                    .font(.system(.title2, design: .rounded).bold())
+                Text("90 stays in a rolling 180 days")
+                    .font(.system(.subheadline, design: .rounded))
+                    .foregroundStyle(.secondary)
+            }
             
             HStack(spacing: 16) {
                 StatCard(
