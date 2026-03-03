@@ -31,6 +31,11 @@ struct PresenceDayDetailView: View {
         day.confidenceLabel.rawValue.capitalized
     }
 
+    private var localDate: Date {
+        let calendar = Calendar.current
+        return DayKey.date(for: day.dayKey, timeZone: calendar.timeZone) ?? calendar.startOfDay(for: day.date)
+    }
+
     var body: some View {
         Form {
             Section("Actions") {
@@ -143,7 +148,7 @@ struct PresenceDayDetailView: View {
             NavigationStack {
                 DayOverrideEditorView(
                     overrideDay: nil,
-                    presetDate: day.date,
+                    presetDate: localDate,
                     presetCountryName: day.countryName,
                     presetCountryCode: day.countryCode
                 )
@@ -152,7 +157,7 @@ struct PresenceDayDetailView: View {
         .sheet(isPresented: $isShowingAddStay) {
             NavigationStack {
                 StayEditorView(
-                    presetEntry: day.date,
+                    presetEntry: localDate,
                     presetCountryName: day.countryName,
                     presetCountryCode: day.countryCode,
                     forceExitDate: true
@@ -172,10 +177,10 @@ struct PresenceDayDetailView: View {
     @Environment(\.modelContext) private var modelContext
 
     private func applySuggestion(code: String, name: String) {
-        let calendar = Calendar.current
-        let normalizedDate = calendar.startOfDay(for: day.date)
+        let normalizedDate = localDate
+        let normalizedCode = CountryCodeNormalizer.normalize(code) ?? code
         let region: Region = {
-            let trimmed = code.trimmingCharacters(in: .whitespacesAndNewlines)
+            let trimmed = normalizedCode.trimmingCharacters(in: .whitespacesAndNewlines)
             if trimmed.isEmpty { return .other }
             return SchengenMembers.isMember(trimmed) ? .schengen : .nonSchengen
         }()
@@ -187,13 +192,13 @@ struct PresenceDayDetailView: View {
         let existing = try? modelContext.fetch(FetchDescriptor(predicate: predicate))
         if let existingOverride = existing?.first {
             existingOverride.countryName = name
-            existingOverride.countryCode = code
+            existingOverride.countryCode = normalizedCode
             existingOverride.region = region
         } else {
             let newOverride = DayOverride(
                 date: normalizedDate,
                 countryName: name,
-                countryCode: code,
+                countryCode: normalizedCode,
                 region: region
             )
             modelContext.insert(newOverride)
@@ -207,8 +212,7 @@ struct PresenceDayDetailView: View {
     }
 
     private func deleteOverride() {
-        let calendar = Calendar.current
-        let normalizedDate = calendar.startOfDay(for: day.date)
+        let normalizedDate = localDate
         let predicate = #Predicate<DayOverride> { override in
             override.date == normalizedDate
         }
