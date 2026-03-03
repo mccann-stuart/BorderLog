@@ -1,3 +1,18 @@
+# Task Plan (Widget Location Authorization Unblock)
+
+- [ ] Add `NSWidgetWantsLocation` to widget extension plist.
+- [ ] Centralize location authorization gating in `LocationSampleService` with widget-specific authorization checks.
+- [ ] Skip widget capture attempts when widget updates are not authorized and keep timeline fallback behavior.
+- [ ] Add targeted tests for authorization gating matrix.
+- [ ] Verify with plist extraction, targeted tests, and widget build.
+- [ ] Add review notes and evidence.
+
+## Review (Widget Location Authorization Unblock)
+
+- Pending implementation.
+
+---
+
 # Task Plan (Weekly Changelog: Feb 24-Mar 1, 2026)
 
 - [x] Confirm existing Weekly Changelog format in `README.md` and load prior automation memory to avoid duplication.

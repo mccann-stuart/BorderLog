@@ -8,6 +8,34 @@
 import WidgetKit
 import SwiftUI
 import SwiftData
+import CoreLocation
+
+private func isWidgetCaptureAuthorized() -> Bool {
+    let manager = CLLocationManager()
+    return LocationSampleService.isCaptureAuthorized(
+        source: .widget,
+        status: manager.authorizationStatus,
+        isAuthorizedForWidgetUpdates: manager.isAuthorizedForWidgetUpdates
+    )
+}
+
+@MainActor
+private func captureWidgetLocationIfAuthorized(modelContext: ModelContext) async {
+    guard isWidgetCaptureAuthorized() else { return }
+
+    let service = LocationSampleService()
+    do {
+        _ = try await service.captureAndStoreBurst(
+            source: .widget,
+            modelContext: modelContext,
+            maxSamples: 6,
+            maxDuration: 8,
+            maxSampleAge: 120
+        )
+    } catch {
+        // Keep widget timeline generation resilient if capture/persistence fails.
+    }
+}
 
 // MARK: - Widget Bundle
 @main
@@ -41,18 +69,7 @@ struct BorderLogWidgetProvider: TimelineProvider {
             let container = ModelContainerProvider.makeContainer()
             let modelContext = ModelContext(container)
 
-            let service = LocationSampleService()
-            do {
-                _ = try await service.captureAndStoreBurst(
-                    source: .widget,
-                    modelContext: modelContext,
-                    maxSamples: 6,
-                    maxDuration: 8,
-                    maxSampleAge: 120
-                )
-            } catch {
-                // Keep widget timeline generation resilient if capture/persistence fails.
-            }
+            await captureWidgetLocationIfAuthorized(modelContext: modelContext)
 
             let latest = Self.latestSample(from: modelContext)
             let country = latest?.countryName ?? latest?.countryCode ?? "Unknown"
@@ -146,18 +163,7 @@ struct TopCountriesWidgetProvider: TimelineProvider {
             let container = ModelContainerProvider.makeContainer()
             let modelContext = ModelContext(container)
 
-            let service = LocationSampleService()
-            do {
-                _ = try await service.captureAndStoreBurst(
-                    source: .widget,
-                    modelContext: modelContext,
-                    maxSamples: 6,
-                    maxDuration: 8,
-                    maxSampleAge: 120
-                )
-            } catch {
-                // Keep widget timeline generation resilient if capture/persistence fails.
-            }
+            await captureWidgetLocationIfAuthorized(modelContext: modelContext)
 
             var descriptor = FetchDescriptor<PresenceDay>()
             let now = Date()
@@ -305,18 +311,7 @@ struct SchengenWidgetProvider: TimelineProvider {
             let container = ModelContainerProvider.makeContainer()
             let modelContext = ModelContext(container)
             
-            let service = LocationSampleService()
-            do {
-                _ = try await service.captureAndStoreBurst(
-                    source: .widget,
-                    modelContext: modelContext,
-                    maxSamples: 6,
-                    maxDuration: 8,
-                    maxSampleAge: 120
-                )
-            } catch {
-                // Keep widget timeline generation resilient if capture/persistence fails.
-            }
+            await captureWidgetLocationIfAuthorized(modelContext: modelContext)
 
             let now = Date()
             let windowStart = Calendar.current.date(byAdding: .day, value: -180, to: now) ?? now.addingTimeInterval(-180 * 24 * 3600)
