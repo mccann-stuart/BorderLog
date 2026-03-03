@@ -245,24 +245,12 @@ private struct EvidenceSection: View {
 
     @State private var locations: [LocationSample] = []
     @State private var photos: [PhotoSignal] = []
-    @State private var stays: [Stay] = []
+    @State private var overlappingStays: [Stay] = []
     @State private var calendarSignals: [CalendarSignal] = []
     
     init(dayKey: String, date: Date) {
         self.dayKey = dayKey
         self.date = date
-    }
-    
-    var overlappingStays: [Stay] {
-        let calendar = Calendar.current
-        let startOfDay = calendar.startOfDay(for: date)
-        guard let endOfDay = calendar.date(byAdding: DateComponents(day: 1, second: -1), to: startOfDay) else { return [] }
-        
-        return stays.filter { stay in
-            let stayStart = calendar.startOfDay(for: stay.enteredOn)
-            let stayEnd = stay.exitedOn.map { calendar.startOfDay(for: $0) } ?? Date.distantFuture
-            return startOfDay <= stayEnd && endOfDay >= stayStart
-        }
     }
     
     var body: some View {
@@ -417,11 +405,19 @@ private struct EvidenceSection: View {
 
         // Stays sorted by enteredOn, reverse order
         do {
-            var stayFetch = FetchDescriptor<Stay>()
+            let calendar = Calendar.current
+            let startOfDay = calendar.startOfDay(for: date)
+            let nextDayStart = calendar.date(byAdding: .day, value: 1, to: startOfDay) ?? startOfDay
+            let distantFuture = Date.distantFuture
+
+            let stayPredicate = #Predicate<Stay> { target in
+                target.enteredOn < nextDayStart && (target.exitedOn ?? distantFuture) >= startOfDay
+            }
+            var stayFetch = FetchDescriptor<Stay>(predicate: stayPredicate)
             stayFetch.sortBy = [SortDescriptor(\.enteredOn, order: .reverse)]
-            stays = try modelContext.fetch(stayFetch)
+            overlappingStays = try modelContext.fetch(stayFetch)
         } catch {
-            stays = []
+            overlappingStays = []
         }
     }
     
