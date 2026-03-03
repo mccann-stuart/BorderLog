@@ -47,7 +47,7 @@ struct UserAccountView: View {
                 } else {
                     Section("Account") {
                         VStack(alignment: .leading, spacing: 8) {
-                            Text("Local-only mode")
+                            Text("Use without an account")
                                 .font(.headline)
                             Text("Sign in is disabled. Your travel data stays on this device.")
                                 .font(.caption)

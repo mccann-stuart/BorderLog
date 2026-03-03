@@ -317,7 +317,7 @@ struct SchengenWidgetEntryView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("Schengen 90/180")
+            Text("Schengen 90 stays valid for a rolling 180 days")
                 .font(.system(.headline, design: .rounded))
             
             if family == .systemSmall {
@@ -386,7 +386,7 @@ struct SchengenWidgetEntryView: View {
                 }
                 
                 if entry.summary.unknownDays > 0 {
-                    Text("Unknown days in window: \(entry.summary.unknownDays)")
+                    Text("Days with no location data: \(entry.summary.unknownDays)")
                         .font(.caption2)
                         .foregroundStyle(.secondary)
                 }

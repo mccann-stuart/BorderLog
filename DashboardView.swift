@@ -259,7 +259,7 @@ private struct SchengenSummarySection: View {
     
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Schengen 90/180")
+            Text("Schengen 90 stays valid for a rolling 180 days")
                 .font(.system(.title2, design: .rounded).bold())
             
             HStack(spacing: 16) {
@@ -291,7 +291,7 @@ private struct SchengenSummarySection: View {
                 NavigationLink {
                     FilteredLedgerView(days: unknownDays, title: "Unknown Days")
                 } label: {
-                    Text("Unknown days in window: \(summary.unknownDays)")
+                    Text("Days with no location data: \(summary.unknownDays)")
                         .font(.caption)
                         .foregroundColor(.accentColor)
                 }

@@ -38,21 +38,21 @@ struct WelcomeView: View {
                 ValuePropRow(
                     icon: "lock.fill",
                     color: .green,
-                    title: "Local-First Privacy",
+                    title: "On-Device Privacy",
                     description: "Your travel data stays on this device. No analytics, no server storage."
                 )
                 
                 ValuePropRow(
                     icon: "calendar.badge.clock",
                     color: .blue,
-                    title: "Schengen 90/180",
+                    title: "Schengen 90 stays valid for a rolling 180 days",
                     description: "Effortlessly monitor your Schengen limit and avoid overstays."
                 )
                 
                 ValuePropRow(
                     icon: "wand.and.stars",
                     color: .purple,
-                    title: "Smart Inference",
+                    title: "Smart Location Tracking",
                     description: "BorderLog infers your location using Apple MapKit signals, minimizing manual entry."
                 )
             }
@@ -81,7 +81,7 @@ struct WelcomeView: View {
                             currentStep = 1
                         }
                     } label: {
-                        Text("Continue in Local Mode")
+                        Text("Continue without an account")
                             .font(.headline)
                             .foregroundStyle(.white)
                             .frame(maxWidth: .infinity)

@@ -215,7 +215,7 @@ struct SettingsView: View {
                 } header: {
                     Text("Data Sources")
                 } footer: {
-                    Text("Location, photo metadata, and read-only calendar events are used to infer which country you were in each day. All processing happens on-device, with Apple Cloud APIs/MapKit used only to resolve geo locations. No data is stored on any server or outside the app.")
+                    Text("Location, photo metadata, and read-only calendar events are used to automatically determine which country you were in each day. All processing happens on your device. No data is stored on any server or outside the app.")
                 }
 
       
@@ -281,7 +281,7 @@ struct SettingsView: View {
                 } header: {
                     Text("Configuration")
                 } footer: {
-                    Text("Schengen membership data is bundled with the app and updated with each release. This toggle controls visibility of the Schengen 90/180 card on Dashboard.")
+                    Text("Schengen country list is built-in and updates automatically. This toggle controls visibility of the 'Schengen 90 stays valid for a rolling 180 days' card on Dashboard.")
                 }
             }
             .scrollContentBackground(.hidden)
@@ -519,7 +519,7 @@ struct SettingsView: View {
         case .local:
             return "Local App storage"
         case .temporary:
-            return "Temporary data store (failure mode)"
+            return "Not saving (Error)"
         }
     }
 

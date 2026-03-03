@@ -237,6 +237,18 @@ struct PresenceInferenceEngine {
             if winner.value.locationCount > 0 { sources.formUnion(.location) }
             if winner.value.calendarCount > 0 { sources.formUnion(.calendar) }
 
+            var suggestedCode1: String? = nil
+            var suggestedName1: String? = nil
+            var suggestedCode2: String? = nil
+            var suggestedName2: String? = nil
+
+            if isDisputed {
+                suggestedCode1 = sortedCountries[0].key.code
+                suggestedName1 = sortedCountries[0].key.name
+                suggestedCode2 = sortedCountries[1].key.code
+                suggestedName2 = sortedCountries[1].key.name
+            }
+
             let result = PresenceDayResult(
                 dayKey: dayKey,
                 date: date,
@@ -251,7 +263,11 @@ struct PresenceInferenceEngine {
                 stayCount: winner.value.stayCount,
                 photoCount: winner.value.photoCount,
                 locationCount: winner.value.locationCount,
-                calendarCount: winner.value.calendarCount
+                calendarCount: winner.value.calendarCount,
+                suggestedCountryCode1: suggestedCode1,
+                suggestedCountryName1: suggestedName1,
+                suggestedCountryCode2: suggestedCode2,
+                suggestedCountryName2: suggestedName2
             )
             appendResult(result)
         }

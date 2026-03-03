@@ -329,6 +329,8 @@ struct StayEditorView: View {
 
         let container = modelContext.container
         Task {
+            // Give SwiftData time to sync the saved context before the background context fetches
+            try? await Task.sleep(nanoseconds: 150_000_000)
             let service = LedgerRecomputeService(modelContainer: container)
             await service.recompute(dayKeys: dayKeys)
         }
