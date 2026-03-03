@@ -142,9 +142,22 @@ struct TopCountriesWidgetProvider: TimelineProvider {
     }
 
     func getTimeline(in context: Context, completion: @escaping (Timeline<TopCountriesEntry>) -> Void) {
-        Task {
+        Task { @MainActor in
             let container = ModelContainerProvider.makeContainer()
             let modelContext = ModelContext(container)
+
+            let service = LocationSampleService()
+            do {
+                _ = try await service.captureAndStoreBurst(
+                    source: .widget,
+                    modelContext: modelContext,
+                    maxSamples: 6,
+                    maxDuration: 8,
+                    maxSampleAge: 120
+                )
+            } catch {
+                // Keep widget timeline generation resilient if capture/persistence fails.
+            }
 
             var descriptor = FetchDescriptor<PresenceDay>()
             let now = Date()
@@ -288,10 +301,23 @@ struct SchengenWidgetProvider: TimelineProvider {
     }
 
     func getTimeline(in context: Context, completion: @escaping (Timeline<SchengenEntry>) -> Void) {
-        Task {
+        Task { @MainActor in
             let container = ModelContainerProvider.makeContainer()
             let modelContext = ModelContext(container)
             
+            let service = LocationSampleService()
+            do {
+                _ = try await service.captureAndStoreBurst(
+                    source: .widget,
+                    modelContext: modelContext,
+                    maxSamples: 6,
+                    maxDuration: 8,
+                    maxSampleAge: 120
+                )
+            } catch {
+                // Keep widget timeline generation resilient if capture/persistence fails.
+            }
+
             let now = Date()
             let windowStart = Calendar.current.date(byAdding: .day, value: -180, to: now) ?? now.addingTimeInterval(-180 * 24 * 3600)
             
