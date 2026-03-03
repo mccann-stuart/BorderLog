@@ -16,6 +16,8 @@
 	<string>1</string>
 	<key>AppGroupId</key>
 	<string>$(APP_GROUP_ID)</string>
+	<key>NSWidgetWantsLocation</key>
+	<true/>
 	<key>NSExtension</key>
 	<dict>
 		<key>NSExtensionPointIdentifier</key>

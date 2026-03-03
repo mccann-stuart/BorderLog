@@ -32,14 +32,33 @@ final class LocationSampleService: NSObject, CLLocationManagerDelegate {
         }
     }
 
+    nonisolated static func isCaptureAuthorized(
+        source: LocationSampleSource,
+        status: CLAuthorizationStatus,
+        isAuthorizedForWidgetUpdates: Bool
+    ) -> Bool {
+        let hasLocationAuthorization = status == .authorizedWhenInUse || status == .authorizedAlways
+        guard hasLocationAuthorization else { return false }
+
+        switch source {
+        case .app:
+            return true
+        case .widget:
+            return isAuthorizedForWidgetUpdates
+        }
+    }
+
     func captureAndStore(
         source: LocationSampleSource,
         modelContext: ModelContext,
         resolver: CountryResolving? = nil
     ) async throws -> LocationSample? {
         let resolver = resolver ?? CLGeocoderCountryResolver()
-        let status = manager.authorizationStatus
-        guard status == .authorizedWhenInUse || status == .authorizedAlways else {
+        guard Self.isCaptureAuthorized(
+            source: source,
+            status: manager.authorizationStatus,
+            isAuthorizedForWidgetUpdates: manager.isAuthorizedForWidgetUpdates
+        ) else {
             return nil
         }
 
@@ -104,8 +123,11 @@ final class LocationSampleService: NSObject, CLLocationManagerDelegate {
         maxSampleAge: TimeInterval = 120
     ) async throws -> LocationSample? {
         let resolver = resolver ?? CLGeocoderCountryResolver()
-        let status = manager.authorizationStatus
-        guard status == .authorizedWhenInUse || status == .authorizedAlways else {
+        guard Self.isCaptureAuthorized(
+            source: source,
+            status: manager.authorizationStatus,
+            isAuthorizedForWidgetUpdates: manager.isAuthorizedForWidgetUpdates
+        ) else {
             return nil
         }
 
