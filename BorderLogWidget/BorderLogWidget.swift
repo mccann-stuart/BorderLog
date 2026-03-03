@@ -338,8 +338,14 @@ struct SchengenWidgetEntryView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("Schengen 90 stays valid for a rolling 180 days")
-                .font(.system(.headline, design: .rounded))
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Schengen")
+                    .font(.system(.headline, design: .rounded))
+                Text("90 stays valid for a rolling 180 days")
+                    .font(.system(.caption, design: .rounded))
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
             
             if family == .systemSmall {
                 HStack {
