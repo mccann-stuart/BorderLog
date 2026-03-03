@@ -13,6 +13,7 @@ struct BorderLogApp: App {
     var sharedModelContainer: ModelContainer = ModelContainerProvider.makeContainer()
 
     @StateObject private var authManager = AuthenticationManager()
+    @Environment(\.scenePhase) private var scenePhase
 
     init() {
         let container = sharedModelContainer
@@ -28,5 +29,46 @@ struct BorderLogApp: App {
                 .environmentObject(authManager)
         }
         .modelContainer(sharedModelContainer)
+        .onChange(of: scenePhase) { oldPhase, newPhase in
+            if newPhase == .active {
+                ingestPendingLocations()
+            }
+        }
+    }
+
+    private func ingestPendingLocations() {
+        let pending = PendingLocationSnapshot.dequeueAll(from: AppConfig.sharedDefaults)
+        guard !pending.isEmpty else { return }
+        
+        let context = ModelContext(sharedModelContainer)
+        var dayKeysToRecompute = Set<String>()
+        
+        for snapshot in pending {
+            let sample = LocationSample(
+                timestamp: snapshot.timestamp,
+                latitude: snapshot.latitude,
+                longitude: snapshot.longitude,
+                accuracyMeters: snapshot.accuracyMeters,
+                source: LocationSampleSource(rawValue: snapshot.sourceRaw) ?? .widget,
+                timeZoneId: snapshot.timeZoneId,
+                dayKey: snapshot.dayKey,
+                countryCode: snapshot.countryCode,
+                countryName: snapshot.countryName
+            )
+            context.insert(sample)
+            dayKeysToRecompute.insert(snapshot.dayKey)
+        }
+        
+        do {
+            try context.save()
+            if !dayKeysToRecompute.isEmpty {
+                Task {
+                    let recomputeService = LedgerRecomputeService(modelContainer: sharedModelContainer)
+                    await recomputeService.recompute(dayKeys: Array(dayKeysToRecompute))
+                }
+            }
+        } catch {
+            print("Failed to save ingested pending locations: \(error)")
+        }
     }
 }

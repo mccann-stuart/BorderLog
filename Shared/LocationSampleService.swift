@@ -62,6 +62,23 @@ final class LocationSampleService: NSObject, CLLocationManagerDelegate {
             countryCode: resolution?.countryCode,
             countryName: resolution?.countryName
         )
+        
+        if source == .widget {
+            let pending = PendingLocationSnapshot(
+                timestamp: sample.timestamp,
+                latitude: sample.latitude,
+                longitude: sample.longitude,
+                accuracyMeters: sample.accuracyMeters,
+                sourceRaw: sample.sourceRaw,
+                timeZoneId: sample.timeZoneId,
+                dayKey: sample.dayKey,
+                countryCode: sample.countryCode,
+                countryName: sample.countryName
+            )
+            PendingLocationSnapshot.enqueue(pending, in: AppConfig.sharedDefaults)
+            return sample
+        }
+
         modelContext.insert(sample)
 
         do {
@@ -132,23 +149,41 @@ final class LocationSampleService: NSObject, CLLocationManagerDelegate {
                 countryCode: resolution?.countryCode,
                 countryName: resolution?.countryName
             )
-            modelContext.insert(sample)
+            
+            if source == .widget {
+                let pending = PendingLocationSnapshot(
+                    timestamp: sample.timestamp,
+                    latitude: sample.latitude,
+                    longitude: sample.longitude,
+                    accuracyMeters: sample.accuracyMeters,
+                    sourceRaw: sample.sourceRaw,
+                    timeZoneId: sample.timeZoneId,
+                    dayKey: sample.dayKey,
+                    countryCode: sample.countryCode,
+                    countryName: sample.countryName
+                )
+                PendingLocationSnapshot.enqueue(pending, in: AppConfig.sharedDefaults)
+            } else {
+                modelContext.insert(sample)
+            }
             storedSamples.append(sample)
         }
 
-        if modelContext.hasChanges {
-            do {
-                try modelContext.save()
-            } catch {
-                print("LocationSampleService burst save error: \(error)")
-                throw error
+        if source != .widget {
+            if modelContext.hasChanges {
+                do {
+                    try modelContext.save()
+                } catch {
+                    print("LocationSampleService burst save error: \(error)")
+                    throw error
+                }
             }
-        }
 
-        if !dayKeys.isEmpty {
-            let container = modelContext.container
-            let recomputeService = LedgerRecomputeService(modelContainer: container)
-            await recomputeService.recompute(dayKeys: Array(dayKeys))
+            if !dayKeys.isEmpty {
+                let container = modelContext.container
+                let recomputeService = LedgerRecomputeService(modelContainer: container)
+                await recomputeService.recompute(dayKeys: Array(dayKeys))
+            }
         }
 
         return storedSamples.first
