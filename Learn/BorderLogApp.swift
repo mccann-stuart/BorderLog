@@ -15,6 +15,9 @@ struct BorderLogApp: App {
     @StateObject private var authManager = AuthenticationManager()
     @Environment(\.scenePhase) private var scenePhase
 
+    @AppStorage("requireBiometrics") private var requireBiometrics = false
+    @State private var isUnlocked = false
+
     init() {
         let container = sharedModelContainer
         Task {
@@ -27,11 +30,20 @@ struct BorderLogApp: App {
         WindowGroup {
             MainNavigationView()
                 .environmentObject(authManager)
+                .overlay {
+                    if requireBiometrics && !isUnlocked {
+                        SecurityLockView(isUnlocked: $isUnlocked)
+                    }
+                }
         }
         .modelContainer(sharedModelContainer)
         .onChange(of: scenePhase) { oldPhase, newPhase in
             if newPhase == .active {
                 ingestPendingLocations()
+            } else if newPhase == .background {
+                if requireBiometrics {
+                    isUnlocked = false
+                }
             }
         }
     }

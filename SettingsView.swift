@@ -33,6 +33,7 @@ struct SettingsView: View {
     @AppStorage("usePolygonMapView") private var usePolygonMapView = true
     @AppStorage("showSchengenDashboardSection") private var showSchengenDashboardSection = true
     @AppStorage("cloudKitSyncEnabled", store: AppConfig.sharedDefaults) private var cloudKitSyncEnabled = false
+    @AppStorage("requireBiometrics") private var requireBiometrics = false
 
     private var dataManager: DataManager {
         DataManager(modelContext: modelContext)
@@ -86,6 +87,10 @@ struct SettingsView: View {
                             .fixedSize(horizontal: false, vertical: true)
                     }
                     .padding(.vertical, 4)
+
+                    Toggle(isOn: $requireBiometrics) {
+                        Label("Require Face ID / Touch ID", systemImage: "faceid")
+                    }
                 } header: {
                     Text("Privacy")
                 }
