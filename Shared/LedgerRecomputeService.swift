@@ -64,7 +64,7 @@ public actor LedgerRecomputeService {
 
         do {
             stays = try dataFetcher.fetchStays(from: rangeStart, to: rangeEnd)
-            overrides = try dataFetcher.fetchOverrides(from: rangeStart, to: rangeEnd)
+            overrides = try dataFetcher.fetchOverrides(dayKeys: Array(dayKeySet))
             locations = try dataFetcher.fetchLocations(from: rangeStart, to: rangeEnd)
             photos = try dataFetcher.fetchPhotos(from: rangeStart, to: rangeEnd)
             calendarSignals = try dataFetcher.fetchCalendarSignals(from: rangeStart, to: rangeEnd)
@@ -76,8 +76,9 @@ public actor LedgerRecomputeService {
 
         let stayInfos = stays.map {
             StayPresenceInfo(
-                enteredOn: $0.enteredOn,
-                exitedOn: $0.exitedOn,
+                entryDayKey: $0.entryDayKey,
+                exitDayKey: $0.exitDayKey,
+                dayTimeZoneId: $0.dayTimeZoneId,
                 countryCode: $0.countryCode,
                 countryName: $0.countryName
             )
@@ -85,7 +86,8 @@ public actor LedgerRecomputeService {
 
         let overrideInfos = overrides.map {
             OverridePresenceInfo(
-                date: $0.date,
+                dayKey: $0.dayKey,
+                dayTimeZoneId: $0.dayTimeZoneId,
                 countryCode: $0.countryCode,
                 countryName: $0.countryName
             )
@@ -95,7 +97,7 @@ public actor LedgerRecomputeService {
             guard let name = sample.countryName ?? sample.countryCode else { return nil }
             return LocationSignalInfo(
                 dayKey: sample.dayKey,
-                countryCode: sample.countryCode ?? name,
+                countryCode: sample.countryCode,
                 countryName: name,
                 accuracyMeters: sample.accuracyMeters,
                 timeZoneId: sample.timeZoneId
@@ -106,7 +108,7 @@ public actor LedgerRecomputeService {
             guard let name = signal.countryName ?? signal.countryCode else { return nil }
             return PhotoSignalInfo(
                 dayKey: signal.dayKey,
-                countryCode: signal.countryCode ?? name,
+                countryCode: signal.countryCode,
                 countryName: name,
                 timeZoneId: signal.timeZoneId
             )
@@ -116,9 +118,10 @@ public actor LedgerRecomputeService {
             guard let name = signal.countryName ?? signal.countryCode else { return nil }
             return CalendarSignalInfo(
                 dayKey: signal.dayKey,
-                countryCode: signal.countryCode ?? name,
+                countryCode: signal.countryCode,
                 countryName: name,
-                timeZoneId: signal.timeZoneId
+                timeZoneId: signal.timeZoneId,
+                bucketingTimeZoneId: signal.bucketingTimeZoneId
             )
         }
 
@@ -146,7 +149,7 @@ public actor LedgerRecomputeService {
 
         do {
             try self.upsertPresenceDays(results)
-            try await dataFetcher.save()
+            try dataFetcher.save()
         } catch {
             print("LedgerRecomputeService save error: \(error)")
             onRecomputeError?(error)
@@ -178,8 +181,7 @@ public actor LedgerRecomputeService {
 
         let existingKeys: Set<String>
         do {
-            // Optimization: Fetch only keys for the relevant 2-year window (plus today) instead of all keys in the database.
-            existingKeys = try await dataFetcher.fetchPresenceDayKeys(from: start, to: today)
+            existingKeys = try dataFetcher.fetchPresenceDayKeys(in: allDayKeys)
         } catch {
             print("LedgerRecomputeService fillMissingDays fetch error: \(error)")
             return
@@ -188,9 +190,9 @@ public actor LedgerRecomputeService {
         let missing = allDayKeys.subtracting(existingKeys)
         guard !missing.isEmpty else { return }
 
-        for dayKey in missing {
-            let date = await DayKey.date(for: dayKey, timeZone: timeZone) ?? today
-            let day = await PresenceDay(
+        for dayKey in missing.sorted() {
+            let date = DayKey.date(for: dayKey, timeZone: timeZone) ?? today
+            let day = PresenceDay(
                 dayKey: dayKey,
                 date: date,
                 timeZoneId: timeZone.identifier,
@@ -205,11 +207,11 @@ public actor LedgerRecomputeService {
                 locationCount: 0,
                 calendarCount: 0
             )
-            await dataFetcher.insertPresenceDay(day)
+            dataFetcher.insertPresenceDay(day)
         }
 
         do {
-            try await dataFetcher.save()
+            try dataFetcher.save()
         } catch {
             print("LedgerRecomputeService fillMissingDays save error: \(error)")
         }

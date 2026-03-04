@@ -78,11 +78,11 @@ struct DayOverrideEditorView: View {
         .confirmationDialog("Delete this override?", isPresented: $isConfirmingDelete) {
             Button("Delete", role: .destructive) {
                 if let existingOverride {
-                    let deletedDate = existingOverride.date
+                    let deletedDayKey = existingOverride.dayKey
                     modelContext.delete(existingOverride)
                     do {
                         try modelContext.save()
-                        recomputeImpactedOverrideDays([deletedDate])
+                        recomputeImpactedOverrideDays([deletedDayKey])
                         dismiss()
                     } catch {
                         print("Failed to delete override: \(error)")
@@ -118,13 +118,10 @@ struct DayOverrideEditorView: View {
 
     private var suggestedCodes: [String] {
         guard existingOverride == nil else { return [] }
-        let calendar = Calendar.current
-        let targetStart = calendar.startOfDay(for: draft.date)
-        guard let targetEnd = calendar.date(byAdding: .day, value: 1, to: targetStart) else { return [] }
+        let targetDayKey = DayKey.make(from: draft.date, timeZone: Calendar.current.timeZone)
 
         let matchingDay = presenceDays.first { day in
-            let dayStart = calendar.startOfDay(for: day.date)
-            return dayStart >= targetStart && dayStart < targetEnd
+            day.dayKey == targetDayKey
         }
 
         var codes: [String] = []
@@ -161,14 +158,16 @@ struct DayOverrideEditorView: View {
 
     private func attemptSave() {
         let calendar = Calendar.current
-        let normalizedDate = calendar.startOfDay(for: draft.date)
-        draft.date = normalizedDate
+        let identity = DayIdentity.canonicalDay(
+            for: draft.date,
+            preferredTimeZoneId: calendar.timeZone.identifier
+        )
+        draft.date = identity.normalizedDate
 
         if let conflict = DayOverrideValidation.conflictingOverride(
-            for: normalizedDate,
+            forDayKey: identity.dayKey,
             in: overrides,
-            excluding: existingOverride,
-            calendar: calendar
+            excluding: existingOverride
         ) {
             replaceTarget = conflict
             isShowingReplaceAlert = true
@@ -179,13 +178,19 @@ struct DayOverrideEditorView: View {
     }
 
     private func applySave(replacing: DayOverride?) {
-        var impactedDates = Set<Date>()
+        let identity = DayIdentity.canonicalDay(
+            for: draft.date,
+            preferredTimeZoneId: Calendar.current.timeZone.identifier
+        )
+        draft.date = identity.normalizedDate
+
+        var impactedDayKeys = Set<String>()
         if let existingOverride {
-            impactedDates.insert(existingOverride.date)
+            impactedDayKeys.insert(existingOverride.dayKey)
         }
-        impactedDates.insert(draft.date)
+        impactedDayKeys.insert(identity.dayKey)
         if let replacing {
-            impactedDates.insert(replacing.date)
+            impactedDayKeys.insert(replacing.dayKey)
         }
 
         if let replacing {
@@ -198,16 +203,20 @@ struct DayOverrideEditorView: View {
         let trimmedNotes = draft.notes.trimmingCharacters(in: .whitespacesAndNewlines)
 
         if let existingOverride {
-            existingOverride.date = draft.date
+            existingOverride.date = identity.normalizedDate
+            existingOverride.dayKey = identity.dayKey
+            existingOverride.dayTimeZoneId = identity.dayTimeZoneId
             existingOverride.countryName = trimmedCountry
             existingOverride.countryCode = normalizedCode
             existingOverride.region = draft.region
             existingOverride.notes = trimmedNotes
         } else {
             let newOverride = DayOverride(
-                date: draft.date,
+                date: identity.normalizedDate,
                 countryName: trimmedCountry,
                 countryCode: normalizedCode,
+                dayKey: identity.dayKey,
+                dayTimeZoneId: identity.dayTimeZoneId,
                 region: draft.region,
                 notes: trimmedNotes
             )
@@ -216,15 +225,14 @@ struct DayOverrideEditorView: View {
 
         do {
             try modelContext.save()
-            recomputeImpactedOverrideDays(impactedDates)
+            recomputeImpactedOverrideDays(impactedDayKeys)
             dismiss()
         } catch {
             print("Failed to save override: \(error)")
         }
     }
 
-    private func recomputeImpactedOverrideDays(_ dates: Set<Date>) {
-        let dayKeys = makeDayKeys(for: dates)
+    private func recomputeImpactedOverrideDays(_ dayKeys: Set<String>) {
         guard !dayKeys.isEmpty else { return }
 
         let container = modelContext.container
@@ -232,17 +240,8 @@ struct DayOverrideEditorView: View {
             // Give SwiftData time to sync the saved context before the background context fetches
             try? await Task.sleep(nanoseconds: 150_000_000)
             let service = LedgerRecomputeService(modelContainer: container)
-            await service.recompute(dayKeys: dayKeys)
+            await service.recompute(dayKeys: Array(dayKeys))
         }
-    }
-
-    private func makeDayKeys(for dates: Set<Date>) -> [String] {
-        let calendar = Calendar.current
-        let timeZone = calendar.timeZone
-        return Array(Set(dates.map { date in
-            let normalized = calendar.startOfDay(for: date)
-            return DayKey.make(from: normalized, timeZone: timeZone)
-        }))
     }
 }
 

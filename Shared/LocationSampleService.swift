@@ -76,7 +76,7 @@ final class LocationSampleService: NSObject, CLLocationManagerDelegate {
             longitude: location.coordinate.longitude,
             accuracyMeters: location.horizontalAccuracy,
             source: source,
-            timeZoneId: resolution?.timeZone?.identifier,
+            timeZoneId: timeZone.identifier,
             dayKey: dayKey,
             countryCode: resolution?.countryCode,
             countryName: resolution?.countryName
@@ -166,7 +166,7 @@ final class LocationSampleService: NSObject, CLLocationManagerDelegate {
                 longitude: location.coordinate.longitude,
                 accuracyMeters: location.horizontalAccuracy,
                 source: source,
-                timeZoneId: resolution?.timeZone?.identifier,
+                timeZoneId: timeZone.identifier,
                 dayKey: dayKey,
                 countryCode: resolution?.countryCode,
                 countryName: resolution?.countryName

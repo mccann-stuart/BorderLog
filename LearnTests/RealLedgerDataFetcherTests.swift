@@ -117,4 +117,39 @@ final class RealLedgerDataFetcherTests: XCTestCase {
 
         XCTAssertNil(try fetcher.fetchNearestKnownPresenceDay(after: d4))
     }
+
+    func testFetchPresenceDayKeysFromRangeUsesCanonicalKeys() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let fetcher = RealLedgerDataFetcher(modelContext: context)
+
+        let calendar = Calendar(identifier: .gregorian)
+        let targetDay = calendar.date(from: DateComponents(year: 2026, month: 3, day: 1))!
+        let driftedDate = calendar.date(from: DateComponents(year: 2026, month: 2, day: 27))!
+
+        context.insert(
+            PresenceDay(
+                dayKey: "2026-03-01",
+                date: driftedDate,
+                timeZoneId: "UTC",
+                countryCode: "ES",
+                countryName: "Spain",
+                confidence: 1,
+                confidenceLabel: .high,
+                sources: .stay,
+                isOverride: false,
+                stayCount: 1,
+                photoCount: 0,
+                locationCount: 0,
+                calendarCount: 0
+            )
+        )
+        try context.save()
+
+        let rangeKeys = try fetcher.fetchPresenceDayKeys(from: targetDay, to: targetDay)
+        let lookupKeys = try fetcher.fetchPresenceDayKeys(in: ["2026-03-01"])
+
+        XCTAssertEqual(rangeKeys, ["2026-03-01"])
+        XCTAssertEqual(lookupKeys, ["2026-03-01"])
+    }
 }

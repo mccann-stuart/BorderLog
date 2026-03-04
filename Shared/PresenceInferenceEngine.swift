@@ -23,7 +23,7 @@ struct PresenceInferenceEngine {
 
     private struct DayBucket {
         var countries: [CountryKey: CountryAccumulator] = [:]
-        var timeZoneId: String?
+        var timeZoneScores: [String: Double] = [:]
     }
 
     static func compute(
@@ -37,7 +37,7 @@ struct PresenceInferenceEngine {
         calendar: Calendar = .current,
         progress: ((Int, Int) -> Void)? = nil
     ) -> [PresenceDayResult] {
-        let timeZone = calendar.timeZone
+        let defaultTimeZone = calendar.timeZone
         var buckets: [String: DayBucket] = [:]
         let orderedDayKeys = dayKeys.sorted()
         let totalCount = orderedDayKeys.count
@@ -53,7 +53,17 @@ struct PresenceInferenceEngine {
             buckets[dayKey] = current
         }
 
-        func addScore(dayKey: String, countryCode: String?, countryName: String, weight: Double, stay: Bool, photo: Bool, location: Bool, calendarSignal: Bool, timeZoneId: String?) {
+        func addScore(
+            dayKey: String,
+            countryCode: String?,
+            countryName: String,
+            weight: Double,
+            stay: Bool,
+            photo: Bool,
+            location: Bool,
+            calendarSignal: Bool,
+            timeZoneId: String?
+        ) {
             updateBucket(dayKey) { bucket in
                 let key = CountryKey(code: countryCode, name: countryName)
                 var accumulator = bucket.countries[key] ?? CountryAccumulator()
@@ -63,27 +73,71 @@ struct PresenceInferenceEngine {
                 if location { accumulator.locationCount += 1 }
                 if calendarSignal { accumulator.calendarCount += 1 }
                 bucket.countries[key] = accumulator
-                if bucket.timeZoneId == nil {
-                    bucket.timeZoneId = timeZoneId
+
+                if let timeZoneId,
+                   TimeZone(identifier: timeZoneId) != nil {
+                    bucket.timeZoneScores[timeZoneId, default: 0] += weight
                 }
             }
         }
 
+        func selectedDayTimeZoneId(
+            for bucket: DayBucket,
+            preferredTimeZoneId: String?,
+            fallback: String
+        ) -> String {
+            if let preferredTimeZoneId,
+               TimeZone(identifier: preferredTimeZoneId) != nil {
+                return preferredTimeZoneId
+            }
+
+            let sortedTimeZones = bucket.timeZoneScores.sorted { lhs, rhs in
+                if lhs.value == rhs.value {
+                    return lhs.key < rhs.key
+                }
+                return lhs.value > rhs.value
+            }
+            return sortedTimeZones.first?.key ?? fallback
+        }
+
         // Manual stays
         for stay in stays {
-            let start = calendar.startOfDay(for: stay.enteredOn)
-            let rawEnd = calendar.startOfDay(for: stay.exitedOn ?? rangeEnd)
-            let end = min(rawEnd, calendar.startOfDay(for: rangeEnd))
+            let stayTimeZone = DayIdentity.canonicalTimeZone(
+                preferredTimeZoneId: stay.dayTimeZoneId,
+                fallback: defaultTimeZone
+            )
+
+            guard let start = DayKey.date(for: stay.entryDayKey, timeZone: stayTimeZone) else {
+                continue
+            }
+
+            let rangeEndKey = DayKey.make(from: rangeEnd, timeZone: stayTimeZone)
+            let clampedRangeEnd = DayKey.date(for: rangeEndKey, timeZone: stayTimeZone) ?? rangeEnd
+            let exitKey = stay.exitDayKey ?? rangeEndKey
+            let rawEnd = DayKey.date(for: exitKey, timeZone: stayTimeZone) ?? clampedRangeEnd
+            let end = min(rawEnd, clampedRangeEnd)
             guard start <= end else { continue }
+
+            var stayCalendar = Calendar(identifier: .gregorian)
+            stayCalendar.timeZone = stayTimeZone
 
             var day = start
             while day <= end {
-                let dayKey = DayKey.make(from: day, timeZone: timeZone)
+                let dayKey = DayKey.make(from: day, timeZone: stayTimeZone)
                 if dayKeys.contains(dayKey) {
-                    let countryName = stay.countryName
-                    addScore(dayKey: dayKey, countryCode: stay.countryCode, countryName: countryName, weight: 5.0, stay: true, photo: false, location: false, calendarSignal: false, timeZoneId: timeZone.identifier)
+                    addScore(
+                        dayKey: dayKey,
+                        countryCode: stay.countryCode,
+                        countryName: stay.countryName,
+                        weight: 5.0,
+                        stay: true,
+                        photo: false,
+                        location: false,
+                        calendarSignal: false,
+                        timeZoneId: stay.dayTimeZoneId
+                    )
                 }
-                guard let next = calendar.date(byAdding: .day, value: 1, to: day) else { break }
+                guard let next = stayCalendar.date(byAdding: .day, value: 1, to: day) else { break }
                 day = next
             }
         }
@@ -91,14 +145,34 @@ struct PresenceInferenceEngine {
         // Photo signals
         for photo in photos {
             if dayKeys.contains(photo.dayKey) {
-                addScore(dayKey: photo.dayKey, countryCode: photo.countryCode, countryName: photo.countryName, weight: 2.0, stay: false, photo: true, location: false, calendarSignal: false, timeZoneId: photo.timeZoneId)
+                addScore(
+                    dayKey: photo.dayKey,
+                    countryCode: photo.countryCode,
+                    countryName: photo.countryName,
+                    weight: 2.0,
+                    stay: false,
+                    photo: true,
+                    location: false,
+                    calendarSignal: false,
+                    timeZoneId: photo.timeZoneId
+                )
             }
         }
 
         // Calendar signals
         for signal in calendarSignals {
             if dayKeys.contains(signal.dayKey) {
-                addScore(dayKey: signal.dayKey, countryCode: signal.countryCode, countryName: signal.countryName, weight: 1.0, stay: false, photo: false, location: false, calendarSignal: true, timeZoneId: signal.timeZoneId)
+                addScore(
+                    dayKey: signal.dayKey,
+                    countryCode: signal.countryCode,
+                    countryName: signal.countryName,
+                    weight: 1.0,
+                    stay: false,
+                    photo: false,
+                    location: false,
+                    calendarSignal: true,
+                    timeZoneId: signal.bucketingTimeZoneId ?? signal.timeZoneId
+                )
             }
         }
 
@@ -107,16 +181,26 @@ struct PresenceInferenceEngine {
             if dayKeys.contains(location.dayKey) {
                 let accuracy = max(location.accuracyMeters, 1)
                 let accuracyFactor = min(1.0, max(0.2, 100.0 / accuracy))
-                addScore(dayKey: location.dayKey, countryCode: location.countryCode, countryName: location.countryName, weight: 3.0 * accuracyFactor, stay: false, photo: false, location: true, calendarSignal: false, timeZoneId: location.timeZoneId)
+                addScore(
+                    dayKey: location.dayKey,
+                    countryCode: location.countryCode,
+                    countryName: location.countryName,
+                    weight: 3.0 * accuracyFactor,
+                    stay: false,
+                    photo: false,
+                    location: true,
+                    calendarSignal: false,
+                    timeZoneId: location.timeZoneId
+                )
             }
         }
 
-        // Overrides map
         var overrideMap: [String: OverridePresenceInfo] = [:]
         for overrideDay in overrides {
-            let dayKey = DayKey.make(from: overrideDay.date, timeZone: timeZone)
-            if dayKeys.contains(dayKey) {
-                overrideMap[dayKey] = overrideDay
+            guard dayKeys.contains(overrideDay.dayKey) else { continue }
+            overrideMap[overrideDay.dayKey] = overrideDay
+            updateBucket(overrideDay.dayKey) { bucket in
+                bucket.timeZoneScores[overrideDay.dayTimeZoneId, default: 0] += 10
             }
         }
 
@@ -134,10 +218,16 @@ struct PresenceInferenceEngine {
 
         for dayKey in orderedDayKeys {
             let bucket = buckets[dayKey] ?? DayBucket()
-            let dayTimeZone = bucket.timeZoneId.flatMap { TimeZone(identifier: $0) } ?? timeZone
+            let overrideInfo = overrideMap[dayKey]
+            let selectedTimeZoneId = selectedDayTimeZoneId(
+                for: bucket,
+                preferredTimeZoneId: overrideInfo?.dayTimeZoneId,
+                fallback: defaultTimeZone.identifier
+            )
+            let dayTimeZone = TimeZone(identifier: selectedTimeZoneId) ?? defaultTimeZone
             let date = DayKey.date(for: dayKey, timeZone: dayTimeZone) ?? calendar.startOfDay(for: rangeEnd)
 
-            if let overrideInfo = overrideMap[dayKey] {
+            if let overrideInfo {
                 let overrideKey = CountryKey(code: overrideInfo.countryCode, name: overrideInfo.countryName)
                 let accumulator = bucket.countries[overrideKey] ?? CountryAccumulator()
                 var sources = SignalSourceMask.override
@@ -273,26 +363,24 @@ struct PresenceInferenceEngine {
         }
 
         var sortedResults = results.sorted { $0.date < $1.date }
-        
+
         var i = 0
         while i < sortedResults.count {
             if sortedResults[i].countryCode == nil {
-                // Find the extent of the gap
                 var j = i
                 while j < sortedResults.count, sortedResults[j].countryCode == nil {
                     j += 1
                 }
-                
+
                 let gapLength = j - i
-                
-                // Check if gap is bounded by same country and length is <= 7
-                // And ensure we have a prior day (i > 0) and an after day (j < sortedResults.count)
+
                 if gapLength <= 7, i > 0, j < sortedResults.count {
                     let prev = sortedResults[i - 1]
                     let next = sortedResults[j]
-                    
-                    // Prior day and after day must match
-                    if let prevCode = prev.countryCode, let nextCode = next.countryCode, prevCode == nextCode {
+
+                    if let prevCode = prev.countryCode,
+                       let nextCode = next.countryCode,
+                       prevCode == nextCode {
                         for k in i..<j {
                             let current = sortedResults[k]
                             sortedResults[k] = PresenceDayResult(
@@ -303,7 +391,7 @@ struct PresenceInferenceEngine {
                                 countryName: prev.countryName,
                                 confidence: 0.5,
                                 confidenceLabel: .medium,
-                                sources: .none, // Explicitly no real sources, just inferred
+                                sources: .none,
                                 isOverride: false,
                                 isDisputed: false,
                                 stayCount: 0,
@@ -314,40 +402,39 @@ struct PresenceInferenceEngine {
                         }
                     }
                 }
-                
-                i = j // Skip past the gap to avoid re-evaluating
+
+                i = j
             } else {
                 i += 1
             }
         }
 
-        // Second pass: add suggestions to unknown days
         for i in 0..<sortedResults.count {
             if sortedResults[i].countryCode == nil || sortedResults[i].confidence == 0 {
-                // Scan backward for a known day
                 var backwardSuggestion: (code: String, name: String)?
                 for j in stride(from: i - 1, through: 0, by: -1) {
-                    if let code = sortedResults[j].countryCode, let name = sortedResults[j].countryName {
+                    if let code = sortedResults[j].countryCode,
+                       let name = sortedResults[j].countryName {
                         backwardSuggestion = (code, name)
                         break
                     }
                 }
 
-                // Scan forward for a known day
                 var forwardSuggestion: (code: String, name: String)?
                 for j in stride(from: i + 1, to: sortedResults.count, by: 1) {
-                    if let code = sortedResults[j].countryCode, let name = sortedResults[j].countryName {
+                    if let code = sortedResults[j].countryCode,
+                       let name = sortedResults[j].countryName {
                         forwardSuggestion = (code, name)
                         break
                     }
                 }
 
                 var suggestions: [(code: String, name: String)] = []
-                if let bg = backwardSuggestion {
-                    suggestions.append(bg)
+                if let backwardSuggestion {
+                    suggestions.append(backwardSuggestion)
                 }
-                if let fg = forwardSuggestion, fg.code != backwardSuggestion?.code {
-                    suggestions.append(fg)
+                if let forwardSuggestion, forwardSuggestion.code != backwardSuggestion?.code {
+                    suggestions.append(forwardSuggestion)
                 }
 
                 if !suggestions.isEmpty {

@@ -45,4 +45,25 @@ final class StayTests: XCTestCase {
         let mixedTitle = entryWithMixedCaseCode.displayTitle
         XCTAssertEqual(mixedTitle, "France (FR)")
     }
+
+    func testCanonicalEntryAndExitDayIdentity() {
+        let utc = TimeZone(secondsFromGMT: 0)!
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = utc
+
+        let entered = calendar.date(from: DateComponents(year: 2026, month: 2, day: 10, hour: 8))!
+        let exited = calendar.date(from: DateComponents(year: 2026, month: 2, day: 12, hour: 20))!
+
+        let stay = Stay(
+            countryName: "France",
+            countryCode: "FR",
+            dayTimeZoneId: utc.identifier,
+            enteredOn: entered,
+            exitedOn: exited
+        )
+
+        XCTAssertEqual(stay.dayTimeZoneId, utc.identifier)
+        XCTAssertEqual(stay.entryDayKey, "2026-02-10")
+        XCTAssertEqual(stay.exitDayKey, "2026-02-12")
+    }
 }

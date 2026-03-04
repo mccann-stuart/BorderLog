@@ -44,4 +44,53 @@ final class ModelContainerProviderRecoveryTests: XCTestCase {
             XCTAssertTrue(fm.fileExists(atPath: quarantined.path))
         }
     }
+
+    func testEnforceStoreEpochClearsStoresOnceAndThenNoOps() throws {
+        let fm = FileManager.default
+        let root = fm.temporaryDirectory.appendingPathComponent("ModelContainerProviderEpochTests-\(UUID().uuidString)")
+        let appGroupDir = root.appendingPathComponent("group")
+        let appSupportDir = root.appendingPathComponent("support")
+        let tempDir = root.appendingPathComponent("temp")
+        try fm.createDirectory(at: appGroupDir, withIntermediateDirectories: true)
+        try fm.createDirectory(at: appSupportDir, withIntermediateDirectories: true)
+        try fm.createDirectory(at: tempDir, withIntermediateDirectories: true)
+        defer { try? fm.removeItem(at: root) }
+
+        for directory in [appGroupDir, appSupportDir] {
+            for file in ["BorderLog.store", "BorderLog.store-wal", "BorderLog.store-shm"] {
+                try Data("x".utf8).write(to: directory.appendingPathComponent(file))
+            }
+        }
+        try Data("x".utf8).write(to: tempDir.appendingPathComponent("BorderLog.fallback.store"))
+
+        let suiteName = "ModelContainerProviderEpochTests.\(UUID().uuidString)"
+        guard let defaults = UserDefaults(suiteName: suiteName) else {
+            XCTFail("Failed to create isolated defaults suite")
+            return
+        }
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        defaults.set(0, forKey: ModelContainerProvider.storeEpochKeyForTests)
+
+        let didReset = ModelContainerProvider.enforceStoreEpoch(
+            defaults: defaults,
+            appGroupStoreDirectory: appGroupDir,
+            appSupportDirectory: appSupportDir,
+            temporaryDirectory: tempDir
+        )
+        XCTAssertTrue(didReset)
+        XCTAssertEqual(defaults.integer(forKey: ModelContainerProvider.storeEpochKeyForTests), ModelContainerProvider.currentStoreEpochForTests)
+
+        XCTAssertFalse(fm.fileExists(atPath: appGroupDir.appendingPathComponent("BorderLog.store").path))
+        XCTAssertFalse(fm.fileExists(atPath: appSupportDir.appendingPathComponent("BorderLog.store").path))
+        XCTAssertFalse(fm.fileExists(atPath: tempDir.appendingPathComponent("BorderLog.fallback.store").path))
+
+        let didResetAgain = ModelContainerProvider.enforceStoreEpoch(
+            defaults: defaults,
+            appGroupStoreDirectory: appGroupDir,
+            appSupportDirectory: appSupportDir,
+            temporaryDirectory: tempDir
+        )
+        XCTAssertFalse(didResetAgain)
+    }
 }

@@ -153,13 +153,10 @@ struct StayEditorView: View {
 
     private var suggestedCodes: [String] {
         guard existingStay == nil else { return [] }
-        let calendar = Calendar.current
-        let targetStart = calendar.startOfDay(for: draft.enteredOn)
-        guard let targetEnd = calendar.date(byAdding: .day, value: 1, to: targetStart) else { return [] }
+        let targetDayKey = DayKey.make(from: draft.enteredOn, timeZone: Calendar.current.timeZone)
 
         let matchingDay = presenceDays.first { day in
-            let dayStart = calendar.startOfDay(for: day.date)
-            return dayStart >= targetStart && dayStart < targetEnd
+            day.dayKey == targetDayKey
         }
 
         var codes: [String] = []
@@ -253,25 +250,51 @@ struct StayEditorView: View {
         let normalizedCode = CountryCodeNormalizer.normalize(trimmedCode)
         let trimmedNotes = draft.notes.trimmingCharacters(in: .whitespacesAndNewlines)
         let exitDate = draft.hasExitDate ? draft.exitedOn : nil
+        let timeZone = Calendar.current.timeZone
+        let entryIdentity = DayIdentity.canonicalDay(
+            for: draft.enteredOn,
+            preferredTimeZoneId: timeZone.identifier
+        )
+        let exitIdentity = exitDate.map {
+            DayIdentity.canonicalDay(
+                for: $0,
+                preferredTimeZoneId: timeZone.identifier
+            )
+        }
+
+        draft.enteredOn = entryIdentity.normalizedDate
+        if let exitIdentity {
+            draft.exitedOn = exitIdentity.normalizedDate
+        }
+
         let previousRange = existingStay.map {
             normalizedStayRange(enteredOn: $0.enteredOn, exitedOn: $0.exitedOn)
         }
-        let newRange = normalizedStayRange(enteredOn: draft.enteredOn, exitedOn: exitDate)
+        let newRange = normalizedStayRange(
+            enteredOn: entryIdentity.normalizedDate,
+            exitedOn: exitIdentity?.normalizedDate
+        )
 
         if let existingStay {
             existingStay.countryName = trimmedCountry
             existingStay.countryCode = normalizedCode
             existingStay.region = draft.region
-            existingStay.enteredOn = draft.enteredOn
-            existingStay.exitedOn = exitDate
+            existingStay.dayTimeZoneId = entryIdentity.dayTimeZoneId
+            existingStay.entryDayKey = entryIdentity.dayKey
+            existingStay.exitDayKey = exitIdentity?.dayKey
+            existingStay.enteredOn = entryIdentity.normalizedDate
+            existingStay.exitedOn = exitIdentity?.normalizedDate
             existingStay.notes = trimmedNotes
         } else {
             let stay = Stay(
                 countryName: trimmedCountry,
                 countryCode: normalizedCode,
+                dayTimeZoneId: entryIdentity.dayTimeZoneId,
+                entryDayKey: entryIdentity.dayKey,
+                exitDayKey: exitIdentity?.dayKey,
                 region: draft.region,
-                enteredOn: draft.enteredOn,
-                exitedOn: exitDate,
+                enteredOn: entryIdentity.normalizedDate,
+                exitedOn: exitIdentity?.normalizedDate,
                 notes: trimmedNotes
             )
             modelContext.insert(stay)

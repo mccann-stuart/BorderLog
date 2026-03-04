@@ -20,7 +20,14 @@ final class InferenceEngineTests: XCTestCase {
         let date = day(2026, 2, 15)
         let dayKey = DayKey.make(from: date, timeZone: calendar.timeZone)
 
-        let overrides = [OverridePresenceInfo(date: date, countryCode: "FR", countryName: "France")]
+        let overrides = [
+            OverridePresenceInfo(
+                dayKey: dayKey,
+                dayTimeZoneId: calendar.timeZone.identifier,
+                countryCode: "FR",
+                countryName: "France"
+            )
+        ]
         let photos = [PhotoSignalInfo(dayKey: dayKey, countryCode: "ES", countryName: "Spain", timeZoneId: nil)]
         let locations = [LocationSignalInfo(dayKey: dayKey, countryCode: "ES", countryName: "Spain", accuracyMeters: 10, timeZoneId: nil)]
 
@@ -103,6 +110,52 @@ final class InferenceEngineTests: XCTestCase {
 
         XCTAssertEqual(results.first?.countryCode, "FR")
         XCTAssertEqual(results.first?.isDisputed, false)
+    }
+
+    func testDeterministicTimeZoneSelectionWhenScoresTie() {
+        let date = day(2026, 2, 15)
+        let dayKey = DayKey.make(from: date, timeZone: calendar.timeZone)
+
+        let photos = [
+            PhotoSignalInfo(dayKey: dayKey, countryCode: "FR", countryName: "France", timeZoneId: "UTC"),
+            PhotoSignalInfo(dayKey: dayKey, countryCode: "FR", countryName: "France", timeZoneId: "Europe/Paris")
+        ]
+
+        let results = PresenceInferenceEngine.compute(
+            dayKeys: [dayKey],
+            stays: [],
+            overrides: [],
+            locations: [],
+            photos: photos,
+            calendarSignals: [],
+            rangeEnd: date,
+            calendar: calendar
+        )
+
+        XCTAssertEqual(results.first?.timeZoneId, "Europe/Paris")
+    }
+
+    func testCountryCodeRemainsNilWhenOnlyCountryNameAvailable() {
+        let date = day(2026, 2, 15)
+        let dayKey = DayKey.make(from: date, timeZone: calendar.timeZone)
+
+        let photos = [
+            PhotoSignalInfo(dayKey: dayKey, countryCode: nil, countryName: "Spain", timeZoneId: "UTC")
+        ]
+
+        let results = PresenceInferenceEngine.compute(
+            dayKeys: [dayKey],
+            stays: [],
+            overrides: [],
+            locations: [],
+            photos: photos,
+            calendarSignals: [],
+            rangeEnd: date,
+            calendar: calendar
+        )
+
+        XCTAssertEqual(results.first?.countryName, "Spain")
+        XCTAssertNil(results.first?.countryCode)
     }
 }
 #endif

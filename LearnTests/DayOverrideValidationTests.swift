@@ -70,4 +70,17 @@ final class DayOverrideValidationTests: XCTestCase {
         )
         XCTAssertTrue(result === override2)
     }
+
+    func testConflictingOverride_ForDayKeyMatchesByCanonicalKey() {
+        let targetKey = "2026-01-05"
+        let override1 = DayOverride(date: date(2026, 1, 5), countryName: "A", dayKey: targetKey, dayTimeZoneId: "UTC")
+        let override2 = DayOverride(date: date(2026, 1, 7), countryName: "B")
+
+        let result = DayOverrideValidation.conflictingOverride(
+            forDayKey: targetKey,
+            in: [override1, override2]
+        )
+
+        XCTAssertTrue(result === override1)
+    }
 }

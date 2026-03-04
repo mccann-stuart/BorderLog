@@ -17,6 +17,7 @@ final class CalendarSignal {
     var countryCode: String?
     var countryName: String?
     var timeZoneId: String?
+    var bucketingTimeZoneId: String?
     @Attribute(.unique) var eventIdentifier: String
     var title: String?
     var source: String?
@@ -29,6 +30,7 @@ final class CalendarSignal {
         countryCode: String?,
         countryName: String?,
         timeZoneId: String?,
+        bucketingTimeZoneId: String? = nil,
         eventIdentifier: String,
         title: String?,
         source: String?
@@ -40,6 +42,7 @@ final class CalendarSignal {
         self.countryCode = countryCode
         self.countryName = countryName
         self.timeZoneId = timeZoneId
+        self.bucketingTimeZoneId = bucketingTimeZoneId
         self.eventIdentifier = eventIdentifier
         self.title = title
         self.source = source

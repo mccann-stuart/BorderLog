@@ -28,14 +28,15 @@ struct SignalSourceMask: OptionSet, Codable, Sendable {
 
 struct CalendarSignalInfo: Sendable {
     let dayKey: String
-    let countryCode: String
+    let countryCode: String?
     let countryName: String
     let timeZoneId: String?
+    let bucketingTimeZoneId: String?
 }
 
 struct LocationSignalInfo: Sendable {
     let dayKey: String
-    let countryCode: String
+    let countryCode: String?
     let countryName: String
     let accuracyMeters: Double
     let timeZoneId: String?
@@ -43,20 +44,22 @@ struct LocationSignalInfo: Sendable {
 
 struct PhotoSignalInfo: Sendable {
     let dayKey: String
-    let countryCode: String
+    let countryCode: String?
     let countryName: String
     let timeZoneId: String?
 }
 
 struct StayPresenceInfo: Sendable {
-    let enteredOn: Date
-    let exitedOn: Date?
+    let entryDayKey: String
+    let exitDayKey: String?
+    let dayTimeZoneId: String
     let countryCode: String?
     let countryName: String
 }
 
 struct OverridePresenceInfo: Sendable {
-    let date: Date
+    let dayKey: String
+    let dayTimeZoneId: String
     let countryCode: String?
     let countryName: String
 }

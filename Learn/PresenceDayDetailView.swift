@@ -16,8 +16,18 @@ struct PresenceDayDetailView: View {
     @State private var appliedSuggestion: String? = nil
     @State private var isShowingDeleteAlert = false
 
+    private var dayTimeZone: TimeZone {
+        DayIdentity.canonicalTimeZone(preferredTimeZoneId: day.timeZoneId)
+    }
+
     private var dayTitle: String {
-        day.dayKey
+        let localDate = DayIdentity.normalizedDate(
+            for: day.dayKey,
+            dayTimeZoneId: day.timeZoneId
+        )
+        var format = Date.FormatStyle(date: .long, time: .omitted)
+        format.timeZone = dayTimeZone
+        return "\(localDate.formatted(format)) (\(dayTimeZone.identifier))"
     }
 
     private var countryText: String {
@@ -32,8 +42,10 @@ struct PresenceDayDetailView: View {
     }
 
     private var localDate: Date {
-        let calendar = Calendar.current
-        return DayKey.date(for: day.dayKey, timeZone: calendar.timeZone) ?? calendar.startOfDay(for: day.date)
+        DayIdentity.normalizedDate(
+            for: day.dayKey,
+            dayTimeZoneId: day.timeZoneId
+        )
     }
 
     var body: some View {
@@ -140,7 +152,11 @@ struct PresenceDayDetailView: View {
                 }
             }
 
-            EvidenceSection(dayKey: day.dayKey, date: day.date)
+            EvidenceSection(
+                dayKey: day.dayKey,
+                date: day.date,
+                dayTimeZoneId: day.timeZoneId
+            )
         }
         .navigationTitle("Day Details")
         .navigationBarTitleDisplayMode(.inline)
@@ -179,6 +195,7 @@ struct PresenceDayDetailView: View {
     private func applySuggestion(code: String, name: String) {
         let normalizedDate = localDate
         let normalizedCode = CountryCodeNormalizer.normalize(code) ?? code
+        let dayKey = day.dayKey
         let region: Region = {
             let trimmed = normalizedCode.trimmingCharacters(in: .whitespacesAndNewlines)
             if trimmed.isEmpty { return .other }
@@ -187,10 +204,13 @@ struct PresenceDayDetailView: View {
 
         // Check if an override already exists for this day and update it in-place
         let predicate = #Predicate<DayOverride> { override in
-            override.date == normalizedDate
+            override.dayKey == dayKey
         }
         let existing = try? modelContext.fetch(FetchDescriptor(predicate: predicate))
         if let existingOverride = existing?.first {
+            existingOverride.date = normalizedDate
+            existingOverride.dayKey = dayKey
+            existingOverride.dayTimeZoneId = dayTimeZone.identifier
             existingOverride.countryName = name
             existingOverride.countryCode = normalizedCode
             existingOverride.region = region
@@ -199,22 +219,24 @@ struct PresenceDayDetailView: View {
                 date: normalizedDate,
                 countryName: name,
                 countryCode: normalizedCode,
+                dayKey: dayKey,
+                dayTimeZoneId: dayTimeZone.identifier,
                 region: region
             )
             modelContext.insert(newOverride)
         }
         do {
             try modelContext.save()
-            recomputeImpactedDay(normalizedDate)
+            recomputeImpactedDay(dayKey)
         } catch {
             print("Failed to save override suggestion: \(error)")
         }
     }
 
     private func deleteOverride() {
-        let normalizedDate = localDate
+        let dayKey = day.dayKey
         let predicate = #Predicate<DayOverride> { override in
-            override.date == normalizedDate
+            override.dayKey == dayKey
         }
         if let matches = try? modelContext.fetch(FetchDescriptor(predicate: predicate)) {
             for match in matches {
@@ -223,15 +245,13 @@ struct PresenceDayDetailView: View {
         }
         do {
             try modelContext.save()
-            recomputeImpactedDay(normalizedDate)
+            recomputeImpactedDay(dayKey)
         } catch {
             print("Failed to delete override: \(error)")
         }
     }
 
-    private func recomputeImpactedDay(_ date: Date) {
-        let calendar = Calendar.current
-        let dayKey = DayKey.make(from: calendar.startOfDay(for: date), timeZone: calendar.timeZone)
+    private func recomputeImpactedDay(_ dayKey: String) {
         let container = modelContext.container
         Task {
             // Need a slight delay to ensure SwiftData propagation to the background context
@@ -246,6 +266,7 @@ struct PresenceDayDetailView: View {
 private struct EvidenceSection: View {
     let dayKey: String
     let date: Date
+    let dayTimeZoneId: String?
     
     @Environment(\.modelContext) private var modelContext
 
@@ -254,9 +275,14 @@ private struct EvidenceSection: View {
     @State private var overlappingStays: [Stay] = []
     @State private var calendarSignals: [CalendarSignal] = []
     
-    init(dayKey: String, date: Date) {
+    private var dayTimeZone: TimeZone {
+        DayIdentity.canonicalTimeZone(preferredTimeZoneId: dayTimeZoneId)
+    }
+
+    init(dayKey: String, date: Date, dayTimeZoneId: String?) {
         self.dayKey = dayKey
         self.date = date
+        self.dayTimeZoneId = dayTimeZoneId
     }
     
     var body: some View {
@@ -299,7 +325,7 @@ private struct EvidenceSection: View {
                                     .foregroundStyle(.primary)
                             }
                             HStack {
-                                Text(signal.timestamp.formatted(date: .omitted, time: .shortened))
+                                Text(formattedEvidenceTime(signal.timestamp))
                                 Spacer()
                                 Text(String(format: "%.4f, %.4f", signal.latitude, signal.longitude))
                                     .font(.caption2)
@@ -322,7 +348,7 @@ private struct EvidenceSection: View {
                             Text(photo.countryName ?? photo.countryCode ?? "Unknown Location")
                                 .font(.subheadline)
                             HStack {
-                                Text(photo.timestamp.formatted(date: .omitted, time: .shortened))
+                                Text(formattedEvidenceTime(photo.timestamp))
                                 Spacer()
                                 Text(String(format: "%.4f, %.4f", photo.latitude, photo.longitude))
                                     .font(.caption2)
@@ -354,7 +380,7 @@ private struct EvidenceSection: View {
                                     .clipShape(Capsule())
                             }
                             HStack {
-                                Text(loc.timestamp.formatted(date: .omitted, time: .shortened))
+                                Text(formattedEvidenceTime(loc.timestamp))
                                 Spacer()
                                 Text(String(format: "%.4f, %.4f (±%.0fm)", loc.latitude, loc.longitude, loc.accuracyMeters))
                                     .font(.caption2)
@@ -370,6 +396,7 @@ private struct EvidenceSection: View {
         .onAppear { loadData() }
         .onChange(of: dayKey) { loadData() }
         .onChange(of: date) { loadData() }
+        .onChange(of: dayTimeZoneId) { loadData() }
     }
     
     private func loadData() {
@@ -411,9 +438,13 @@ private struct EvidenceSection: View {
 
         // Stays sorted by enteredOn, reverse order
         do {
-            let calendar = Calendar.current
-            let startOfDay = calendar.startOfDay(for: date)
-            let nextDayStart = calendar.date(byAdding: .day, value: 1, to: startOfDay) ?? startOfDay
+            let window = DayIdentity.dayWindow(
+                dayKey: dayKey,
+                dayTimeZoneId: dayTimeZoneId,
+                fallback: dayTimeZone
+            )
+            let startOfDay = window.start
+            let nextDayStart = window.end
             let distantFuture = Date.distantFuture
 
             let stayPredicate = #Predicate<Stay> { target in
@@ -429,11 +460,19 @@ private struct EvidenceSection: View {
     
     private func dateRangeText(for stay: Stay) -> String {
         let formatter = Date.FormatStyle(date: .abbreviated, time: .omitted)
-        let start = stay.enteredOn.formatted(formatter)
+        var localFormatter = formatter
+        localFormatter.timeZone = dayTimeZone
+        let start = stay.enteredOn.formatted(localFormatter)
         if let exit = stay.exitedOn {
-            return "\(start) - \(exit.formatted(formatter))"
+            return "\(start) - \(exit.formatted(localFormatter))"
         }
         return "\(start) - Present"
+    }
+
+    private func formattedEvidenceTime(_ date: Date) -> String {
+        var formatter = Date.FormatStyle(date: .omitted, time: .shortened)
+        formatter.timeZone = dayTimeZone
+        return "\(date.formatted(formatter)) \(dayTimeZone.identifier)"
     }
 }
 

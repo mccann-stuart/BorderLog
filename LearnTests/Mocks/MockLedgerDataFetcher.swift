@@ -47,6 +47,12 @@ class MockLedgerDataFetcher: LedgerDataFetching {
         return overrides
     }
 
+    func fetchOverrides(dayKeys: [String]) throws -> [DayOverride] {
+        if let error = fetchOverridesError { throw error }
+        let keySet = Set(dayKeys)
+        return overrides.filter { keySet.contains($0.dayKey) }
+    }
+
     func fetchLocations(from start: Date, to end: Date) throws -> [LocationSample] {
         if let error = fetchLocationsError { throw error }
         return locations
@@ -91,6 +97,12 @@ class MockLedgerDataFetcher: LedgerDataFetching {
         if let error = fetchPresenceDayKeysError { throw error }
         let keys = presenceDays.values.filter { $0.date >= start && $0.date <= end }.map { $0.dayKey }
         return Set(keys)
+    }
+
+    func fetchPresenceDayKeys(in keys: Set<String>) throws -> Set<String> {
+        if let error = fetchPresenceDayKeysError { throw error }
+        let existing = presenceDays.keys.filter { keys.contains($0) }
+        return Set(existing)
     }
 
     func fetchNearestKnownPresenceDay(before date: Date) throws -> PresenceDay? {

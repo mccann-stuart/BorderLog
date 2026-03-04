@@ -31,6 +31,10 @@ struct PresenceDayRow: View {
         return "Unknown"
     }
 
+    private var isTodayInDayTimeZone: Bool {
+        DayKey.make(from: Date(), timeZone: dayTimeZone) == day.dayKey
+    }
+
     private var confidenceColor: Color {
         switch day.confidenceLabel {
         case .high: return .green
@@ -71,7 +75,7 @@ struct PresenceDayRow: View {
                         .clipShape(Capsule())
                 }
 
-                if Calendar.current.isDateInToday(day.date) {
+                if isTodayInDayTimeZone {
                     Text("Today")
                         .font(.system(.caption, design: .rounded))
                         .padding(.horizontal, 6)

@@ -1,3 +1,44 @@
+# Task Plan (Data Model + Day Detail Hardening)
+
+- [x] Add schema V6 fields for canonical day identity (`DayOverride.dayKey/dayTimeZoneId`, `Stay.entryDayKey/exitDayKey/dayTimeZoneId`, `CalendarSignal.bucketingTimeZoneId`) and introduce one-time epoch reset gate.
+- [x] Add/centralize day identity helpers and update all creation/edit flows to persist canonical day keys/timezones.
+- [x] Rework calendar ingest to true upsert semantics, consistent timezone bucketing, and orphan cleanup with impacted day recompute.
+- [x] Update inference/recompute to consume canonical day keys, remove `countryCode` fallback pollution, and make day timezone selection deterministic.
+- [x] Harden day-detail behavior: key-based override matching, canonical day window for evidence, and timezone-consistent display/Today logic.
+- [x] Make presence-day window key retrieval robust against `date` drift.
+- [x] Add and update tests for calendar upsert/orphan cleanup, canonical day identity stability, inference determinism, and day-detail override behavior.
+- [x] Run targeted and full test suites; capture results and residual risks.
+
+## Review (Data Model + Day Detail Hardening)
+
+- Added canonical day identity persistence across manual models and signals:
+  - `DayOverride`: unique `dayKey` + `dayTimeZoneId`.
+  - `Stay`: `entryDayKey`, `exitDayKey`, `dayTimeZoneId`.
+  - `CalendarSignal`: `bucketingTimeZoneId`.
+- Added `DayIdentity` helper to canonicalize write-time day keys/timezones and day-window derivation (`canonicalDay`, `normalizedDate`, `dayWindow`), then wired editor/apply flows to persist canonical fields.
+- Upgraded storage schema to V6 and introduced one-time store epoch reset gate in `ModelContainerProvider` (`storeEpochV2=6`) with test coverage for one-time purge semantics.
+- Reworked calendar ingestion to real upsert behavior with stale/orphan cleanup and impacted-day recompute tracking, while ensuring `dayKey`, `timeZoneId`, and `bucketingTimeZoneId` are derived from one explicit bucketing timezone.
+- Updated recompute/inference pipeline to consume canonical manual day keys, propagate `bucketingTimeZoneId` for calendar evidence, remove `countryCode ?? countryName` fallback pollution, and use deterministic timezone tie-break (`highest score`, then lexicographic timezone id).
+- Hardened day detail and row behavior:
+  - Override CRUD now matches by `dayKey` instead of brittle `Date ==`.
+  - Evidence stay overlap uses canonical day window from `dayKey + day.timeZoneId`.
+  - Date display and "Today" logic now use day timezone semantics.
+- Hardened day-key range retrieval by switching `fetchPresenceDayKeys(from:to:)` to key-window generation + key lookup, eliminating dependence on drift-prone `PresenceDay.date` range filters.
+- Added/updated tests:
+  - `CalendarSignalIngestorCoreTests` (upsert moved-day + delete/orphan behavior).
+  - Canonical model tests (`DayOverrideTests`, `StayTests`).
+  - Validation and determinism tests (`DayOverrideValidationTests`, `InferenceEngineTests`).
+  - Fetch safety and epoch reset tests (`RealLedgerDataFetcherTests`, `ModelContainerProviderRecoveryTests`).
+- Verification:
+  - Targeted run: `xcodebuild -project Learn.xcodeproj -scheme Learn -destination 'platform=iOS Simulator,name=iPhone 17' -only-testing:LearnTests/DayKeyTests -only-testing:LearnTests/StayTests -only-testing:LearnTests/DayOverrideTests -only-testing:LearnTests/DayOverrideValidationTests -only-testing:LearnTests/InferenceEngineTests -only-testing:LearnTests/RealLedgerDataFetcherTests -only-testing:LearnTests/CalendarSignalIngestorCoreTests -only-testing:LearnTests/ModelContainerProviderRecoveryTests -only-testing:LearnTests/LedgerRecomputeServiceTests test` -> **TEST SUCCEEDED**.
+  - Full suite: `xcodebuild -project Learn.xcodeproj -scheme Learn -destination 'platform=iOS Simulator,name=iPhone 17' -parallel-testing-enabled NO -maximum-parallel-testing-workers 1 -only-testing:LearnTests test` -> **TEST SUCCEEDED** (`113 tests, 0 failures`).
+  - Post-hardening follow-up (canonical timestamp normalization in `DayOverride`/`Stay`):
+    - `xcodebuild -project Learn.xcodeproj -scheme Learn -destination 'platform=iOS Simulator,name=iPhone 17' build` -> **BUILD SUCCEEDED**.
+    - `xcodebuild -project Learn.xcodeproj -scheme Learn -destination 'platform=iOS Simulator,id=9DE9B9B2-671C-4278-8A4A-F3B48E244388' -parallel-testing-enabled NO -maximum-parallel-testing-workers 1 -only-testing:LearnTests/DayOverrideTests -only-testing:LearnTests/StayTests -only-testing:LearnTests/RealLedgerDataFetcherTests test` -> **TEST SUCCEEDED** (13 tests, 0 failures).
+- Residual risk:
+  - Existing actor-isolation warnings (outside this scope and pre-existing in project) remain; no behavioral regressions were observed in targeted or full test runs.
+
+---
 # Task Plan (Widget Location Authorization Unblock)
 
 - [ ] Add `NSWidgetWantsLocation` to widget extension plist.

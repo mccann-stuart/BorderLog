@@ -11,6 +11,7 @@ import SwiftData
 protocol LedgerDataFetching {
     func fetchStays(from start: Date, to end: Date) throws -> [Stay]
     func fetchOverrides(from start: Date, to end: Date) throws -> [DayOverride]
+    func fetchOverrides(dayKeys: [String]) throws -> [DayOverride]
     func fetchLocations(from start: Date, to end: Date) throws -> [LocationSample]
     func fetchPhotos(from start: Date, to end: Date) throws -> [PhotoSignal]
     func fetchCalendarSignals(from start: Date, to end: Date) throws -> [CalendarSignal]
@@ -23,6 +24,7 @@ protocol LedgerDataFetching {
 
     func fetchPresenceDays(keys: [String]) throws -> [PresenceDay]
     func fetchPresenceDayKeys(from start: Date, to end: Date) throws -> Set<String>
+    func fetchPresenceDayKeys(in keys: Set<String>) throws -> Set<String>
     func fetchNearestKnownPresenceDay(before date: Date) throws -> PresenceDay?
     func fetchNearestKnownPresenceDay(after date: Date) throws -> PresenceDay?
     func insertPresenceDay(_ day: PresenceDay)
@@ -47,6 +49,15 @@ struct RealLedgerDataFetcher: LedgerDataFetching {
         let descriptor = FetchDescriptor<DayOverride>(
             predicate: #Predicate { override in
                 override.date >= start && override.date <= end
+            }
+        )
+        return try modelContext.fetch(descriptor)
+    }
+
+    func fetchOverrides(dayKeys: [String]) throws -> [DayOverride] {
+        let descriptor = FetchDescriptor<DayOverride>(
+            predicate: #Predicate { override in
+                dayKeys.contains(override.dayKey)
             }
         )
         return try modelContext.fetch(descriptor)
@@ -118,9 +129,29 @@ struct RealLedgerDataFetcher: LedgerDataFetching {
 
     // Optimization: Fetch only keys within the relevant date range to avoid loading the entire history.
     func fetchPresenceDayKeys(from start: Date, to end: Date) throws -> Set<String> {
+        let calendar = Calendar.current
+        let startDay = calendar.startOfDay(for: start)
+        let endDay = calendar.startOfDay(for: end)
+        guard startDay <= endDay else { return [] }
+
+        let timeZone = calendar.timeZone
+        var day = startDay
+        var keys: Set<String> = []
+        while day <= endDay {
+            keys.insert(DayKey.make(from: day, timeZone: timeZone))
+            guard let next = calendar.date(byAdding: .day, value: 1, to: day) else { break }
+            day = next
+        }
+
+        return try fetchPresenceDayKeys(in: keys)
+    }
+
+    func fetchPresenceDayKeys(in keys: Set<String>) throws -> Set<String> {
+        guard !keys.isEmpty else { return [] }
+        let lookup = Array(keys)
         let descriptor = FetchDescriptor<PresenceDay>(
             predicate: #Predicate { day in
-                day.date >= start && day.date <= end
+                lookup.contains(day.dayKey)
             }
         )
         let days = try modelContext.fetch(descriptor)

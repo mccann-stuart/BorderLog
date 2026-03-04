@@ -8,6 +8,19 @@
 import Foundation
 
 enum DayOverrideValidation {
+    static func conflictingOverride(
+        forDayKey dayKey: String,
+        in overrides: [DayOverride],
+        excluding currentOverride: DayOverride? = nil
+    ) -> DayOverride? {
+        return overrides.first { overrideDay in
+            if let currentOverride, overrideDay === currentOverride {
+                return false
+            }
+            return overrideDay.dayKey == dayKey
+        }
+    }
+
     /// Checks for a conflicting override in the given list of overrides.
     ///
     /// - Parameters:
@@ -22,13 +35,11 @@ enum DayOverrideValidation {
         excluding currentOverride: DayOverride? = nil,
         calendar: Calendar = .current
     ) -> DayOverride? {
-        let normalizedDate = calendar.startOfDay(for: date)
-
-        return overrides.first { overrideDay in
-            if let currentOverride, overrideDay === currentOverride {
-                return false
-            }
-            return calendar.isDate(overrideDay.date, inSameDayAs: normalizedDate)
-        }
+        let dayKey = DayKey.make(from: date, timeZone: calendar.timeZone)
+        return conflictingOverride(
+            forDayKey: dayKey,
+            in: overrides,
+            excluding: currentOverride
+        )
     }
 }

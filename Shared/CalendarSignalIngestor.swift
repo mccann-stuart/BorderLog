@@ -17,6 +17,17 @@ actor CalendarSignalIngestor {
         case manualFullScan
     }
 
+    struct ResolvedCalendarSignal: Sendable {
+        let timestamp: Date
+        let dayKey: String
+        let timeZoneId: String
+        let bucketingTimeZoneId: String
+        let latitude: Double
+        let longitude: Double
+        let countryCode: String
+        let countryName: String
+    }
+
     private var resolver: CountryResolving?
     internal var saveContextOverride: (@Sendable () throws -> Void)?
 
@@ -44,19 +55,17 @@ actor CalendarSignalIngestor {
         let calendar = Calendar.current
         let now = Date()
 
-        let startDate: Date
-        let endDate = now
+        let ingestStartDate: Date
+        let ingestEndDate = now
 
         switch mode {
         case .manualFullScan:
-            startDate = calendar.date(byAdding: .year, value: -2, to: now) ?? now
+            ingestStartDate = calendar.date(byAdding: .year, value: -2, to: now) ?? now
         case .auto:
-            startDate = calendar.date(byAdding: .month, value: -1, to: now) ?? now
+            ingestStartDate = calendar.date(byAdding: .month, value: -1, to: now) ?? now
         }
 
-        let predicate = store.predicateForEvents(withStart: startDate, end: endDate, calendars: nil)
-
-        // Fetch events
+        let predicate = store.predicateForEvents(withStart: ingestStartDate, end: ingestEndDate, calendars: nil)
         let events = store.events(matching: predicate)
         let totalEvents = events.count
         let progressUpdateEvery = 10
@@ -78,11 +87,22 @@ actor CalendarSignalIngestor {
 
         var processed = 0
         var touchedDayKeys: Set<String> = []
-        let existingSignals = try modelContext.fetch(FetchDescriptor<CalendarSignal>())
+
+        let staleWindowEnd = calendar.date(byAdding: .day, value: 1, to: ingestEndDate) ?? ingestEndDate
+        let existingSignals = try modelContext.fetch(
+            FetchDescriptor<CalendarSignal>(
+                predicate: #Predicate { signal in
+                    signal.timestamp >= ingestStartDate && signal.timestamp <= staleWindowEnd
+                }
+            )
+        )
+
         var existingSignalByIdentifier: [String: CalendarSignal] = [:]
         for signal in existingSignals {
             existingSignalByIdentifier[signal.eventIdentifier] = signal
         }
+
+        var seenIdentifiers = Set<String>()
 
         let activeResolver: CountryResolving
         if let storedResolver = self.resolver {
@@ -100,19 +120,26 @@ actor CalendarSignalIngestor {
                     InferenceActivity.shared.updateCalendarScanProgress(scannedEvents: scannedEvents)
                 }
             }
-            
+
             let id = event.eventIdentifier ?? event.calendarItemIdentifier
             let endId = id + "#end"
-            var signalsCreatedOrDeleted = 0
+            var eventMutations = 0
 
             guard shouldIngest(event) else {
-                for staleIdentifier in [id, endId] {
-                    guard let stale = existingSignalByIdentifier.removeValue(forKey: staleIdentifier) else { continue }
-                    touchedDayKeys.insert(stale.dayKey)
-                    modelContext.delete(stale)
-                    signalsCreatedOrDeleted += 1
-                }
-                if signalsCreatedOrDeleted > 0 {
+                eventMutations += deleteSignalIfExists(
+                    identifier: id,
+                    existingSignalByIdentifier: &existingSignalByIdentifier,
+                    touchedDayKeys: &touchedDayKeys
+                )
+                eventMutations += deleteSignalIfExists(
+                    identifier: endId,
+                    existingSignalByIdentifier: &existingSignalByIdentifier,
+                    touchedDayKeys: &touchedDayKeys
+                )
+                seenIdentifiers.insert(id)
+                seenIdentifiers.insert(endId)
+
+                if eventMutations > 0 {
                     processed += 1
                     if processed % 10 == 0 {
                         try saveContextIfNeeded()
@@ -120,83 +147,109 @@ actor CalendarSignalIngestor {
                 }
                 continue
             }
-            guard let startDate = event.startDate else { continue }
 
+            guard let eventStartDate = event.startDate else { continue }
             let (parsedFrom, parsedTo) = parseFlightInfo(event)
-
-            // Determine Start Signal
-            // Prefer parsed "From". Fallback to event location/coordinate if not parsed.
-            // But if event location/coordinate matches "To", do NOT use it for Start (it's likely destination).
 
             var startLocationString: String? = parsedFrom
             var startCoordinate: CLLocationCoordinate2D? = nil
 
             if startLocationString == nil {
                 if let structured = event.structuredLocation, let geo = structured.geoLocation {
-                    // Use coordinate if available
                     startCoordinate = geo.coordinate
-                    startLocationString = structured.title // For fallback text
+                    startLocationString = structured.title
                 } else {
                     startLocationString = event.location
                 }
             }
 
-            // Check for destination conflict in start location
-            if let to = parsedTo, let startRaw = startLocationString, !startRaw.isEmpty {
-                if startRaw.localizedStandardContains(to) {
-                    // The candidate start location contains the destination name.
-                    // This implies the event location is actually the destination.
-                    // In this case, we suppress the start signal unless we had a different coordinate?
-                    // Coordinates don't have names, but structured.title does.
-                    // To be safe, suppress start signal if we think it's the destination.
-                    startLocationString = nil
-                    startCoordinate = nil
-                }
+            if let to = parsedTo, let startRaw = startLocationString, !startRaw.isEmpty,
+               startRaw.localizedStandardContains(to) {
+                startLocationString = nil
+                startCoordinate = nil
             }
 
-            // 1. Create Start Signal
-            if startLocationString != nil || startCoordinate != nil {
-                if existingSignalByIdentifier[id] == nil {
-                    if let signal = await resolveAndCreateSignal(
-                        locationString: startLocationString,
-                        coordinate: startCoordinate,
-                        date: startDate,
-                        eventIdentifier: id,
-                        event: event,
-                        activeResolver: activeResolver
-                    ) {
-                        signalsCreatedOrDeleted += 1
-                        touchedDayKeys.insert(signal.dayKey)
-                        existingSignalByIdentifier[id] = signal
-                    }
+            let startResolved = await resolveSignal(
+                locationString: startLocationString,
+                coordinate: startCoordinate,
+                date: eventStartDate,
+                event: event,
+                activeResolver: activeResolver
+            )
+
+            seenIdentifiers.insert(id)
+            if let startResolved {
+                if upsertSignal(
+                    identifier: id,
+                    resolved: startResolved,
+                    title: event.title,
+                    existingSignalByIdentifier: &existingSignalByIdentifier,
+                    touchedDayKeys: &touchedDayKeys
+                ) {
+                    eventMutations += 1
                 }
+            } else {
+                eventMutations += deleteSignalIfExists(
+                    identifier: id,
+                    existingSignalByIdentifier: &existingSignalByIdentifier,
+                    touchedDayKeys: &touchedDayKeys
+                )
             }
 
-            // 2. Create End Signal (Destination)
             if let to = parsedTo {
-                if existingSignalByIdentifier[endId] == nil {
-                    let nextDay = calendar.date(byAdding: .day, value: 1, to: startDate) ?? event.endDate ?? startDate
-                    if let signal = await resolveAndCreateSignal(
-                        locationString: to,
-                        coordinate: nil, // Destination usually just string unless we parsed it from somewhere else
-                        date: nextDay, // Signal at arrival on the next day
-                        eventIdentifier: endId,
-                        event: event,
-                        activeResolver: activeResolver
+                let nextDay = calendar.date(byAdding: .day, value: 1, to: eventStartDate) ?? event.endDate ?? eventStartDate
+                let endResolved = await resolveSignal(
+                    locationString: to,
+                    coordinate: nil,
+                    date: nextDay,
+                    event: event,
+                    activeResolver: activeResolver
+                )
+
+                seenIdentifiers.insert(endId)
+                if let endResolved {
+                    if upsertSignal(
+                        identifier: endId,
+                        resolved: endResolved,
+                        title: event.title,
+                        existingSignalByIdentifier: &existingSignalByIdentifier,
+                        touchedDayKeys: &touchedDayKeys
                     ) {
-                        signalsCreatedOrDeleted += 1
-                        touchedDayKeys.insert(signal.dayKey)
-                        existingSignalByIdentifier[endId] = signal
+                        eventMutations += 1
                     }
+                } else {
+                    eventMutations += deleteSignalIfExists(
+                        identifier: endId,
+                        existingSignalByIdentifier: &existingSignalByIdentifier,
+                        touchedDayKeys: &touchedDayKeys
+                    )
                 }
+            } else {
+                seenIdentifiers.insert(endId)
+                eventMutations += deleteSignalIfExists(
+                    identifier: endId,
+                    existingSignalByIdentifier: &existingSignalByIdentifier,
+                    touchedDayKeys: &touchedDayKeys
+                )
             }
 
-            if signalsCreatedOrDeleted > 0 {
+            if eventMutations > 0 {
                 processed += 1
                 if processed % 10 == 0 {
                     try saveContextIfNeeded()
                 }
             }
+        }
+
+        var orphanDeletes = 0
+        for (identifier, signal) in existingSignalByIdentifier {
+            guard !seenIdentifiers.contains(identifier) else { continue }
+            touchedDayKeys.insert(signal.dayKey)
+            modelContext.delete(signal)
+            orphanDeletes += 1
+        }
+        if orphanDeletes > 0 {
+            processed += orphanDeletes
         }
 
         try saveContextIfNeeded()
@@ -223,81 +276,229 @@ actor CalendarSignalIngestor {
         CalendarFlightParsing.parseFlightInfo(title: event.title, notes: event.notes)
     }
 
-    private func resolveAndCreateSignal(
+    private func resolveSignal(
         locationString: String?,
         coordinate: CLLocationCoordinate2D?,
         date: Date,
-        eventIdentifier: String,
         event: EKEvent,
         activeResolver: CountryResolving
-    ) async -> CalendarSignal? {
+    ) async -> ResolvedCalendarSignal? {
         guard coordinate != nil || (locationString != nil && !locationString!.isEmpty) else {
             return nil
         }
 
         var countryCode: String?
         var countryName: String?
-        var timeZoneId: String?
-        var lat: Double = 0
-        var long: Double = 0
+        var resolvedTimeZoneId: String?
+        var latitude: Double = 0
+        var longitude: Double = 0
 
-        if let coord = coordinate {
-            lat = coord.latitude
-            long = coord.longitude
-            let location = CLLocation(latitude: lat, longitude: long)
+        if let coordinate {
+            latitude = coordinate.latitude
+            longitude = coordinate.longitude
+            let location = CLLocation(latitude: latitude, longitude: longitude)
             let resolution = await activeResolver.resolveCountry(for: location)
             countryCode = resolution?.countryCode
             countryName = resolution?.countryName
-            timeZoneId = resolution?.timeZone?.identifier
-        } else if let locString = locationString {
-            // First try to resolve as an airport code
-            if let airport = await AirportCodeResolver.shared.resolve(code: locString) {
-                lat = airport.lat
-                long = airport.lon
+            resolvedTimeZoneId = resolution?.timeZone?.identifier
+        } else if let locationString {
+            if let airport = await AirportCodeResolver.shared.resolve(code: locationString) {
+                latitude = airport.lat
+                longitude = airport.lon
                 countryCode = airport.country
                 countryName = Locale.current.localizedString(forRegionCode: airport.country)
-                // TimeZone: Fallback to event timezone or infer from country?
-                // Event timezone is a safe bet for calendar events.
             } else {
-                // Rate limit manually: 1 request per second max
                 try? await Task.sleep(nanoseconds: 1_000_000_000)
 
                 let request = MKLocalSearch.Request()
-                request.naturalLanguageQuery = locString
+                request.naturalLanguageQuery = locationString
                 let search = MKLocalSearch(request: request)
 
                 if let response = try? await search.start(),
                    let item = response.mapItems.first {
-                    let loc = item.location
-                    lat = loc.coordinate.latitude
-                    long = loc.coordinate.longitude
+                    let location = item.location
+                    latitude = location.coordinate.latitude
+                    longitude = location.coordinate.longitude
                     countryCode = item.addressRepresentations?.region?.identifier
                     countryName = item.addressRepresentations?.regionName
-                    timeZoneId = item.timeZone?.identifier
+                    resolvedTimeZoneId = item.timeZone?.identifier
                 }
             }
         }
 
-        guard let validCountryCode = countryCode else { return nil }
+        guard let resolvedCountryCode = countryCode else { return nil }
 
-        let eventTimeZone = event.timeZone ?? TimeZone(identifier: timeZoneId ?? "") ?? TimeZone.current
-        let dayKey = await DayKey.make(from: date, timeZone: eventTimeZone)
+        let bucketingTimeZone = DayIdentity.canonicalTimeZone(
+            preferredTimeZoneId: resolvedTimeZoneId ?? event.timeZone?.identifier
+        )
+        let dayKey = DayKey.make(from: date, timeZone: bucketingTimeZone)
 
-        let signal = CalendarSignal(
+        return ResolvedCalendarSignal(
             timestamp: date,
             dayKey: dayKey,
-            latitude: lat,
-            longitude: long,
-            countryCode: validCountryCode,
-            countryName: countryName,
-            timeZoneId: timeZoneId ?? eventTimeZone.identifier,
-            eventIdentifier: eventIdentifier,
-            title: event.title,
+            timeZoneId: bucketingTimeZone.identifier,
+            bucketingTimeZoneId: bucketingTimeZone.identifier,
+            latitude: latitude,
+            longitude: longitude,
+            countryCode: resolvedCountryCode,
+            countryName: countryName ?? Locale.current.localizedString(forRegionCode: resolvedCountryCode) ?? resolvedCountryCode
+        )
+    }
+
+    func upsertSignal(
+        identifier: String,
+        resolved: ResolvedCalendarSignal,
+        title: String?,
+        existingSignalByIdentifier: inout [String: CalendarSignal],
+        touchedDayKeys: inout Set<String>
+    ) -> Bool {
+        if let existing = existingSignalByIdentifier[identifier] {
+            var didChange = false
+
+            if existing.dayKey != resolved.dayKey {
+                touchedDayKeys.insert(existing.dayKey)
+                existing.dayKey = resolved.dayKey
+                didChange = true
+            }
+            if existing.timestamp != resolved.timestamp {
+                existing.timestamp = resolved.timestamp
+                didChange = true
+            }
+            if existing.latitude != resolved.latitude {
+                existing.latitude = resolved.latitude
+                didChange = true
+            }
+            if existing.longitude != resolved.longitude {
+                existing.longitude = resolved.longitude
+                didChange = true
+            }
+            if existing.countryCode != resolved.countryCode {
+                existing.countryCode = resolved.countryCode
+                didChange = true
+            }
+            if existing.countryName != resolved.countryName {
+                existing.countryName = resolved.countryName
+                didChange = true
+            }
+            if existing.timeZoneId != resolved.timeZoneId {
+                existing.timeZoneId = resolved.timeZoneId
+                didChange = true
+            }
+            if existing.bucketingTimeZoneId != resolved.bucketingTimeZoneId {
+                existing.bucketingTimeZoneId = resolved.bucketingTimeZoneId
+                didChange = true
+            }
+            if existing.title != title {
+                existing.title = title
+                didChange = true
+            }
+            if existing.source != "Calendar" {
+                existing.source = "Calendar"
+                didChange = true
+            }
+
+            if didChange {
+                touchedDayKeys.insert(resolved.dayKey)
+            }
+            return didChange
+        }
+
+        let signal = CalendarSignal(
+            timestamp: resolved.timestamp,
+            dayKey: resolved.dayKey,
+            latitude: resolved.latitude,
+            longitude: resolved.longitude,
+            countryCode: resolved.countryCode,
+            countryName: resolved.countryName,
+            timeZoneId: resolved.timeZoneId,
+            bucketingTimeZoneId: resolved.bucketingTimeZoneId,
+            eventIdentifier: identifier,
+            title: title,
             source: "Calendar"
         )
-
         modelContext.insert(signal)
-        return signal
+        existingSignalByIdentifier[identifier] = signal
+        touchedDayKeys.insert(resolved.dayKey)
+        return true
+    }
+
+    func deleteSignalIfExists(
+        identifier: String,
+        existingSignalByIdentifier: inout [String: CalendarSignal],
+        touchedDayKeys: inout Set<String>
+    ) -> Int {
+        guard let stale = existingSignalByIdentifier.removeValue(forKey: identifier) else {
+            return 0
+        }
+        touchedDayKeys.insert(stale.dayKey)
+        modelContext.delete(stale)
+        return 1
+    }
+
+    func testUpsertScenario(
+        existingDayKey: String,
+        resolved: ResolvedCalendarSignal
+    ) -> (
+        changed: Bool,
+        touchedDayKeys: [String],
+        finalDayKey: String,
+        finalTimeZoneId: String?,
+        finalBucketingTimeZoneId: String?
+    ) {
+        let existing = CalendarSignal(
+            timestamp: Date(timeIntervalSince1970: 0),
+            dayKey: existingDayKey,
+            latitude: 0,
+            longitude: 0,
+            countryCode: "GB",
+            countryName: "United Kingdom",
+            timeZoneId: "UTC",
+            bucketingTimeZoneId: "UTC",
+            eventIdentifier: "event-1",
+            title: "Old",
+            source: "Calendar"
+        )
+        var map: [String: CalendarSignal] = ["event-1": existing]
+        var touchedDayKeys = Set<String>()
+        let changed = upsertSignal(
+            identifier: "event-1",
+            resolved: resolved,
+            title: "New",
+            existingSignalByIdentifier: &map,
+            touchedDayKeys: &touchedDayKeys
+        )
+        let updated = map["event-1"] ?? existing
+        return (
+            changed: changed,
+            touchedDayKeys: touchedDayKeys.sorted(),
+            finalDayKey: updated.dayKey,
+            finalTimeZoneId: updated.timeZoneId,
+            finalBucketingTimeZoneId: updated.bucketingTimeZoneId
+        )
+    }
+
+    func testDeleteScenario(existingDayKey: String) -> (deleted: Int, touchedDayKeys: [String], remaining: Int) {
+        let existing = CalendarSignal(
+            timestamp: Date(timeIntervalSince1970: 0),
+            dayKey: existingDayKey,
+            latitude: 0,
+            longitude: 0,
+            countryCode: "GB",
+            countryName: "United Kingdom",
+            timeZoneId: "UTC",
+            bucketingTimeZoneId: "UTC",
+            eventIdentifier: "event-2",
+            title: "Old",
+            source: "Calendar"
+        )
+        var map: [String: CalendarSignal] = ["event-2": existing]
+        var touchedDayKeys = Set<String>()
+        let deleted = deleteSignalIfExists(
+            identifier: "event-2",
+            existingSignalByIdentifier: &map,
+            touchedDayKeys: &touchedDayKeys
+        )
+        return (deleted: deleted, touchedDayKeys: touchedDayKeys.sorted(), remaining: map.count)
     }
 
     private func saveContextIfNeeded() throws {

@@ -162,27 +162,49 @@ enum BorderLogSchemaV5: VersionedSchema {
     ]
 }
 
+enum BorderLogSchemaV6: VersionedSchema {
+    static var versionIdentifier: Schema.Version = .init(6, 0, 0)
+    static var models: [any PersistentModel.Type] = [
+        Stay.self,
+        DayOverride.self,
+        LocationSample.self,
+        PhotoSignal.self,
+        PresenceDay.self,
+        PhotoIngestState.self,
+        CountryConfig.self,
+        CalendarSignal.self
+    ]
+}
+
 enum BorderLogMigrationPlan: SchemaMigrationPlan {
     static var schemas: [any VersionedSchema.Type] = [
         BorderLogSchemaV1.self,
         BorderLogSchemaV2.self,
         BorderLogSchemaV3.self,
         BorderLogSchemaV4.self,
-        BorderLogSchemaV5.self
+        BorderLogSchemaV5.self,
+        BorderLogSchemaV6.self
     ]
     static var stages: [MigrationStage] = [
         .lightweight(fromVersion: BorderLogSchemaV1.self, toVersion: BorderLogSchemaV2.self),
         .lightweight(fromVersion: BorderLogSchemaV2.self, toVersion: BorderLogSchemaV3.self),
         .lightweight(fromVersion: BorderLogSchemaV3.self, toVersion: BorderLogSchemaV4.self),
-        .lightweight(fromVersion: BorderLogSchemaV4.self, toVersion: BorderLogSchemaV5.self)
+        .lightweight(fromVersion: BorderLogSchemaV4.self, toVersion: BorderLogSchemaV5.self),
+        .lightweight(fromVersion: BorderLogSchemaV5.self, toVersion: BorderLogSchemaV6.self)
     ]
 }
 
 enum ModelContainerProvider {
     private static let logger = Logger(subsystem: "com.MCCANN.Border", category: "Persistence")
+    private static let storeEpochDefaultsKey = "storeEpochV2"
+    private static let currentStoreEpoch = 6
+
+    internal static var storeEpochKeyForTests: String { storeEpochDefaultsKey }
+    internal static var currentStoreEpochForTests: Int { currentStoreEpoch }
 
     static func makeContainer() -> ModelContainer {
-        let schema = Schema(versionedSchema: BorderLogSchemaV5.self)
+        _ = enforceStoreEpoch()
+        let schema = Schema(versionedSchema: BorderLogSchemaV6.self)
         let cloudKitDatabase: ModelConfiguration.CloudKitDatabase =
             (AppConfig.isCloudKitFeatureEnabled && AppConfig.isCloudKitSyncEnabled)
                 ? .private(AppConfig.cloudKitContainerId)
@@ -248,6 +270,46 @@ enum ModelContainerProvider {
 
         logger.critical("All persistent store options failed. Falling back to in-memory store.")
         return makeInMemoryContainer(schema: schema)
+    }
+
+    @discardableResult
+    internal static func enforceStoreEpoch(
+        defaults: UserDefaults = AppConfig.sharedDefaults,
+        appGroupStoreDirectory: URL? = nil,
+        appSupportDirectory: URL? = nil,
+        temporaryDirectory: URL = FileManager.default.temporaryDirectory
+    ) -> Bool {
+        let existingEpoch = defaults.integer(forKey: storeEpochDefaultsKey)
+        guard existingEpoch != currentStoreEpoch else { return false }
+
+        logger.warning("Store epoch change detected (\(existingEpoch, privacy: .public) -> \(currentStoreEpoch, privacy: .public)); clearing persistent stores.")
+
+        if let appGroupSupport = appGroupStoreDirectory
+            ?? {
+                guard let appGroupId = AppConfig.appGroupId,
+                      let appGroupRoot = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: appGroupId) else {
+                    return nil
+                }
+                return appGroupRoot.appendingPathComponent("Library/Application Support")
+            }() {
+            for storeName in ["default.store", "Learn.store", "BorderLog.store", "BorderLog.fallback.store"] {
+                deleteStoreFiles(in: appGroupSupport, named: storeName)
+            }
+        }
+
+        if let appSupport = appSupportDirectory
+            ?? FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first {
+            for storeName in ["BorderLog.store", "BorderLog.fallback.store"] {
+                deleteStoreFiles(in: appSupport, named: storeName)
+            }
+        }
+
+        for storeName in ["BorderLog.fallback.store"] {
+            deleteStoreFiles(in: temporaryDirectory, named: storeName)
+        }
+
+        defaults.set(currentStoreEpoch, forKey: storeEpochDefaultsKey)
+        return true
     }
 
     private static func makeInMemoryContainer(schema: Schema) -> ModelContainer {

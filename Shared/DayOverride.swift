@@ -10,6 +10,8 @@ import SwiftData
 
 @Model
 final class DayOverride: TravelEntry {
+    @Attribute(.unique) var dayKey: String
+    var dayTimeZoneId: String
     var date: Date
     var countryName: String
     var countryCode: String?
@@ -20,10 +22,25 @@ final class DayOverride: TravelEntry {
         date: Date,
         countryName: String,
         countryCode: String? = nil,
+        dayKey: String? = nil,
+        dayTimeZoneId: String? = nil,
         region: Region = .schengen,
         notes: String = ""
     ) {
-        self.date = date
+        if let dayKey {
+            let timeZone = DayIdentity.canonicalTimeZone(preferredTimeZoneId: dayTimeZoneId)
+            self.dayKey = dayKey
+            self.dayTimeZoneId = timeZone.identifier
+            self.date = DayKey.date(for: dayKey, timeZone: timeZone) ?? date
+        } else {
+            let identity = DayIdentity.canonicalDay(
+                for: date,
+                preferredTimeZoneId: dayTimeZoneId
+            )
+            self.dayKey = identity.dayKey
+            self.dayTimeZoneId = identity.dayTimeZoneId
+            self.date = identity.normalizedDate
+        }
         self.countryName = countryName
         self.countryCode = countryCode
         self.regionRaw = region.rawValue

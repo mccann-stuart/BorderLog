@@ -82,4 +82,21 @@ final class DayOverrideTests: XCTestCase {
          let title = override.displayTitle
          XCTAssertEqual(title, "Belgium (BE)")
      }
+
+    func testCanonicalDayIdentityDerivedFromDateAndTimeZone() {
+        let utc = TimeZone(secondsFromGMT: 0)!
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = utc
+        let date = calendar.date(from: DateComponents(year: 2026, month: 2, day: 15, hour: 23, minute: 0))!
+
+        let override = DayOverride(
+            date: date,
+            countryName: "France",
+            countryCode: "FR",
+            dayTimeZoneId: utc.identifier
+        )
+
+        XCTAssertEqual(override.dayTimeZoneId, utc.identifier)
+        XCTAssertEqual(override.dayKey, "2026-02-15")
+    }
 }

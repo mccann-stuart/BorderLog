@@ -128,7 +128,7 @@ actor PhotoSignalIngestor {
                     latitude: location.coordinate.latitude,
                     longitude: location.coordinate.longitude,
                     assetIdHash: assetIdHash,
-                    timeZoneId: resolution?.timeZone?.identifier,
+                    timeZoneId: timeZone.identifier,
                     dayKey: dayKey,
                     countryCode: resolution?.countryCode,
                     countryName: resolution?.countryName
