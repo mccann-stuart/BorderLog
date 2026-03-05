@@ -28,14 +28,22 @@ enum SchengenLedgerCalculator {
         let windowEnd = calendar.startOfDay(for: referenceDate)
         let windowStart = calendar.date(byAdding: .day, value: -(windowSize - 1), to: windowEnd) ?? windowEnd
 
-        let windowDays = days.filter { $0.date >= windowStart && $0.date <= windowEnd }
+        var schengenDays = 0
+        var knownDays = 0
 
-        let schengenDays = windowDays.filter {
-            guard let code = $0.countryCode else { return false }
-            return SchengenMembers.isMember(code)
-        }.count
+        // Optimization: Replace multiple .filter() calls (which create intermediate arrays)
+        // with a single pass through the sequence.
+        for day in days {
+            if day.date >= windowStart && day.date <= windowEnd {
+                if day.countryCode != nil || day.countryName != nil {
+                    knownDays += 1
+                    if let code = day.countryCode, SchengenMembers.isMember(code) {
+                        schengenDays += 1
+                    }
+                }
+            }
+        }
 
-        let knownDays = windowDays.filter { $0.countryCode != nil || $0.countryName != nil }.count
         let totalDays = windowSize
         let unknownDays = max(0, totalDays - knownDays)
 

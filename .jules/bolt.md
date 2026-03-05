@@ -9,3 +9,7 @@
 ## 2024-03-02 - FetchDescriptor Predicate Optimization
 **Learning:** In SwiftData, fetching all entities (e.g. `Stay`) and filtering them in memory with `filter` causes full-table loads which is O(N) memory and compute. This can be heavily optimized by pushing the filter logic to the database using `#Predicate`.
 **Action:** When working with SwiftData, always prefer `#Predicate` in `FetchDescriptor` over in-memory filtering for potentially large datasets like stays, locations, or photos.
+
+## 2026-02-18 - Single-Pass Sequence Iteration vs Chained Filters
+**Learning:** Chaining multiple `.filter` calls on Swift collections (`Array`) or executing `filter` multiple times over the same subset incurs a large O(N) memory allocation penalty because each `.filter` generates a new array.
+**Action:** When computing multiple metrics or sub-sets over a sequence, prefer a single `for` loop pass with standard conditional checks. This reduces iteration count and eliminates unnecessary memory allocations (dropping space complexity from O(N) to O(1)).
