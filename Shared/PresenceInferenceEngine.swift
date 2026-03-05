@@ -409,31 +409,35 @@ struct PresenceInferenceEngine {
             }
         }
 
+        // Optimization: Precalculate backward and forward suggestions in O(N) linear passes
+        // to avoid O(N²) nested loops when filling gap days.
+        var backwardSuggestions = [Optional<(code: String, name: String)>](repeating: nil, count: sortedResults.count)
+        var currentBackward: (code: String, name: String)? = nil
+        for i in 0..<sortedResults.count {
+            backwardSuggestions[i] = currentBackward
+            if let code = sortedResults[i].countryCode,
+               let name = sortedResults[i].countryName {
+                currentBackward = (code, name)
+            }
+        }
+
+        var forwardSuggestions = [Optional<(code: String, name: String)>](repeating: nil, count: sortedResults.count)
+        var currentForward: (code: String, name: String)? = nil
+        for i in stride(from: sortedResults.count - 1, through: 0, by: -1) {
+            forwardSuggestions[i] = currentForward
+            if let code = sortedResults[i].countryCode,
+               let name = sortedResults[i].countryName {
+                currentForward = (code, name)
+            }
+        }
+
         for i in 0..<sortedResults.count {
             if sortedResults[i].countryCode == nil || sortedResults[i].confidence == 0 {
-                var backwardSuggestion: (code: String, name: String)?
-                for j in stride(from: i - 1, through: 0, by: -1) {
-                    if let code = sortedResults[j].countryCode,
-                       let name = sortedResults[j].countryName {
-                        backwardSuggestion = (code, name)
-                        break
-                    }
-                }
-
-                var forwardSuggestion: (code: String, name: String)?
-                for j in stride(from: i + 1, to: sortedResults.count, by: 1) {
-                    if let code = sortedResults[j].countryCode,
-                       let name = sortedResults[j].countryName {
-                        forwardSuggestion = (code, name)
-                        break
-                    }
-                }
-
                 var suggestions: [(code: String, name: String)] = []
-                if let backwardSuggestion {
+                if let backwardSuggestion = backwardSuggestions[i] {
                     suggestions.append(backwardSuggestion)
                 }
-                if let forwardSuggestion, forwardSuggestion.code != backwardSuggestion?.code {
+                if let forwardSuggestion = forwardSuggestions[i], forwardSuggestion.code != backwardSuggestions[i]?.code {
                     suggestions.append(forwardSuggestion)
                 }
 
