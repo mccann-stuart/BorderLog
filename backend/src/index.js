@@ -21,6 +21,16 @@ const getSecurityHeaders = (baseHeaders) => {
   return headers;
 };
 
+// Helper to create standardized error responses
+const createErrorResponse = (message, status) => {
+  const headers = getSecurityHeaders();
+  headers.set("Content-Type", "text/plain; charset=UTF-8");
+  return new Response(message, {
+    status: status,
+    headers: headers
+  });
+};
+
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
@@ -28,10 +38,7 @@ export default {
     const method = request.method;
 
     if (method !== "GET" && method !== "HEAD") {
-      return new Response("Method Not Allowed", {
-        status: 405,
-        headers: getSecurityHeaders()
-      });
+      return createErrorResponse("Method Not Allowed", 405);
     }
 
     // Helper to validate version string (alphanumeric, dot, dash, underscore)
@@ -48,10 +55,7 @@ export default {
       // Check if binding exists
       if (!env.CONFIG_BUCKET) {
         console.error("R2 Bucket 'CONFIG_BUCKET' not configured in environment");
-        return new Response("Internal Server Error", {
-            status: 500,
-            headers: getSecurityHeaders()
-        });
+        return createErrorResponse("Internal Server Error", 500);
       }
 
       try {
@@ -62,10 +66,7 @@ export default {
         const object = await env.CONFIG_BUCKET.get(key, options);
 
         if (object === null) {
-          return new Response("Not Found", {
-            status: 404,
-            headers: getSecurityHeaders()
-          });
+          return createErrorResponse("Not Found", 404);
         }
 
         const headers = new Headers();
@@ -93,10 +94,7 @@ export default {
       } catch (e) {
         // Log a generic error message to avoid leaking sensitive details
         console.error("Error fetching from R2");
-        return new Response("Internal Server Error", {
-            status: 500,
-            headers: getSecurityHeaders()
-        });
+        return createErrorResponse("Internal Server Error", 500);
       }
     };
 
@@ -113,18 +111,12 @@ export default {
       const version = configMatch[2];
 
       if (!isValidVersion(version)) {
-        return new Response("Invalid version format", {
-            status: 400,
-            headers: getSecurityHeaders()
-        });
+        return createErrorResponse("Invalid version format", 400);
       }
       return fetchFromR2(`${type}/${version}.json`);
     }
 
     // Default response
-    return new Response("Not Found", {
-        status: 404,
-        headers: getSecurityHeaders()
-    });
+    return createErrorResponse("Not Found", 404);
   },
 };

@@ -17,6 +17,12 @@ function assertSecurityHeaders(res) {
   assert.strictEqual(res.headers.get("Permissions-Policy"), "accelerometer=(), camera=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), payment=(), usb=(), interest-cohort=()", "Missing Permissions-Policy");
 }
 
+// Helper to check error response headers specifically
+function assertErrorHeaders(res) {
+  assertSecurityHeaders(res);
+  assert.strictEqual(res.headers.get("Content-Type"), "text/plain; charset=UTF-8", "Missing or incorrect Content-Type for error response");
+}
+
 // Helper to run test
 async function runTest(name, fn) {
   try {
@@ -40,7 +46,7 @@ async function runTest(name, fn) {
     const res = await worker.fetch(req, env, ctx);
 
     assert.strictEqual(res.status, 405);
-    assertSecurityHeaders(res);
+    assertErrorHeaders(res);
   });
 
   await runTest("Missing CONFIG_BUCKET binding returns 500 Generic Error", async () => {
@@ -59,7 +65,7 @@ async function runTest(name, fn) {
     assert.strictEqual(res.status, 500);
     const text = await res.text();
     assert.strictEqual(text, "Internal Server Error");
-    assertSecurityHeaders(res);
+    assertErrorHeaders(res);
     assert.ok(loggedError.includes("not configured"), "Should log internal details");
   });
 
@@ -83,7 +89,7 @@ async function runTest(name, fn) {
     assert.strictEqual(res.status, 500);
     const text = await res.text();
     assert.strictEqual(text, "Internal Server Error");
-    assertSecurityHeaders(res);
+    assertErrorHeaders(res);
     assert.ok(loggedError.includes("Error fetching from R2"), "Should log generic error message");
     assert.ok(!loggedError.includes("R2 Connection Failed"), "Should NOT log sensitive error details");
   });
@@ -99,7 +105,7 @@ async function runTest(name, fn) {
     const res = await worker.fetch(req, env, ctx);
 
     assert.strictEqual(res.status, 404);
-    assertSecurityHeaders(res);
+    assertErrorHeaders(res);
   });
 
   await runTest("Invalid Version format returns 400 + Security Headers", async () => {
@@ -109,7 +115,7 @@ async function runTest(name, fn) {
     const res = await worker.fetch(req, env, ctx);
 
     assert.strictEqual(res.status, 400);
-    assertSecurityHeaders(res);
+    assertErrorHeaders(res);
   });
 
   await runTest("Invalid Version (too long) returns 400", async () => {
@@ -120,7 +126,7 @@ async function runTest(name, fn) {
     const res = await worker.fetch(req, env, ctx);
 
     assert.strictEqual(res.status, 400);
-    assertSecurityHeaders(res);
+    assertErrorHeaders(res);
   });
 
   await runTest("Invalid Version (contains ..) returns 400", async () => {
@@ -130,7 +136,7 @@ async function runTest(name, fn) {
     const res = await worker.fetch(req, env, ctx);
 
     assert.strictEqual(res.status, 400);
-    assertSecurityHeaders(res);
+    assertErrorHeaders(res);
   });
 
   await runTest("Unknown Route returns 404 + Security Headers", async () => {
@@ -140,7 +146,7 @@ async function runTest(name, fn) {
     const res = await worker.fetch(req, env, ctx);
 
     assert.strictEqual(res.status, 404);
-    assertSecurityHeaders(res);
+    assertErrorHeaders(res);
   });
 
   await runTest("Successful Fetch includes Security Headers and Cache-Control", async () => {
