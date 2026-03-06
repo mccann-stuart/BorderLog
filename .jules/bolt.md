@@ -17,3 +17,7 @@
 ## 2026-02-16 - Precalculating Fallbacks/Suggestions in Array Processing
 **Learning:** Nested loops used for resolving missing data points (like scanning forward/backward in a chronological array to find the nearest non-nil value) can severely degrade performance to O(N²) when large gaps exist.
 **Action:** When filling gaps in chronological data, perform two linear passes (O(N)) first: one forward pass to precalculate the previous known value, and one backward pass to precalculate the next known value. Store these in O(N) arrays. Then, iterate the original array once more to apply these suggestions in O(1) time per element.
+
+## 2026-03-06 - Dictionary Subscript Struct Mutation and O(1) Pre-computing
+**Learning:** Performing `Array.first { ... }` inside a fast path iteration (like an aggregation loop) results in an O(N*M) time complexity bottleneck. Also, continually re-instantiating a struct just to update a value inside a dictionary increases ARC and allocation overhead.
+**Action:** Before iterating, pre-compute lookup tables using `Dictionary(uniqueKeysWithValues:)` to achieve O(1) inner-loop accesses. When updating structs in dictionaries, use Swift's direct dictionary mutation (e.g. `dict[key]?.value += 1`) to avoid re-allocating the entire struct.
