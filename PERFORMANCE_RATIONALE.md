@@ -196,3 +196,22 @@ for day in days {
 - **Time Complexity**: Remains O(N), but the constant factor is reduced significantly (1 pass instead of 3).
 - **Space Complexity**: Reduced from O(N) (creating new arrays) to O(1) (simple integer counters).
 - **Benchmarking**: Simulation scripts confirm processing time is roughly halved, and memory allocation is virtually eliminated compared to the functional/filter approach.
+
+# Performance Optimization Rationale: Linear Precalculation in PresenceInferenceEngine
+
+## Current State
+`PresenceInferenceEngine.compute` previously inferred missing days (gaps or low-confidence days) by running nested loops to find the nearest backward and forward countries. For each gap day, it iterated forwards and backwards through the entire array until it hit a known day.
+
+## Problem
+1. **O(N²) Time Complexity**: In the worst-case scenario (many unknown days), the algorithm performs O(N²) operations to resolve suggestions.
+2. **Computational Overhead**: As the number of `PresenceDay` records grows (e.g. tracking years of travel history), this nested loop blocks the main thread when updating the UI.
+
+## Optimization
+Replace the nested loops with linear passes (O(N)):
+1. Create `backwardSuggestions` by iterating forward exactly once, carrying the `currentBackward` value forward.
+2. Create `forwardSuggestions` by iterating backward exactly once, carrying the `currentForward` value backward.
+3. On the final pass over the days array to fill the gaps, look up these precalculated suggestions in O(1) time by index.
+
+## Verification
+- **Time Complexity**: The operation has been reduced from O(N²) worst-case to O(N) strict bounds. Space complexity is O(N) due to the two precalculation arrays, which is negligible compared to the time savings.
+- **Benchmarking**: Simulation scripts confirm the single-pass lookups produce the identical suggestions as the nested iteration logic.

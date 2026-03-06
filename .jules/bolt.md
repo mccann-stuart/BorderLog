@@ -13,3 +13,7 @@
 ## 2026-02-18 - Single-Pass Sequence Iteration vs Chained Filters
 **Learning:** Chaining multiple `.filter` calls on Swift collections (`Array`) or executing `filter` multiple times over the same subset incurs a large O(N) memory allocation penalty because each `.filter` generates a new array.
 **Action:** When computing multiple metrics or sub-sets over a sequence, prefer a single `for` loop pass with standard conditional checks. This reduces iteration count and eliminates unnecessary memory allocations (dropping space complexity from O(N) to O(1)).
+
+## 2026-02-16 - Precalculating Fallbacks/Suggestions in Array Processing
+**Learning:** Nested loops used for resolving missing data points (like scanning forward/backward in a chronological array to find the nearest non-nil value) can severely degrade performance to O(N²) when large gaps exist.
+**Action:** When filling gaps in chronological data, perform two linear passes (O(N)) first: one forward pass to precalculate the previous known value, and one backward pass to precalculate the next known value. Store these in O(N) arrays. Then, iterate the original array once more to apply these suggestions in O(1) time per element.
