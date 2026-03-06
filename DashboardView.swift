@@ -41,21 +41,24 @@ struct DashboardView: View {
     private var countryDaysSummary: [CountryDaysInfo] {
         var countryDict: [String: CountryDaysInfo] = [:]
         
+        // Optimization: Create an O(1) lookup dictionary for country configs
+        // to avoid O(N) array scans inside the main aggregation loop.
+        let configsDict = Dictionary(
+            countryConfigs.map { ($0.countryCode, $0) },
+            uniquingKeysWith: { first, _ in first }
+        )
+
         for day in timeframeDays {
             guard let countryName = day.countryName ?? day.countryCode else { continue }
             let normalizedCode = CountryCodeNormalizer.normalize(day.countryCode)
             let key = normalizedCode ?? countryName
 
-            if let info = countryDict[key] {
-                countryDict[key] = CountryDaysInfo(
-                    countryName: info.countryName,
-                    countryCode: info.countryCode,
-                    totalDays: info.totalDays + 1,
-                    region: info.region,
-                    maxAllowedDays: info.maxAllowedDays
-                )
+            if countryDict[key] != nil {
+                // Optimization: Directly mutate the struct inside the dictionary
+                // rather than allocating a new one every time.
+                countryDict[key]?.totalDays += 1
             } else {
-                let maxDays = countryConfigs.first { $0.countryCode == (normalizedCode ?? "") }?.maxAllowedDays
+                let maxDays = normalizedCode.flatMap { configsDict[$0]?.maxAllowedDays }
                 countryDict[key] = CountryDaysInfo(
                     countryName: countryName,
                     countryCode: normalizedCode,
