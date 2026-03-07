@@ -40,11 +40,9 @@ struct ContentView: View {
     private var filteredPresenceDays: [PresenceDay] {
         switch ledgerFilter {
         case .all:
-            return presenceDays
+            return presenceDays // O(1) return via copy-on-write
         case .unknown:
-            return presenceDays.filter { day in
-                day.countryCode == nil && day.countryName == nil
-            }
+            return presenceDays.filter { $0.countryCode == nil && $0.countryName == nil }
         case .manual:
             return presenceDays.filter { $0.isManuallyModified }
         case .disputed:
@@ -61,14 +59,14 @@ struct ContentView: View {
 
     private var recentDayCount: Int {
         let range = dateRange
-        return presenceDays.filter { day in
+        return presenceDays.lazy.filter { day in
             day.date >= range.start && day.date <= range.end
         }.count
     }
 
     private var disputedDayCount: Int {
         let range = dateRange
-        return presenceDays.filter { day in
+        return presenceDays.lazy.filter { day in
             day.date >= range.start &&
             day.date <= range.end &&
             day.isDisputed &&

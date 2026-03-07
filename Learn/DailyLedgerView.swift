@@ -35,13 +35,15 @@ struct DailyLedgerView: View {
 
     private var recentDays: [PresenceDay] {
         let range = dateRange
-        return allPresenceDays
-            .filter { $0.date >= range.start && $0.date <= range.end }
-            .sorted { $0.date > $1.date }
+        // Since allPresenceDays is fetched with a SortDescriptor ordering by date reverse,
+        // we can safely use filter, but .sorted is redundant. To avoid intermediate arrays, use lazy where possible,
+        // but since we need an Array for the view and further filtering, we just use a single pass filter.
+        return allPresenceDays.filter { $0.date >= range.start && $0.date <= range.end }
     }
 
     private var disputedDayCount: Int {
-        recentDays.filter { $0.isDisputed && !$0.isManuallyModified }.count
+        // Optimization: Use `lazy` to avoid allocating an intermediate array just to count.
+        recentDays.lazy.filter { $0.isDisputed && !$0.isManuallyModified }.count
     }
 
     private var anyFilterActive: Bool {
@@ -49,42 +51,20 @@ struct DailyLedgerView: View {
     }
 
     private var filteredDays: [PresenceDay] {
-        recentDays.filter { day in
-            // If no filters are active, show all
-            if !anyFilterActive {
-                return true
-            }
-            
+        if !anyFilterActive {
+            return recentDays // O(1) return via copy-on-write
+        }
+
+        // Single pass standard filter is generally faster than Array(.lazy.filter) due to buffer capacities.
+        return recentDays.filter { day in
             // If multiple filters are active, we show days matching ANY of the active filters (OR logic)
-            var matches = false
+            if showUnknownOnly && day.countryCode == nil && day.countryName == nil { return true }
+            if showLowConfidenceOnly && day.confidenceLabel == .low { return true }
+            if showMediumConfidenceOnly && day.confidenceLabel == .medium { return true }
+            if showManualOnly && day.isManuallyModified { return true }
+            if showDisputedOnly && day.isDisputed && !day.isManuallyModified { return true }
             
-            if showUnknownOnly {
-                if day.countryCode == nil && day.countryName == nil {
-                    matches = true
-                }
-            }
-            if showLowConfidenceOnly {
-                if day.confidenceLabel == .low {
-                    matches = true
-                }
-            }
-            if showMediumConfidenceOnly {
-                if day.confidenceLabel == .medium {
-                    matches = true
-                }
-            }
-            if showManualOnly {
-                if day.isManuallyModified {
-                    matches = true
-                }
-            }
-            if showDisputedOnly {
-                if day.isDisputed && !day.isManuallyModified {
-                    matches = true
-                }
-            }
-            
-            return matches
+            return false
         }
     }
 

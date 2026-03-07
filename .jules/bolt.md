@@ -17,3 +17,7 @@
 ## 2026-02-16 - Precalculating Fallbacks/Suggestions in Array Processing
 **Learning:** Nested loops used for resolving missing data points (like scanning forward/backward in a chronological array to find the nearest non-nil value) can severely degrade performance to O(N²) when large gaps exist.
 **Action:** When filling gaps in chronological data, perform two linear passes (O(N)) first: one forward pass to precalculate the previous known value, and one backward pass to precalculate the next known value. Store these in O(N) arrays. Then, iterate the original array once more to apply these suggestions in O(1) time per element.
+
+## 2026-03-05 - Lazy Filter Counting vs Array Evaluation
+**Learning:** Using `.lazy.filter { ... }.count` is an excellent optimization for counting elements because it avoids allocating a new array in memory, turning an O(N) space operation into O(1). However, when you actually need to return a fully evaluated array, standard `.filter { ... }` is generally faster than `Array(.lazy.filter)` because the Swift standard library can optimize buffer capacities under the hood. Also, never wrap an existing array in `Array()` if you're just returning it unmodified, as returning it directly is an O(1) operation due to Swift's copy-on-write semantics.
+**Action:** Use `.lazy.filter {}.count` when counting. Use `.filter {}` when returning an array. Return the original array directly if no filtering is applied.
