@@ -25,28 +25,32 @@ struct CountryDetailView: View {
         var id: String { rawValue }
     }
 
-    // Days filtered to this country only
-    private var countryDays: [PresenceDay] {
+    // Optimization: Avoid allocating intermediate arrays by combining filter conditions in a single pass.
+    // Standard `filter` is preferred here over `Array(.lazy.filter)` for optimal buffer allocation.
+    private var filteredCountryDays: [PresenceDay] {
         let normalizedTarget = CountryCodeNormalizer.normalize(countryCode)
+        let now = Date()
+        let calendar = Calendar.current
+
         return allPresenceDays.filter { day in
+            // First, filter by country
+            let isMatch: Bool
             let normalizedDay = CountryCodeNormalizer.normalize(day.countryCode)
             if let target = normalizedTarget, let code = normalizedDay {
-                return target == code
+                isMatch = (target == code)
+            } else {
+                isMatch = ((day.countryName ?? "") == countryName)
             }
-            return (day.countryName ?? "") == countryName
-        }
-    }
 
-    private var filteredCountryDays: [PresenceDay] {
-        switch ledgerRangeFilter {
-        case .timeframe:
-            let now = Date()
-            let calendar = Calendar.current
-            return countryDays.filter { day in
-                selectedTimeframe.contains(day.date, now: now, calendar: calendar)
+            guard isMatch else { return false }
+
+            // Second, apply timeframe filter if needed
+            switch ledgerRangeFilter {
+            case .timeframe:
+                return selectedTimeframe.contains(day.date, now: now, calendar: calendar)
+            case .allTime:
+                return true
             }
-        case .allTime:
-            return countryDays
         }
     }
 
