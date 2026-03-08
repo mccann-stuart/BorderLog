@@ -33,72 +33,66 @@ struct DailyLedgerView: View {
         return (start, today)
     }
 
-    private var recentDays: [PresenceDay] {
-        let range = dateRange
-        return allPresenceDays
-            .filter { $0.date >= range.start && $0.date <= range.end }
-            .sorted { $0.date > $1.date }
-    }
-
-    private var disputedDayCount: Int {
-        recentDays.filter { $0.isDisputed && !$0.isManuallyModified }.count
-    }
-
     private var anyFilterActive: Bool {
         showUnknownOnly || showLowConfidenceOnly || showMediumConfidenceOnly || showManualOnly || showDisputedOnly
     }
 
-    private var filteredDays: [PresenceDay] {
-        recentDays.filter { day in
-            // If no filters are active, show all
-            if !anyFilterActive {
-                return true
+    // ⚡ Bolt: Single-pass iteration to filter days and count disputed days in O(N) time and O(1) space overhead
+    private var filteredData: (days: [PresenceDay], disputedCount: Int) {
+        let range = dateRange
+        var matchingDays: [PresenceDay] = []
+        var disputedCount = 0
+        let isAnyFilterActive = anyFilterActive
+
+        for day in allPresenceDays {
+            if day.date > range.end { continue }
+            // Since allPresenceDays is reverse sorted by date, we can early exit once we pass the window
+            if day.date < range.start { break }
+
+            let isUnmodifiedDisputed = day.isDisputed && !day.isManuallyModified
+            if isUnmodifiedDisputed {
+                disputedCount += 1
+            }
+
+            if !isAnyFilterActive {
+                matchingDays.append(day)
+                continue
             }
             
-            // If multiple filters are active, we show days matching ANY of the active filters (OR logic)
             var matches = false
             
-            if showUnknownOnly {
-                if day.countryCode == nil && day.countryName == nil {
-                    matches = true
-                }
-            }
-            if showLowConfidenceOnly {
-                if day.confidenceLabel == .low {
-                    matches = true
-                }
-            }
-            if showMediumConfidenceOnly {
-                if day.confidenceLabel == .medium {
-                    matches = true
-                }
-            }
-            if showManualOnly {
-                if day.isManuallyModified {
-                    matches = true
-                }
-            }
-            if showDisputedOnly {
-                if day.isDisputed && !day.isManuallyModified {
-                    matches = true
-                }
+            if showUnknownOnly && day.countryCode == nil && day.countryName == nil {
+                matches = true
+            } else if showLowConfidenceOnly && day.confidenceLabel == .low {
+                matches = true
+            } else if showMediumConfidenceOnly && day.confidenceLabel == .medium {
+                matches = true
+            } else if showManualOnly && day.isManuallyModified {
+                matches = true
+            } else if showDisputedOnly && isUnmodifiedDisputed {
+                matches = true
             }
             
-            return matches
+            if matches {
+                matchingDays.append(day)
+            }
         }
+
+        return (matchingDays, disputedCount)
     }
 
     var body: some View {
+        let data = filteredData
         List {
             Section("Days") {
-                if filteredDays.isEmpty {
+                if data.days.isEmpty {
                     ContentUnavailableView(
                         "No matching days",
                         systemImage: "calendar.badge.exclamationmark",
                         description: Text("No days match the active filters in the last two years.")
                     )
                 } else {
-                    ForEach(filteredDays) { day in
+                    ForEach(data.days) { day in
                         NavigationLink {
                             PresenceDayDetailView(day: day)
                         } label: {
@@ -123,7 +117,7 @@ struct DailyLedgerView: View {
                         }
                     }
                     Toggle("Show Unknown", isOn: $showUnknownOnly)
-                    Toggle("Show Disputed (\(disputedDayCount))", isOn: $showDisputedOnly)
+                    Toggle("Show Disputed (\(data.disputedCount))", isOn: $showDisputedOnly)
                     Toggle("Show Low Confidence", isOn: $showLowConfidenceOnly)
                     Toggle("Show Medium Confidence", isOn: $showMediumConfidenceOnly)
                     Toggle("Show Manually Marked", isOn: $showManualOnly)

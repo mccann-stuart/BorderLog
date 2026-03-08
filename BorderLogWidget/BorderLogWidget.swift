@@ -187,13 +187,9 @@ struct TopCountriesWidgetProvider: TimelineProvider {
                 let normalizedCode = CountryCodeNormalizer.normalize(day.countryCode)
                 let key = normalizedCode ?? countryName
                 
-                if let info = countryDict[key] {
-                    countryDict[key] = WidgetCountryDaysInfo(
-                        countryName: info.countryName,
-                        countryCode: info.countryCode,
-                        totalDays: info.totalDays + 1,
-                        region: info.region
-                    )
+                if countryDict[key] != nil {
+                    // ⚡ Bolt: Mutate struct directly to avoid intermediate allocations
+                    countryDict[key]?.totalDays += 1
                 } else {
                     countryDict[key] = WidgetCountryDaysInfo(
                         countryName: countryName,

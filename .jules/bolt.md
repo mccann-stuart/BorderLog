@@ -17,3 +17,7 @@
 ## 2026-02-16 - Precalculating Fallbacks/Suggestions in Array Processing
 **Learning:** Nested loops used for resolving missing data points (like scanning forward/backward in a chronological array to find the nearest non-nil value) can severely degrade performance to O(N²) when large gaps exist.
 **Action:** When filling gaps in chronological data, perform two linear passes (O(N)) first: one forward pass to precalculate the previous known value, and one backward pass to precalculate the next known value. Store these in O(N) arrays. Then, iterate the original array once more to apply these suggestions in O(1) time per element.
+
+## 2026-03-08 - Redundant Array Re-sorting from @Query
+**Learning:** Calling `.sorted()` on arrays returned from a SwiftData `@Query(sort:)` after applying an in-memory `.filter` introduces an unnecessary O(N log N) sorting cost because SwiftData `@Query` results are already pre-sorted. In-memory `.filter` preserves the original order of the elements.
+**Action:** When filtering a sorted array or `@Query` result, do not call `.sorted()` unless the sort criteria has explicitly changed. The resulting array from `.filter` inherently maintains the order.
