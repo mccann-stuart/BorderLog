@@ -46,14 +46,9 @@ struct DashboardView: View {
             let normalizedCode = CountryCodeNormalizer.normalize(day.countryCode)
             let key = normalizedCode ?? countryName
 
-            if let info = countryDict[key] {
-                countryDict[key] = CountryDaysInfo(
-                    countryName: info.countryName,
-                    countryCode: info.countryCode,
-                    totalDays: info.totalDays + 1,
-                    region: info.region,
-                    maxAllowedDays: info.maxAllowedDays
-                )
+            if countryDict[key] != nil {
+                // ⚡ Bolt: Mutate the struct in-place to avoid reallocating new IDs and structs during aggregation
+                countryDict[key]?.totalDays += 1
             } else {
                 let maxDays = countryConfigs.first { $0.countryCode == (normalizedCode ?? "") }?.maxAllowedDays
                 countryDict[key] = CountryDaysInfo(
