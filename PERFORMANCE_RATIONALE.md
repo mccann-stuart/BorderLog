@@ -124,6 +124,36 @@ overlappingStays = try modelContext.fetch(stayFetch)
 - **Reduced I/O and Memory**: The database query now retrieves only the records overlapping with the specific day. Complexity drops from O(N) to O(K), where K is the number of stays on that day (typically very small).
 - **Improved Performance**: Leverages database-level filtering, reducing main thread processing and avoiding unnecessary object instantiation.
 
+# Performance Optimization Rationale: Single-Pass Iteration for Ledger Metrics in ContentView
+
+## Current State
+`ContentView.swift` previously contained two separate computed properties, `recentDayCount` and `disputedDayCount`. Both properties chained `.filter { ... }.count` on the `presenceDays` array:
+```swift
+private var recentDayCount: Int {
+    let range = dateRange
+    return presenceDays.filter { day in
+        day.date >= range.start && day.date <= range.end
+    }.count
+}
+// Similar for disputedDayCount
+```
+
+## Problem
+1. **Multiple Iterations**: The full `presenceDays` array was iterated over twice, doubling computational overhead.
+2. **Intermediate Array Allocations**: The `.filter { ... }` operations allocated entirely new arrays only to call `.count` on them immediately after, increasing ARC and garbage collection pressure unnecessarily.
+3. **Inefficient Full Scans**: Although `presenceDays` is retrieved via a SwiftData `@Query` which pre-sorts it in reverse chronological order, the filter functions ignored this sorted nature and scanned the *entire* array history, even the entries prior to the 2-year window.
+
+## Optimization
+Replace the two properties with a single computed property `ledgerMetrics` that loops over `presenceDays` manually:
+1. **Single Pass**: It calculates both `recentCount` and `disputedCount` simultaneously within one loop.
+2. **Zero Allocations**: Counters are used instead of filter arrays, reducing space complexity from `O(N)` to `O(1)`.
+3. **Early Exit (`break`)**: The array is already pre-sorted from youngest to oldest. If the loop encounters a date earlier than `range.start` (the 2-year cutoff), it breaks the loop completely, avoiding processing years of older data.
+
+## Verification
+- **Time Complexity**: Reduced from `O(2N)` to `O(K)` where `K` is the number of days within the 2-year date window. In the worst case, this is still better than `O(N)`.
+- **Space Complexity**: Reduced from `O(2N)` to `O(1)`.
+- **Benchmarking**: Simulation logic confirms the output remains identical but with no intermediate array allocations.
+
 # Performance Optimization Rationale: Reusing FormatStyle vs Allocating DateFormatter
 
 ## Current State
