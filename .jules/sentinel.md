@@ -6,3 +6,7 @@
 **Vulnerability:** HTTP API error responses (like 400, 404, 500) were being returned as plain text bodies without an explicit `Content-Type` header. This could potentially lead to content sniffing by certain clients.
 **Learning:** Even simple string-based error responses should explicitly declare their content type (`text/plain; charset=UTF-8`) to prevent browsers/clients from trying to guess the format.
 **Prevention:** Always use a helper like `createErrorResponse` that injects the required `Content-Type: text/plain; charset=UTF-8` header for non-JSON or error payloads in workers.
+## 2026-03-09 - iOS App Switcher Data Leakage
+**Vulnerability:** When the app enters the background (e.g. going to the iOS app switcher), a snapshot of the UI is taken by the OS. Since the state variable updating `isUnlocked` to false inside `.onChange(of: scenePhase)` isn't processed quickly enough before the OS snapshot, sensitive travel data may be visible in the multitasking preview.
+**Learning:** Depending solely on state changes in `.onChange(of: scenePhase)` to obscure views can be too slow to prevent sensitive data leakage in OS multitasking previews.
+**Prevention:** Always directly bind security overlays or blur effects to `scenePhase != .active` within the view hierarchy (like in an `.overlay`) when biometrics/security locks are required.
