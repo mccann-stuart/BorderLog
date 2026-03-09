@@ -21,3 +21,7 @@
 ## 2026-03-08 - Redundant Array Re-sorting from @Query
 **Learning:** Calling `.sorted()` on arrays returned from a SwiftData `@Query(sort:)` after applying an in-memory `.filter` introduces an unnecessary O(N log N) sorting cost because SwiftData `@Query` results are already pre-sorted. In-memory `.filter` preserves the original order of the elements.
 **Action:** When filtering a sorted array or `@Query` result, do not call `.sorted()` unless the sort criteria has explicitly changed. The resulting array from `.filter` inherently maintains the order.
+
+## 2026-02-17 - Avoid .filter {}.count on sorted arrays
+**Learning:** Chaining `.filter {}.count` on Swift arrays not only iterates over the entire collection but needlessly allocates memory for intermediate arrays. In `ContentView.swift`, multiple properties were doing this on the same `presenceDays` array which is pre-sorted by SwiftData (`@Query(sort: [SortDescriptor(\PresenceDay.date, order: .reverse)])`). This leads to unnecessary memory pressure and garbage collection overhead.
+**Action:** Replace multiple `.filter {}.count` calls with a single `for` loop that computes all metrics in one pass using integer counters `O(1)` memory. Additionally, if the source array is pre-sorted, use early loop exits (`break` or `continue`) to stop the scan once the condition bounds are breached.
