@@ -25,3 +25,7 @@
 ## 2026-02-17 - Avoid .filter {}.count on sorted arrays
 **Learning:** Chaining `.filter {}.count` on Swift arrays not only iterates over the entire collection but needlessly allocates memory for intermediate arrays. In `ContentView.swift`, multiple properties were doing this on the same `presenceDays` array which is pre-sorted by SwiftData (`@Query(sort: [SortDescriptor(\PresenceDay.date, order: .reverse)])`). This leads to unnecessary memory pressure and garbage collection overhead.
 **Action:** Replace multiple `.filter {}.count` calls with a single `for` loop that computes all metrics in one pass using integer counters `O(1)` memory. Additionally, if the source array is pre-sorted, use early loop exits (`break` or `continue`) to stop the scan once the condition bounds are breached.
+
+## 2026-02-16 - Prevent Multi-pass Filtering
+**Learning:** Chaining `.filter()` calls, or evaluating arrays into intermediate arrays before iterating again, results in unnecessary O(N) heap allocations, Arc thrashing, and constant-factor latency increases, especially for frequently rendered dashboard views evaluating large histories.
+**Action:** Replace sequential `.filter`s with a single `for` loop that evaluates multiple conditions in-line. Combine condition checks or use early break/continue when properties guarantee ordered data.
