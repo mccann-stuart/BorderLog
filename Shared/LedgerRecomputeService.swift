@@ -7,10 +7,12 @@
 
 import Foundation
 import SwiftData
+import os
 
 @ModelActor
 public actor LedgerRecomputeService {
     internal var _dataFetcher: LedgerDataFetching?
+    private static let logger = Logger(subsystem: "com.MCCANN.Border", category: "LedgerRecomputeService")
     internal var onRecomputeError: ((Error) -> Void)?
 
     private var dataFetcher: LedgerDataFetching {
@@ -44,7 +46,7 @@ public actor LedgerRecomputeService {
             }
             scope = expandedScope
         } catch {
-            print("LedgerRecomputeService scope error: \(error)")
+            Self.logger.error("LedgerRecomputeService scope error: \(error, privacy: .private)")
             onRecomputeError?(error)
             return
         }
@@ -69,7 +71,7 @@ public actor LedgerRecomputeService {
             photos = try dataFetcher.fetchPhotos(from: rangeStart, to: rangeEnd)
             calendarSignals = try dataFetcher.fetchCalendarSignals(from: rangeStart, to: rangeEnd)
         } catch {
-            print("LedgerRecomputeService fetch error: \(error)")
+            Self.logger.error("LedgerRecomputeService fetch error: \(error, privacy: .private)")
             onRecomputeError?(error)
             return
         }
@@ -151,7 +153,7 @@ public actor LedgerRecomputeService {
             try self.upsertPresenceDays(results)
             try dataFetcher.save()
         } catch {
-            print("LedgerRecomputeService save error: \(error)")
+            Self.logger.error("LedgerRecomputeService save error: \(error, privacy: .private)")
             onRecomputeError?(error)
         }
     }
@@ -183,7 +185,7 @@ public actor LedgerRecomputeService {
         do {
             existingKeys = try dataFetcher.fetchPresenceDayKeys(in: allDayKeys)
         } catch {
-            print("LedgerRecomputeService fillMissingDays fetch error: \(error)")
+            Self.logger.error("LedgerRecomputeService fillMissingDays fetch error: \(error, privacy: .private)")
             return
         }
 
@@ -213,7 +215,7 @@ public actor LedgerRecomputeService {
         do {
             try dataFetcher.save()
         } catch {
-            print("LedgerRecomputeService fillMissingDays save error: \(error)")
+            Self.logger.error("LedgerRecomputeService fillMissingDays save error: \(error, privacy: .private)")
         }
     }
 
