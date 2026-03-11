@@ -34,7 +34,7 @@ struct BorderLogApp: App {
             MainNavigationView()
                 .environmentObject(authManager)
                 .overlay {
-                    if requireBiometrics && !isUnlocked {
+                    if requireBiometrics && (!isUnlocked || scenePhase != .active) {
                         SecurityLockView(isUnlocked: $isUnlocked)
                     }
                 }
