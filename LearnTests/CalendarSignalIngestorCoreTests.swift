@@ -49,4 +49,68 @@ final class CalendarSignalIngestorCoreTests: XCTestCase {
         XCTAssertEqual(result.touchedDayKeys, ["2026-03-03"])
         XCTAssertEqual(result.remaining, 0)
     }
+
+    func testPrimarySignalSelectionUsesDestinationAndEndDateWhenDestinationExists() async throws {
+        let ingestor = try makeIngestor()
+        let start = Date(timeIntervalSince1970: 1_000)
+        let end = Date(timeIntervalSince1970: 2_000)
+
+        let selection = await ingestor.testPrimarySignalSelection(
+            parsedFrom: nil,
+            parsedTo: "MUC",
+            eventStartDate: start,
+            eventEndDate: end,
+            structuredLocationTitle: "Manchester Airport",
+            structuredCoordinate: CLLocationCoordinate2D(latitude: 53.3494, longitude: -2.2795),
+            eventLocation: "Manchester MAN"
+        )
+
+        XCTAssertEqual(selection.locationString, "MUC")
+        XCTAssertTrue(selection.usesDestinationRule)
+        XCTAssertEqual(selection.date, end)
+        XCTAssertFalse(selection.usesCoordinate)
+    }
+
+    func testPrimarySignalSelectionFallsBackToStructuredOriginWhenNoDestination() async throws {
+        let ingestor = try makeIngestor()
+        let start = Date(timeIntervalSince1970: 1_000)
+
+        let selection = await ingestor.testPrimarySignalSelection(
+            parsedFrom: nil,
+            parsedTo: nil,
+            eventStartDate: start,
+            eventEndDate: nil,
+            structuredLocationTitle: "Manchester Airport",
+            structuredCoordinate: CLLocationCoordinate2D(latitude: 53.3494, longitude: -2.2795),
+            eventLocation: "Manchester MAN"
+        )
+
+        XCTAssertEqual(selection.locationString, "Manchester Airport")
+        XCTAssertFalse(selection.usesDestinationRule)
+        XCTAssertEqual(selection.date, start)
+        XCTAssertTrue(selection.usesCoordinate)
+    }
+
+    func testDestinationFirstLegacyEndCleanupRemovesStaleEndSignal() async throws {
+        let ingestor = try makeIngestor()
+        let resolved = CalendarSignalIngestor.ResolvedCalendarSignal(
+            timestamp: Date(timeIntervalSince1970: 2_000),
+            dayKey: "2026-03-10",
+            timeZoneId: "Europe/Berlin",
+            bucketingTimeZoneId: "Europe/Berlin",
+            latitude: 48.3538,
+            longitude: 11.7861,
+            countryCode: "DE",
+            countryName: "Germany"
+        )
+
+        let result = await ingestor.testDestinationFirstLegacyEndCleanup(
+            existingDayKey: "2026-03-09",
+            resolved: resolved
+        )
+
+        XCTAssertTrue(result.changed)
+        XCTAssertEqual(result.deletedLegacyEnd, 1)
+        XCTAssertEqual(result.remainingIdentifiers, ["event-3"])
+    }
 }

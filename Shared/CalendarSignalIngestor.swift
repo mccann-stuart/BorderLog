@@ -518,6 +518,86 @@ actor CalendarSignalIngestor {
         return (deleted: deleted, touchedDayKeys: touchedDayKeys.sorted(), remaining: map.count)
     }
 
+    func testPrimarySignalSelection(
+        parsedFrom: String?,
+        parsedTo: String?,
+        eventStartDate: Date,
+        eventEndDate: Date?,
+        structuredLocationTitle: String?,
+        structuredCoordinate: CLLocationCoordinate2D?,
+        eventLocation: String?
+    ) -> (locationString: String?, usesDestinationRule: Bool, date: Date, usesCoordinate: Bool) {
+        let selection = selectPrimarySignalInput(
+            parsedFrom: parsedFrom,
+            parsedTo: parsedTo,
+            eventStartDate: eventStartDate,
+            eventEndDate: eventEndDate,
+            structuredLocationTitle: structuredLocationTitle,
+            structuredCoordinate: structuredCoordinate,
+            eventLocation: eventLocation
+        )
+        return (
+            locationString: selection.locationString,
+            usesDestinationRule: selection.usesDestinationRule,
+            date: selection.date,
+            usesCoordinate: selection.coordinate != nil
+        )
+    }
+
+    func testDestinationFirstLegacyEndCleanup(
+        existingDayKey: String,
+        resolved: ResolvedCalendarSignal
+    ) -> (changed: Bool, deletedLegacyEnd: Int, remainingIdentifiers: [String]) {
+        let legacyPrimary = CalendarSignal(
+            timestamp: Date(timeIntervalSince1970: 0),
+            dayKey: existingDayKey,
+            latitude: 0,
+            longitude: 0,
+            countryCode: "GB",
+            countryName: "United Kingdom",
+            timeZoneId: "UTC",
+            bucketingTimeZoneId: "UTC",
+            eventIdentifier: "event-3",
+            title: "Old",
+            source: "Calendar"
+        )
+        let legacyEnd = CalendarSignal(
+            timestamp: Date(timeIntervalSince1970: 0),
+            dayKey: existingDayKey,
+            latitude: 0,
+            longitude: 0,
+            countryCode: "DE",
+            countryName: "Germany",
+            timeZoneId: "UTC",
+            bucketingTimeZoneId: "UTC",
+            eventIdentifier: "event-3#end",
+            title: "Old End",
+            source: "Calendar"
+        )
+        var map: [String: CalendarSignal] = [
+            "event-3": legacyPrimary,
+            "event-3#end": legacyEnd
+        ]
+        var touchedDayKeys = Set<String>()
+        let changed = upsertSignal(
+            identifier: "event-3",
+            resolved: resolved,
+            title: "New",
+            existingSignalByIdentifier: &map,
+            touchedDayKeys: &touchedDayKeys
+        )
+        let deletedLegacyEnd = deleteSignalIfExists(
+            identifier: "event-3#end",
+            existingSignalByIdentifier: &map,
+            touchedDayKeys: &touchedDayKeys
+        )
+        return (
+            changed: changed,
+            deletedLegacyEnd: deletedLegacyEnd,
+            remainingIdentifiers: map.keys.sorted()
+        )
+    }
+
     private func saveContextIfNeeded() throws {
         guard modelContext.hasChanges else { return }
         if let saveContextOverride {

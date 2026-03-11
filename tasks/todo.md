@@ -255,3 +255,34 @@
     - Result: **TEST SUCCEEDED**.
 - Residual risk:
   - Existing non-blocking actor-isolation warnings in `LedgerRecomputeService`/related types remain unchanged in this task.
+
+---
+
+# Task Plan (Calendar Flight Inference Destination-First)
+
+- [x] Expand `CalendarFlightParsing` to parse from full event snapshot (`title/location/structuredLocationTitle/notes`) with destination cleanup normalization.
+- [x] Add/priority route patterns for IATA routes, `from ... to ...`, and `Flight <carrier><number> ... to ...` plus destination-only `Flight to ...`.
+- [x] Rework `CalendarSignalIngestor` to destination-first primary signal selection (`to` wins, date from `endDate` fallback `startDate`) and skip origin fallback when destination exists.
+- [x] Stop writing new `eventIdentifier#end` records and always delete any stale legacy `#end` signals during ingest.
+- [x] Add deterministic ingestor core test helpers for primary signal selection and legacy end cleanup behavior.
+- [x] Update `CalendarFlightParsingTests` with LH4087/LH4089-style regressions and normalization assertions.
+- [x] Update `CalendarSignalIngestorCoreTests` for destination-first selection, end-date bucketing, and legacy `#end` cleanup.
+- [x] Run targeted tests (`CalendarFlightParsingTests`, `CalendarSignalIngestorCoreTests`) and capture outcomes.
+- [x] Add review notes with verification evidence and residual risk.
+
+## Review (Calendar Flight Inference Destination-First)
+
+- Verified the destination-first parser/ingestor implementation already present in the codebase:
+  - `CalendarFlightParsing` already consumes full event snapshot text and performs destination cleanup normalization.
+  - `CalendarSignalIngestor` already applies destination-first primary selection (`parsedTo` + `endDate` fallback) and deletes legacy `eventIdentifier#end` rows.
+- Added test-only helpers in `CalendarSignalIngestor` to verify selection and stale-end cleanup behavior without EventKit integration complexity.
+- Added regression tests:
+  - `CalendarFlightParsingTests`: destination cleanup (`Flight to Munich (LH 4087)`), explicit MAN→MUC route, flight-number route, punctuation cleanup, and existing ingestion predicates.
+  - `CalendarSignalIngestorCoreTests`: destination-first selection, structured fallback when no destination, and legacy `#end` cleanup.
+- Verification:
+  - `xcodebuild -project Learn.xcodeproj -scheme Learn -destination 'platform=iOS Simulator,name=iPhone 17' -only-testing:LearnTests/CalendarFlightParsingTests -only-testing:LearnTests/CalendarSignalIngestorCoreTests test`
+  - Result: **TEST SUCCEEDED** (14 tests passed).
+- Supporting compile unblock:
+  - Updated `LearnTests/AirportCodeResolverTests.swift` to remove invalid `XCTUnwrap(await ...)` autoclosures so the test target can compile under current concurrency checks.
+- Residual risk:
+  - No cross-event deduplication was added; duplicate calendar events can still create duplicate evidence rows, but destination inference now remains consistent.
