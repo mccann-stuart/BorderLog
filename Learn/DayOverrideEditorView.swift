@@ -7,8 +7,11 @@
 
 import SwiftUI
 import SwiftData
+import os
 
 struct DayOverrideEditorView: View {
+    private static let logger = Logger(subsystem: "com.MCCANN.Border", category: "DayOverrideEditorView")
+
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
     @Query(sort: [SortDescriptor(\DayOverride.date, order: .reverse)]) private var overrides: [DayOverride]
@@ -85,7 +88,7 @@ struct DayOverrideEditorView: View {
                         recomputeImpactedOverrideDays([deletedDayKey])
                         dismiss()
                     } catch {
-                        print("Failed to delete override: \(error)")
+                        Self.logger.error("Failed to delete override: \(error, privacy: .private)")
                     }
                     return
                 }
@@ -228,7 +231,7 @@ struct DayOverrideEditorView: View {
             recomputeImpactedOverrideDays(impactedDayKeys)
             dismiss()
         } catch {
-            print("Failed to save override: \(error)")
+            Self.logger.error("Failed to save override: \(error, privacy: .private)")
         }
     }
 

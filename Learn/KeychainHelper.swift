@@ -38,7 +38,7 @@ final class KeychainHelper: KeychainHelperProtocol {
         let status = SecItemAdd(addQuery, nil)
 
         if status != errSecSuccess {
-            Self.logger.error("Error saving to Keychain: \(status, privacy: .public)")
+            Self.logger.error("Error saving to Keychain: \(status, privacy: .private)")
         }
     }
 

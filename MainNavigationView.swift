@@ -1,8 +1,11 @@
 import SwiftUI
 import SwiftData
+import os
 import Photos
 
 struct MainNavigationView: View {
+    private static let logger = Logger(subsystem: "com.MCCANN.Border", category: "MainNavigationView")
+
     @EnvironmentObject private var authManager: AuthenticationManager
     @Environment(\.modelContext) private var modelContext
     @Environment(\.scenePhase) private var scenePhase
@@ -142,7 +145,7 @@ struct MainNavigationView: View {
         do {
             _ = try await calendarIngestor.ingest(mode: .auto)
         } catch {
-            print("MainNavigationView calendar auto ingest failed: \(error)")
+            Self.logger.error("MainNavigationView calendar auto ingest failed: \(error, privacy: .private)")
         }
     }
 
@@ -166,7 +169,7 @@ struct MainNavigationView: View {
         do {
             _ = try await ingestor.ingest(mode: .sequenced)
         } catch {
-            print("MainNavigationView photo bootstrap ingest failed: \(error)")
+            Self.logger.error("MainNavigationView photo bootstrap ingest failed: \(error, privacy: .private)")
         }
     }
 

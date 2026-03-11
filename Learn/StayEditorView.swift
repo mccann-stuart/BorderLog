@@ -124,7 +124,7 @@ struct StayEditorView: View {
                         recomputeImpactedStayRange(deletedRange)
                         dismiss()
                     } catch {
-                        print("Failed to delete stay: \(error)")
+                        Self.logger.error("Failed to delete stay: \(error, privacy: .private)")
                     }
                     return
                 }
@@ -219,7 +219,7 @@ struct StayEditorView: View {
         do {
             potentialOverlaps = try modelContext.fetch(descriptor)
         } catch {
-             Self.logger.error("Failed to fetch potential overlaps: \(error, privacy: .public)")
+             Self.logger.error("Failed to fetch potential overlaps: \(error, privacy: .private)")
              potentialOverlaps = []
         }
 
@@ -307,7 +307,7 @@ struct StayEditorView: View {
             }
             dismiss()
         } catch {
-            print("Failed to save stay: \(error)")
+            Self.logger.error("Failed to save stay: \(error, privacy: .private)")
         }
     }
 
