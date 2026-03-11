@@ -48,6 +48,10 @@ enum CalendarFlightParsing {
             pattern: "flight\\s*[:\\-]?\\s*[A-Z]{1,3}\\s*\\d{1,4}\\s+(.+?)\\s+to\\s+(.+)",
             options: [.caseInsensitive]
         )
+        let patternLineRoute = try? NSRegularExpression(
+            pattern: "^\\s*([\\p{L}][\\p{L}\\p{M} .'-]{1,80}?)\\s+to\\s+([\\p{L}][\\p{L}\\p{M} .'-]{1,80}?)\\s*$",
+            options: [.caseInsensitive, .anchorsMatchLines]
+        )
         let patternPlane = try? NSRegularExpression(pattern: "(.+?)\\s*✈\\s*(.+)", options: [])
         let patternPlaneEmoji = try? NSRegularExpression(pattern: "(.+?)\\s*✈️\\s*(.+)", options: [])
         let patternCodes = try? NSRegularExpression(pattern: "\\b([A-Z]{3})\\s*(?:[-/→]|->)\\s*([A-Z]{3})\\b", options: [])
@@ -55,8 +59,11 @@ enum CalendarFlightParsing {
         let bestFrom: String? = nil
         var bestTo: String? = nil
 
-        for text in candidates {
+        for rawText in candidates {
+            let preprocessedText = preprocessCandidateText(rawText)
+            let text = collapseWhitespace(preprocessedText)
             if text.isEmpty { continue }
+
             let nsString = text as NSString
             let range = NSRange(location: 0, length: nsString.length)
 
@@ -97,6 +104,18 @@ enum CalendarFlightParsing {
                 )
             }
 
+            if let p = patternLineRoute {
+                let preprocessedNSString = preprocessedText as NSString
+                let preprocessedRange = NSRange(location: 0, length: preprocessedNSString.length)
+                if let match = p.firstMatch(in: preprocessedText, options: [], range: preprocessedRange),
+                   match.numberOfRanges >= 3 {
+                    return (
+                        normalizeLocationToken(preprocessedNSString.substring(with: match.range(at: 1))),
+                        normalizeLocationToken(preprocessedNSString.substring(with: match.range(at: 2)))
+                    )
+                }
+            }
+
             if bestTo == nil,
                let p = patternTo,
                let match = p.firstMatch(in: text, options: [], range: range),
@@ -106,6 +125,22 @@ enum CalendarFlightParsing {
         }
 
         return (bestFrom, bestTo)
+    }
+
+    private static func preprocessCandidateText(_ raw: String) -> String {
+        guard !raw.isEmpty else { return "" }
+
+        let separators = CharacterSet(charactersIn: "\u{200B}\u{200C}\u{200D}\u{2060}\u{FEFF}")
+        let filteredScalars = raw.unicodeScalars.filter { !separators.contains($0) }
+        var value = String(String.UnicodeScalarView(filteredScalars))
+        value = value.replacingOccurrences(of: "\u{00A0}", with: " ")
+        return value
+    }
+
+    private static func collapseWhitespace(_ raw: String) -> String {
+        raw
+            .replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     private static func normalizeLocationToken(_ raw: String) -> String? {

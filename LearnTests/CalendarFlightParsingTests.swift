@@ -75,4 +75,36 @@ final class CalendarFlightParsingTests: XCTestCase {
         XCTAssertEqual(parsed.from, "MAN")
         XCTAssertEqual(parsed.to, "MUC")
     }
+
+    func testParseFlightInfoFromUnicodeSeparatedIATARoute() {
+        let parsed = CalendarFlightParsing.parseFlightInfo(
+            event: snapshot(title: "✈ MAN\u{200B}→\u{200B}MUC • LH\u{00A0}4089")
+        )
+        XCTAssertEqual(parsed.from, "MAN")
+        XCTAssertEqual(parsed.to, "MUC")
+    }
+
+    func testParseFlightInfoFromNotesLineRouteFallback() {
+        let parsed = CalendarFlightParsing.parseFlightInfo(
+            event: snapshot(
+                title: "Lufthansa 4089",
+                notes: """
+                Lufthansa 4089
+                Manchester to Munich
+                ↗ 11:15 GMT
+                ↘ 14:15 CET
+                """
+            )
+        )
+        XCTAssertEqual(parsed.from, "Manchester")
+        XCTAssertEqual(parsed.to, "Munich")
+    }
+
+    func testParseFlightInfoHandlesNonBreakingSpacesInIATARoute() {
+        let parsed = CalendarFlightParsing.parseFlightInfo(
+            event: snapshot(title: "LHR\u{00A0}-\u{00A0}JFK")
+        )
+        XCTAssertEqual(parsed.from, "LHR")
+        XCTAssertEqual(parsed.to, "JFK")
+    }
 }
