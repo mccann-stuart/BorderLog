@@ -10,8 +10,11 @@ import SwiftData
 import CoreLocation
 import Photos
 import EventKit
+import os
 
 struct SettingsView: View {
+    private static let logger = Logger(subsystem: "com.MCCANN.Border", category: "SettingsView")
+
     @Environment(\.modelContext) private var modelContext
 
 
@@ -432,7 +435,7 @@ struct SettingsView: View {
             // is computed against any newly added data.
             didBootstrapInference = false
         } catch {
-            print("Failed to reset data: \(error)")
+            Self.logger.error("Failed to reset data: \(error, privacy: .private)")
         }
     }
 

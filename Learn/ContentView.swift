@@ -239,7 +239,7 @@ struct ContentView: View {
         do {
             try dataManager.resetAllData()
         } catch {
-            Self.logger.error("Failed to reset data: \(error, privacy: .public)")
+            Self.logger.error("Failed to reset data: \(error, privacy: .private)")
         }
     }
 
@@ -256,7 +256,7 @@ struct ContentView: View {
                 isShowingSeedAlert = true
             }
         } catch {
-            Self.logger.error("Failed to seed data: \(error, privacy: .public)")
+            Self.logger.error("Failed to seed data: \(error, privacy: .private)")
         }
     }
 }

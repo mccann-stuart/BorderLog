@@ -7,8 +7,11 @@
 
 import SwiftUI
 import SwiftData
+import os
 
 struct PresenceDayDetailView: View {
+    private static let logger = Logger(subsystem: "com.MCCANN.Border", category: "PresenceDayDetailView")
+
     let day: PresenceDay
 
     @State private var isShowingOverride = false
@@ -229,7 +232,7 @@ struct PresenceDayDetailView: View {
             try modelContext.save()
             recomputeImpactedDay(dayKey)
         } catch {
-            print("Failed to save override suggestion: \(error)")
+            Self.logger.error("Failed to save override suggestion: \(error, privacy: .private)")
         }
     }
 
@@ -247,7 +250,7 @@ struct PresenceDayDetailView: View {
             try modelContext.save()
             recomputeImpactedDay(dayKey)
         } catch {
-            print("Failed to delete override: \(error)")
+            Self.logger.error("Failed to delete override: \(error, privacy: .private)")
         }
     }
 
