@@ -5,8 +5,11 @@
 
 import SwiftUI
 import AuthenticationServices
+import os
 
 struct WelcomeView: View {
+    private static let logger = Logger(subsystem: "com.MCCANN.Border", category: "WelcomeView")
+
     @Binding var currentStep: Int
     @EnvironmentObject private var authManager: AuthenticationManager
     
@@ -113,7 +116,7 @@ struct WelcomeView: View {
                 }
             }
         case .failure(let error):
-            print("Apple Sign In failed: \(error.localizedDescription)")
+            Self.logger.error("Apple Sign In failed: \(error, privacy: .private)")
             // In a real app, you might show an error alert here. For now we stay on this screen.
         }
     }

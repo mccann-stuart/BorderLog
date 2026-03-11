@@ -28,6 +28,13 @@ actor CalendarSignalIngestor {
         let countryName: String
     }
 
+    private struct PrimarySignalSelection {
+        let locationString: String?
+        let coordinate: CLLocationCoordinate2D?
+        let date: Date
+        let usesDestinationRule: Bool
+    }
+
     private var resolver: CountryResolving?
     internal var saveContextOverride: (@Sendable () throws -> Void)?
 
@@ -124,8 +131,9 @@ actor CalendarSignalIngestor {
             let id = event.eventIdentifier ?? event.calendarItemIdentifier
             let endId = id + "#end"
             var eventMutations = 0
+            let snapshot = eventSnapshot(for: event)
 
-            guard shouldIngest(event) else {
+            guard shouldIngest(snapshot) else {
                 eventMutations += deleteSignalIfExists(
                     identifier: id,
                     existingSignalByIdentifier: &existingSignalByIdentifier,
@@ -149,30 +157,21 @@ actor CalendarSignalIngestor {
             }
 
             guard let eventStartDate = event.startDate else { continue }
-            let (parsedFrom, parsedTo) = parseFlightInfo(event)
-
-            var startLocationString: String? = parsedFrom
-            var startCoordinate: CLLocationCoordinate2D? = nil
-
-            if startLocationString == nil {
-                if let structured = event.structuredLocation, let geo = structured.geoLocation {
-                    startCoordinate = geo.coordinate
-                    startLocationString = structured.title
-                } else {
-                    startLocationString = event.location
-                }
-            }
-
-            if let to = parsedTo, let startRaw = startLocationString, !startRaw.isEmpty,
-               startRaw.localizedStandardContains(to) {
-                startLocationString = nil
-                startCoordinate = nil
-            }
+            let (parsedFrom, parsedTo) = parseFlightInfo(snapshot)
+            let primarySelection = selectPrimarySignalInput(
+                parsedFrom: parsedFrom,
+                parsedTo: parsedTo,
+                eventStartDate: eventStartDate,
+                eventEndDate: event.endDate,
+                structuredLocationTitle: event.structuredLocation?.title,
+                structuredCoordinate: event.structuredLocation?.geoLocation?.coordinate,
+                eventLocation: event.location
+            )
 
             let startResolved = await resolveSignal(
-                locationString: startLocationString,
-                coordinate: startCoordinate,
-                date: eventStartDate,
+                locationString: primarySelection.locationString,
+                coordinate: primarySelection.coordinate,
+                date: primarySelection.date,
                 event: event,
                 activeResolver: activeResolver
             )
@@ -196,42 +195,12 @@ actor CalendarSignalIngestor {
                 )
             }
 
-            if let to = parsedTo {
-                let nextDay = calendar.date(byAdding: .day, value: 1, to: eventStartDate) ?? event.endDate ?? eventStartDate
-                let endResolved = await resolveSignal(
-                    locationString: to,
-                    coordinate: nil,
-                    date: nextDay,
-                    event: event,
-                    activeResolver: activeResolver
-                )
-
-                seenIdentifiers.insert(endId)
-                if let endResolved {
-                    if upsertSignal(
-                        identifier: endId,
-                        resolved: endResolved,
-                        title: event.title,
-                        existingSignalByIdentifier: &existingSignalByIdentifier,
-                        touchedDayKeys: &touchedDayKeys
-                    ) {
-                        eventMutations += 1
-                    }
-                } else {
-                    eventMutations += deleteSignalIfExists(
-                        identifier: endId,
-                        existingSignalByIdentifier: &existingSignalByIdentifier,
-                        touchedDayKeys: &touchedDayKeys
-                    )
-                }
-            } else {
-                seenIdentifiers.insert(endId)
-                eventMutations += deleteSignalIfExists(
-                    identifier: endId,
-                    existingSignalByIdentifier: &existingSignalByIdentifier,
-                    touchedDayKeys: &touchedDayKeys
-                )
-            }
+            seenIdentifiers.insert(endId)
+            eventMutations += deleteSignalIfExists(
+                identifier: endId,
+                existingSignalByIdentifier: &existingSignalByIdentifier,
+                touchedDayKeys: &touchedDayKeys
+            )
 
             if eventMutations > 0 {
                 processed += 1
@@ -262,18 +231,66 @@ actor CalendarSignalIngestor {
         return processed
     }
 
-    private func shouldIngest(_ event: EKEvent) -> Bool {
-        let snapshot = CalendarEventTextSnapshot(
+    private func eventSnapshot(for event: EKEvent) -> CalendarEventTextSnapshot {
+        CalendarEventTextSnapshot(
             title: event.title,
             location: event.location,
             structuredLocationTitle: event.structuredLocation?.title,
             notes: event.notes
         )
-        return CalendarFlightParsing.shouldIngest(event: snapshot)
     }
 
-    private func parseFlightInfo(_ event: EKEvent) -> (from: String?, to: String?) {
-        CalendarFlightParsing.parseFlightInfo(title: event.title, notes: event.notes)
+    private func shouldIngest(_ snapshot: CalendarEventTextSnapshot) -> Bool {
+        CalendarFlightParsing.shouldIngest(event: snapshot)
+    }
+
+    private func parseFlightInfo(_ snapshot: CalendarEventTextSnapshot) -> (from: String?, to: String?) {
+        CalendarFlightParsing.parseFlightInfo(event: snapshot)
+    }
+
+    private func selectPrimarySignalInput(
+        parsedFrom: String?,
+        parsedTo: String?,
+        eventStartDate: Date,
+        eventEndDate: Date?,
+        structuredLocationTitle: String?,
+        structuredCoordinate: CLLocationCoordinate2D?,
+        eventLocation: String?
+    ) -> PrimarySignalSelection {
+        if let destination = nonEmptyLocation(parsedTo) {
+            return PrimarySignalSelection(
+                locationString: destination,
+                coordinate: nil,
+                date: eventEndDate ?? eventStartDate,
+                usesDestinationRule: true
+            )
+        }
+
+        var startLocationString = nonEmptyLocation(parsedFrom)
+        var startCoordinate: CLLocationCoordinate2D? = nil
+
+        if startLocationString == nil {
+            if let structuredCoordinate {
+                startCoordinate = structuredCoordinate
+                startLocationString = nonEmptyLocation(structuredLocationTitle)
+            } else {
+                startLocationString = nonEmptyLocation(eventLocation)
+            }
+        }
+
+        return PrimarySignalSelection(
+            locationString: startLocationString,
+            coordinate: startCoordinate,
+            date: eventStartDate,
+            usesDestinationRule: false
+        )
+    }
+
+    private func nonEmptyLocation(_ value: String?) -> String? {
+        guard let trimmed = value?.trimmingCharacters(in: .whitespacesAndNewlines), !trimmed.isEmpty else {
+            return nil
+        }
+        return trimmed
     }
 
     private func resolveSignal(
@@ -499,6 +516,86 @@ actor CalendarSignalIngestor {
             touchedDayKeys: &touchedDayKeys
         )
         return (deleted: deleted, touchedDayKeys: touchedDayKeys.sorted(), remaining: map.count)
+    }
+
+    func testPrimarySignalSelection(
+        parsedFrom: String?,
+        parsedTo: String?,
+        eventStartDate: Date,
+        eventEndDate: Date?,
+        structuredLocationTitle: String?,
+        structuredCoordinate: CLLocationCoordinate2D?,
+        eventLocation: String?
+    ) -> (locationString: String?, usesDestinationRule: Bool, date: Date, usesCoordinate: Bool) {
+        let selection = selectPrimarySignalInput(
+            parsedFrom: parsedFrom,
+            parsedTo: parsedTo,
+            eventStartDate: eventStartDate,
+            eventEndDate: eventEndDate,
+            structuredLocationTitle: structuredLocationTitle,
+            structuredCoordinate: structuredCoordinate,
+            eventLocation: eventLocation
+        )
+        return (
+            locationString: selection.locationString,
+            usesDestinationRule: selection.usesDestinationRule,
+            date: selection.date,
+            usesCoordinate: selection.coordinate != nil
+        )
+    }
+
+    func testDestinationFirstLegacyEndCleanup(
+        existingDayKey: String,
+        resolved: ResolvedCalendarSignal
+    ) -> (changed: Bool, deletedLegacyEnd: Int, remainingIdentifiers: [String]) {
+        let legacyPrimary = CalendarSignal(
+            timestamp: Date(timeIntervalSince1970: 0),
+            dayKey: existingDayKey,
+            latitude: 0,
+            longitude: 0,
+            countryCode: "GB",
+            countryName: "United Kingdom",
+            timeZoneId: "UTC",
+            bucketingTimeZoneId: "UTC",
+            eventIdentifier: "event-3",
+            title: "Old",
+            source: "Calendar"
+        )
+        let legacyEnd = CalendarSignal(
+            timestamp: Date(timeIntervalSince1970: 0),
+            dayKey: existingDayKey,
+            latitude: 0,
+            longitude: 0,
+            countryCode: "DE",
+            countryName: "Germany",
+            timeZoneId: "UTC",
+            bucketingTimeZoneId: "UTC",
+            eventIdentifier: "event-3#end",
+            title: "Old End",
+            source: "Calendar"
+        )
+        var map: [String: CalendarSignal] = [
+            "event-3": legacyPrimary,
+            "event-3#end": legacyEnd
+        ]
+        var touchedDayKeys = Set<String>()
+        let changed = upsertSignal(
+            identifier: "event-3",
+            resolved: resolved,
+            title: "New",
+            existingSignalByIdentifier: &map,
+            touchedDayKeys: &touchedDayKeys
+        )
+        let deletedLegacyEnd = deleteSignalIfExists(
+            identifier: "event-3#end",
+            existingSignalByIdentifier: &map,
+            touchedDayKeys: &touchedDayKeys
+        )
+        return (
+            changed: changed,
+            deletedLegacyEnd: deletedLegacyEnd,
+            remainingIdentifiers: map.keys.sorted()
+        )
     }
 
     private func saveContextIfNeeded() throws {

@@ -7,9 +7,12 @@
 
 import SwiftUI
 import SwiftData
+import os
 
 @main
 struct BorderLogApp: App {
+    private static let logger = Logger(subsystem: "com.MCCANN.Border", category: "BorderLogApp")
+
     var sharedModelContainer: ModelContainer = ModelContainerProvider.makeContainer()
 
     @StateObject private var authManager = AuthenticationManager()
@@ -80,7 +83,7 @@ struct BorderLogApp: App {
                 }
             }
         } catch {
-            print("Failed to save ingested pending locations: \(error)")
+            Self.logger.error("Failed to save ingested pending locations: \(error, privacy: .private)")
         }
     }
 }

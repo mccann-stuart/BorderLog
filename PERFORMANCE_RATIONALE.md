@@ -124,6 +124,36 @@ overlappingStays = try modelContext.fetch(stayFetch)
 - **Reduced I/O and Memory**: The database query now retrieves only the records overlapping with the specific day. Complexity drops from O(N) to O(K), where K is the number of stays on that day (typically very small).
 - **Improved Performance**: Leverages database-level filtering, reducing main thread processing and avoiding unnecessary object instantiation.
 
+# Performance Optimization Rationale: Single-Pass Iteration for Ledger Metrics in ContentView
+
+## Current State
+`ContentView.swift` previously contained two separate computed properties, `recentDayCount` and `disputedDayCount`. Both properties chained `.filter { ... }.count` on the `presenceDays` array:
+```swift
+private var recentDayCount: Int {
+    let range = dateRange
+    return presenceDays.filter { day in
+        day.date >= range.start && day.date <= range.end
+    }.count
+}
+// Similar for disputedDayCount
+```
+
+## Problem
+1. **Multiple Iterations**: The full `presenceDays` array was iterated over twice, doubling computational overhead.
+2. **Intermediate Array Allocations**: The `.filter { ... }` operations allocated entirely new arrays only to call `.count` on them immediately after, increasing ARC and garbage collection pressure unnecessarily.
+3. **Inefficient Full Scans**: Although `presenceDays` is retrieved via a SwiftData `@Query` which pre-sorts it in reverse chronological order, the filter functions ignored this sorted nature and scanned the *entire* array history, even the entries prior to the 2-year window.
+
+## Optimization
+Replace the two properties with a single computed property `ledgerMetrics` that loops over `presenceDays` manually:
+1. **Single Pass**: It calculates both `recentCount` and `disputedCount` simultaneously within one loop.
+2. **Zero Allocations**: Counters are used instead of filter arrays, reducing space complexity from `O(N)` to `O(1)`.
+3. **Early Exit (`break`)**: The array is already pre-sorted from youngest to oldest. If the loop encounters a date earlier than `range.start` (the 2-year cutoff), it breaks the loop completely, avoiding processing years of older data.
+
+## Verification
+- **Time Complexity**: Reduced from `O(2N)` to `O(K)` where `K` is the number of days within the 2-year date window. In the worst case, this is still better than `O(N)`.
+- **Space Complexity**: Reduced from `O(2N)` to `O(1)`.
+- **Benchmarking**: Simulation logic confirms the output remains identical but with no intermediate array allocations.
+
 # Performance Optimization Rationale: Reusing FormatStyle vs Allocating DateFormatter
 
 ## Current State
@@ -215,3 +245,46 @@ Replace the nested loops with linear passes (O(N)):
 ## Verification
 - **Time Complexity**: The operation has been reduced from O(N²) worst-case to O(N) strict bounds. Space complexity is O(N) due to the two precalculation arrays, which is negligible compared to the time savings.
 - **Benchmarking**: Simulation scripts confirm the single-pass lookups produce the identical suggestions as the nested iteration logic.
+
+# Performance Optimization Rationale: Single-Pass Iteration in DashboardView and CountryDetailView
+
+## Current State
+Both `DashboardView` and `CountryDetailView` computed multi-step ledger arrays by creating intermediate filtered arrays. `DashboardView.unknownSchengenDays` explicitly filtered an already sorted database query (`presenceDays`). `DashboardView.countryDaysSummary` calculated a `timeframeDays` intermediate array before looping over it. `CountryDetailView.filteredCountryDays` evaluated on a pre-filtered `countryDays` intermediate array.
+
+## Problem
+1. **Multiple Iterations**: Constructing intermediate filtered arrays meant iterating through the database query results multiple times.
+2. **Intermediate Array Allocations**: Creating arrays like `timeframeDays` and `countryDays` causes significant O(N) memory allocations, stressing ARC and the memory allocator during every view re-render.
+3. **Inefficient Processing**: Because the database queries output reverse-chronologically sorted elements, we could employ early exits based on time bounds to skip processing years of data, but `filter()` operations scanned the entire sequence indiscriminately.
+
+## Optimization
+Consolidated logic into single-pass `for` loops across the board:
+1. `DashboardView.unknownSchengenDays`: A `for` loop now breaks entirely once it encounters a date older than the Schengen window, avoiding a full table scan.
+2. `DashboardView.countryDaysSummary`: Computes timeframe filtering and country counting in the same loop block without allocating an intermediary `timeframeDays` array.
+3. `CountryDetailView.filteredCountryDays`: Fuses the logic of the two computed properties into one single-pass loop that directly generates the final filtered subset without intermediate copies.
+
+## Verification
+- **Time Complexity**: The operations are strictly reduced from constant-factor O(2N) scans to O(N) single-pass scans, with `DashboardView.unknownSchengenDays` reduced dramatically from O(N) to O(K) where K is the number of days inside the time window.
+- **Space Complexity**: Memory allocation dropped from O(N) to O(K) output elements for filtered lists, and O(1) extra space for counting logic, effectively eliminating ARC jitter.
+
+# Performance Optimization Rationale: Replaced Sorting with Max for Single Elements
+
+## Current State
+In `PresenceInferenceEngine.swift`, `selectedDayTimeZoneId` determines the best time zone by sorting the entire `timeZoneScores` dictionary and grabbing the first element:
+```swift
+let sortedTimeZones = bucket.timeZoneScores.sorted { ... }
+return sortedTimeZones.first?.key ?? fallback
+```
+
+## Problem
+1. **O(N log N) Sorting Overhead**: Sorting a collection requires an O(N log N) algorithm and creates an entirely new array in memory.
+2. **Unnecessary Allocation**: Creating an entire sorted array just to extract a single element (the maximum) is wasteful and contributes to ARC thrashing during mass inference operations.
+
+## Optimization
+Use `.max(by:)` to iterate through the sequence in a single O(N) pass, tracking and returning only the largest element without sorting or allocating a new array.
+```swift
+return bucket.timeZoneScores.max(by: { ... })?.key ?? fallback
+```
+
+## Verification
+- **Time Complexity**: Reduced from O(N log N) to O(N).
+- **Space Complexity**: Reduced from O(N) allocation of a new array to O(1).

@@ -219,10 +219,10 @@ enum ModelContainerProvider {
             )
             do {
                 let container = try ModelContainer(for: schema, migrationPlan: BorderLogMigrationPlan.self, configurations: [appGroupConfig])
-                logger.info("Using App Group store at group: \(appGroupId, privacy: .public)")
+                logger.info("Using App Group store at group: \(appGroupId, privacy: .private)")
                 return container
             } catch {
-                logger.error("App Group store open failed. Attempting quarantine recovery. Error: \(error, privacy: .public)")
+                logger.error("App Group store open failed. Attempting quarantine recovery. Error: \(error, privacy: .private)")
                 if let appGroupRoot = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: appGroupId) {
                     let appGroupSupport = appGroupRoot.appendingPathComponent("Library/Application Support")
                     if let recovered = recoverByQuarantiningStore(
@@ -252,10 +252,10 @@ enum ModelContainerProvider {
         let localConfig = ModelConfiguration(schema: schema, url: storeURL, cloudKitDatabase: cloudKitDatabase)
         do {
             let container = try ModelContainer(for: schema, migrationPlan: BorderLogMigrationPlan.self, configurations: [localConfig])
-            logger.info("Using local sandbox store at: \(storeURL.lastPathComponent, privacy: .public)")
+            logger.info("Using local sandbox store at: \(storeURL.lastPathComponent, privacy: .private)")
             return container
         } catch {
-            logger.error("Local store open failed. Attempting quarantine recovery. Error: \(error, privacy: .public)")
+            logger.error("Local store open failed. Attempting quarantine recovery. Error: \(error, privacy: .private)")
             if let recovered = recoverByQuarantiningStore(
                 schema: schema,
                 configuration: localConfig,
@@ -282,7 +282,7 @@ enum ModelContainerProvider {
         let existingEpoch = defaults.integer(forKey: storeEpochDefaultsKey)
         guard existingEpoch != currentStoreEpoch else { return false }
 
-        logger.warning("Store epoch change detected (\(existingEpoch, privacy: .public) -> \(currentStoreEpoch, privacy: .public)); clearing persistent stores.")
+        logger.warning("Store epoch change detected (\(existingEpoch, privacy: .private) -> \(currentStoreEpoch, privacy: .private)); clearing persistent stores.")
 
         if let appGroupSupport = appGroupStoreDirectory
             ?? {
@@ -317,7 +317,7 @@ enum ModelContainerProvider {
         do {
             return try ModelContainer(for: schema, configurations: [memConfig])
         } catch {
-            logger.critical("In-memory store init failed. Attempting temporary file-backed fallback. Error: \(error, privacy: .public)")
+            logger.critical("In-memory store init failed. Attempting temporary file-backed fallback. Error: \(error, privacy: .private)")
             do {
                 return try makeTemporaryFallbackContainer(schema: schema)
             } catch {
@@ -333,7 +333,7 @@ enum ModelContainerProvider {
         let fallbackURL = fallbackDirectory.appendingPathComponent(fallbackStoreName)
         let fallbackConfig = ModelConfiguration(schema: schema, url: fallbackURL, cloudKitDatabase: .none)
         let container = try ModelContainer(for: schema, configurations: [fallbackConfig])
-        logger.warning("Using temporary file-backed fallback store: \(fallbackStoreName, privacy: .public)")
+        logger.warning("Using temporary file-backed fallback store: \(fallbackStoreName, privacy: .private)")
         return container
     }
 
@@ -346,7 +346,7 @@ enum ModelContainerProvider {
         contextLabel: String
     ) -> ModelContainer? {
         guard shouldAttemptRecovery(for: initialError) else {
-            logger.error("\(contextLabel, privacy: .public) store failure does not match recovery heuristics; skipping destructive paths.")
+            logger.error("\(contextLabel, privacy: .private) store failure does not match recovery heuristics; skipping destructive paths.")
             return nil
         }
 
@@ -356,31 +356,31 @@ enum ModelContainerProvider {
             quarantinedAny = quarantineStoreFiles(in: storeDirectory, named: storeName, quarantineTag: quarantineTag) || quarantinedAny
         }
         guard quarantinedAny else {
-            logger.error("\(contextLabel, privacy: .public) recovery skipped; no store files available to quarantine.")
+            logger.error("\(contextLabel, privacy: .private) recovery skipped; no store files available to quarantine.")
             return nil
         }
 
         do {
             let container = try ModelContainer(for: schema, migrationPlan: BorderLogMigrationPlan.self, configurations: [configuration])
-            logger.warning("\(contextLabel, privacy: .public) store recovered by quarantining prior files with tag \(quarantineTag, privacy: .public).")
+            logger.warning("\(contextLabel, privacy: .private) store recovered by quarantining prior files with tag \(quarantineTag, privacy: .private).")
             return container
         } catch {
-            logger.error("\(contextLabel, privacy: .public) quarantine recovery failed. Error: \(error, privacy: .public)")
+            logger.error("\(contextLabel, privacy: .private) quarantine recovery failed. Error: \(error, privacy: .private)")
             guard shouldDeleteAfterRecoveryFailure(for: error) else {
                 return nil
             }
 
-            logger.error("\(contextLabel, privacy: .public) failure matches corruption heuristics; deleting active store files and retrying once.")
+            logger.error("\(contextLabel, privacy: .private) failure matches corruption heuristics; deleting active store files and retrying once.")
             for storeName in storeNames {
                 deleteStoreFiles(in: storeDirectory, named: storeName)
             }
 
             do {
                 let container = try ModelContainer(for: schema, migrationPlan: BorderLogMigrationPlan.self, configurations: [configuration])
-                logger.warning("\(contextLabel, privacy: .public) store recreated after quarantine + corruption-confirmed delete.")
+                logger.warning("\(contextLabel, privacy: .private) store recreated after quarantine + corruption-confirmed delete.")
                 return container
             } catch {
-                logger.critical("\(contextLabel, privacy: .public) store recreation failed after delete. Error: \(error, privacy: .public)")
+                logger.critical("\(contextLabel, privacy: .private) store recreation failed after delete. Error: \(error, privacy: .private)")
                 return nil
             }
         }
@@ -446,9 +446,9 @@ enum ModelContainerProvider {
                 }
                 try fm.moveItem(at: sourceURL, to: destinationURL)
                 movedAny = true
-                logger.warning("Quarantined store file: \(sourceURL.lastPathComponent, privacy: .public)")
+                logger.warning("Quarantined store file: \(sourceURL.lastPathComponent, privacy: .private)")
             } catch {
-                logger.error("Failed to quarantine \(sourceURL.lastPathComponent, privacy: .public): \(error, privacy: .public)")
+                logger.error("Failed to quarantine \(sourceURL.lastPathComponent, privacy: .private): \(error, privacy: .private)")
             }
         }
         return movedAny
@@ -464,9 +464,9 @@ enum ModelContainerProvider {
             guard fm.fileExists(atPath: url.path) else { continue }
             do {
                 try fm.removeItem(at: url)
-                logger.info("Deleted store file: \(url.lastPathComponent, privacy: .public)")
+                logger.info("Deleted store file: \(url.lastPathComponent, privacy: .private)")
             } catch {
-                logger.error("Failed to delete \(url.lastPathComponent, privacy: .public): \(error, privacy: .public)")
+                logger.error("Failed to delete \(url.lastPathComponent, privacy: .private): \(error, privacy: .private)")
             }
         }
     }
