@@ -8,10 +8,12 @@
 import Foundation
 import CoreLocation
 import SwiftData
+import os
 
 @MainActor
 final class LocationSampleService: NSObject, CLLocationManagerDelegate {
     private let manager = CLLocationManager()
+    private static let logger = Logger(subsystem: "com.MCCANN.Border", category: "LocationSampleService")
     private var continuations: [CheckedContinuation<CLLocation?, Never>] = []
     private var batchContinuation: CheckedContinuation<[CLLocation], Never>?
     private var batchLocations: [CLLocation] = []
@@ -103,7 +105,7 @@ final class LocationSampleService: NSObject, CLLocationManagerDelegate {
         do {
             try modelContext.save()
         } catch {
-            print("LocationSampleService save error: \(error)")
+            Self.logger.error("LocationSampleService save error: \(error, privacy: .private)")
             throw error
         }
 
@@ -196,7 +198,7 @@ final class LocationSampleService: NSObject, CLLocationManagerDelegate {
                 do {
                     try modelContext.save()
                 } catch {
-                    print("LocationSampleService burst save error: \(error)")
+                    Self.logger.error("LocationSampleService burst save error: \(error, privacy: .private)")
                     throw error
                 }
             }
