@@ -91,13 +91,13 @@ struct PresenceInferenceEngine {
                 return preferredTimeZoneId
             }
 
-            let sortedTimeZones = bucket.timeZoneScores.sorted { lhs, rhs in
+            // ⚡ Bolt: Replace O(N log N) sort with O(N) max to avoid allocating a sorted array
+            return bucket.timeZoneScores.max(by: { lhs, rhs in
                 if lhs.value == rhs.value {
-                    return lhs.key < rhs.key
+                    return lhs.key > rhs.key
                 }
-                return lhs.value > rhs.value
-            }
-            return sortedTimeZones.first?.key ?? fallback
+                return lhs.value < rhs.value
+            })?.key ?? fallback
         }
 
         // Manual stays

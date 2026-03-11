@@ -265,3 +265,26 @@ Consolidated logic into single-pass `for` loops across the board:
 ## Verification
 - **Time Complexity**: The operations are strictly reduced from constant-factor O(2N) scans to O(N) single-pass scans, with `DashboardView.unknownSchengenDays` reduced dramatically from O(N) to O(K) where K is the number of days inside the time window.
 - **Space Complexity**: Memory allocation dropped from O(N) to O(K) output elements for filtered lists, and O(1) extra space for counting logic, effectively eliminating ARC jitter.
+
+# Performance Optimization Rationale: Replaced Sorting with Max for Single Elements
+
+## Current State
+In `PresenceInferenceEngine.swift`, `selectedDayTimeZoneId` determines the best time zone by sorting the entire `timeZoneScores` dictionary and grabbing the first element:
+```swift
+let sortedTimeZones = bucket.timeZoneScores.sorted { ... }
+return sortedTimeZones.first?.key ?? fallback
+```
+
+## Problem
+1. **O(N log N) Sorting Overhead**: Sorting a collection requires an O(N log N) algorithm and creates an entirely new array in memory.
+2. **Unnecessary Allocation**: Creating an entire sorted array just to extract a single element (the maximum) is wasteful and contributes to ARC thrashing during mass inference operations.
+
+## Optimization
+Use `.max(by:)` to iterate through the sequence in a single O(N) pass, tracking and returning only the largest element without sorting or allocating a new array.
+```swift
+return bucket.timeZoneScores.max(by: { ... })?.key ?? fallback
+```
+
+## Verification
+- **Time Complexity**: Reduced from O(N log N) to O(N).
+- **Space Complexity**: Reduced from O(N) allocation of a new array to O(1).

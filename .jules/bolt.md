@@ -29,3 +29,7 @@
 ## 2026-02-16 - Prevent Multi-pass Filtering
 **Learning:** Chaining `.filter()` calls, or evaluating arrays into intermediate arrays before iterating again, results in unnecessary O(N) heap allocations, Arc thrashing, and constant-factor latency increases, especially for frequently rendered dashboard views evaluating large histories.
 **Action:** Replace sequential `.filter`s with a single `for` loop that evaluates multiple conditions in-line. Combine condition checks or use early break/continue when properties guarantee ordered data.
+
+## 2026-03-09 - Avoid O(N log N) Sorting when Extracting a Single Max/Min
+**Learning:** Sorting an array or dictionary (`.sorted { ... }`) to extract only the top element (`.first`) results in unnecessary O(N log N) processing and allocates a new sequence in memory.
+**Action:** When finding the highest or lowest scoring item in a Swift collection, always use `.max(by:)` or `.min(by:)` to perform a single O(N) pass with O(1) space complexity instead of sorting.
