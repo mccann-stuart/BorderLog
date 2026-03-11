@@ -16,14 +16,6 @@ struct DashboardView: View {
     
     @State private var selectedTimeframe: VisitedCountriesTimeframe = .last12Months
     
-    private var timeframeDays: [PresenceDay] {
-        let calendar = Calendar.current
-        let now = Date()
-        return presenceDays.filter { day in
-            selectedTimeframe.contains(day.date, now: now, calendar: calendar)
-        }
-    }
-    
     private var schengenSummary: SchengenLedgerSummary {
         SchengenLedgerCalculator.summary(for: presenceDays, asOf: Date())
     }
@@ -31,17 +23,32 @@ struct DashboardView: View {
     private var unknownSchengenDays: [PresenceDay] {
         let start = schengenSummary.windowStart
         let end = schengenSummary.windowEnd
-        return presenceDays.filter { day in
-            day.date >= start && day.date <= end &&
-            (day.countryCode == nil && day.countryName == nil)
+        var unknownDays: [PresenceDay] = []
+
+        // ⚡ Bolt: Since presenceDays is reverse chronologically sorted, we can early exit when reaching older dates
+        for day in presenceDays {
+            if day.date > end { continue }
+            if day.date < start { break }
+            if day.countryCode == nil && day.countryName == nil {
+                unknownDays.append(day)
+            }
         }
+        return unknownDays
     }
     
     // Group stays by country and calculate total days
     private var countryDaysSummary: [CountryDaysInfo] {
         var countryDict: [String: CountryDaysInfo] = [:]
+        let calendar = Calendar.current
+        let now = Date()
         
-        for day in timeframeDays {
+        for day in presenceDays {
+            // ⚡ Bolt: Avoid intermediate array allocation `timeframeDays`. Evaluate conditions inline.
+            // Some timeframes (e.g. .lastYear) skip recent days, so we cannot safely early break without calculating min date.
+            if !selectedTimeframe.contains(day.date, now: now, calendar: calendar) {
+                continue
+            }
+
             guard let countryName = day.countryName ?? day.countryCode else { continue }
             let normalizedCode = CountryCodeNormalizer.normalize(day.countryCode)
             let key = normalizedCode ?? countryName

@@ -59,21 +59,25 @@ struct ContentView: View {
         return (start, today)
     }
 
-    private var recentDayCount: Int {
+    // ⚡ Bolt: Single-pass iteration to calculate metrics in O(K) time and O(1) space
+    private var ledgerMetrics: (recentCount: Int, disputedCount: Int) {
         let range = dateRange
-        return presenceDays.filter { day in
-            day.date >= range.start && day.date <= range.end
-        }.count
-    }
+        var recentCount = 0
+        var disputedCount = 0
 
-    private var disputedDayCount: Int {
-        let range = dateRange
-        return presenceDays.filter { day in
-            day.date >= range.start &&
-            day.date <= range.end &&
-            day.isDisputed &&
-            !day.isManuallyModified
-        }.count
+        for day in presenceDays {
+            // Since presenceDays is reverse sorted by date, skip future days
+            if day.date > range.end { continue }
+            // Early exit once we pass the 2-year window
+            if day.date < range.start { break }
+
+            recentCount += 1
+            if day.isDisputed && !day.isManuallyModified {
+                disputedCount += 1
+            }
+        }
+
+        return (recentCount, disputedCount)
     }
 
     var body: some View {
@@ -168,12 +172,13 @@ struct ContentView: View {
 
     private var rangeSummary: some View {
         let formatter = Date.FormatStyle(date: .abbreviated, time: .omitted)
+        let metrics = ledgerMetrics
         return VStack(alignment: .leading, spacing: 6) {
             HStack {
                 Label("Last 2 years", systemImage: "calendar")
                     .font(.subheadline.weight(.semibold))
                 Spacer()
-                Text("\(recentDayCount) days")
+                Text("\(metrics.recentCount) days")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -182,10 +187,10 @@ struct ContentView: View {
                 .foregroundStyle(.secondary)
             HStack {
                 Label("Disputed", systemImage: "exclamationmark.triangle.fill")
-                    .foregroundStyle(disputedDayCount > 0 ? Color.orange : Color.secondary)
+                    .foregroundStyle(metrics.disputedCount > 0 ? Color.orange : Color.secondary)
                 Spacer()
-                Text("\(disputedDayCount)")
-                    .foregroundStyle(disputedDayCount > 0 ? Color.orange : Color.secondary)
+                Text("\(metrics.disputedCount)")
+                    .foregroundStyle(metrics.disputedCount > 0 ? Color.orange : Color.secondary)
             }
             .font(.caption)
             Text("Click each day for evidence of location")
