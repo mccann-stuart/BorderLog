@@ -245,3 +245,23 @@ Replace the nested loops with linear passes (O(N)):
 ## Verification
 - **Time Complexity**: The operation has been reduced from O(N²) worst-case to O(N) strict bounds. Space complexity is O(N) due to the two precalculation arrays, which is negligible compared to the time savings.
 - **Benchmarking**: Simulation scripts confirm the single-pass lookups produce the identical suggestions as the nested iteration logic.
+
+# Performance Optimization Rationale: Single-Pass Iteration in DashboardView and CountryDetailView
+
+## Current State
+Both `DashboardView` and `CountryDetailView` computed multi-step ledger arrays by creating intermediate filtered arrays. `DashboardView.unknownSchengenDays` explicitly filtered an already sorted database query (`presenceDays`). `DashboardView.countryDaysSummary` calculated a `timeframeDays` intermediate array before looping over it. `CountryDetailView.filteredCountryDays` evaluated on a pre-filtered `countryDays` intermediate array.
+
+## Problem
+1. **Multiple Iterations**: Constructing intermediate filtered arrays meant iterating through the database query results multiple times.
+2. **Intermediate Array Allocations**: Creating arrays like `timeframeDays` and `countryDays` causes significant O(N) memory allocations, stressing ARC and the memory allocator during every view re-render.
+3. **Inefficient Processing**: Because the database queries output reverse-chronologically sorted elements, we could employ early exits based on time bounds to skip processing years of data, but `filter()` operations scanned the entire sequence indiscriminately.
+
+## Optimization
+Consolidated logic into single-pass `for` loops across the board:
+1. `DashboardView.unknownSchengenDays`: A `for` loop now breaks entirely once it encounters a date older than the Schengen window, avoiding a full table scan.
+2. `DashboardView.countryDaysSummary`: Computes timeframe filtering and country counting in the same loop block without allocating an intermediary `timeframeDays` array.
+3. `CountryDetailView.filteredCountryDays`: Fuses the logic of the two computed properties into one single-pass loop that directly generates the final filtered subset without intermediate copies.
+
+## Verification
+- **Time Complexity**: The operations are strictly reduced from constant-factor O(2N) scans to O(N) single-pass scans, with `DashboardView.unknownSchengenDays` reduced dramatically from O(N) to O(K) where K is the number of days inside the time window.
+- **Space Complexity**: Memory allocation dropped from O(N) to O(K) output elements for filtered lists, and O(1) extra space for counting logic, effectively eliminating ARC jitter.

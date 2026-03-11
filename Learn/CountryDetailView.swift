@@ -25,29 +25,37 @@ struct CountryDetailView: View {
         var id: String { rawValue }
     }
 
-    // Days filtered to this country only
-    private var countryDays: [PresenceDay] {
-        let normalizedTarget = CountryCodeNormalizer.normalize(countryCode)
-        return allPresenceDays.filter { day in
-            let normalizedDay = CountryCodeNormalizer.normalize(day.countryCode)
-            if let target = normalizedTarget, let code = normalizedDay {
-                return target == code
-            }
-            return (day.countryName ?? "") == countryName
-        }
-    }
-
+    // ⚡ Bolt: Single-pass iteration to filter country and timeframe simultaneously,
+    // without creating intermediate arrays (`countryDays`).
     private var filteredCountryDays: [PresenceDay] {
-        switch ledgerRangeFilter {
-        case .timeframe:
-            let now = Date()
-            let calendar = Calendar.current
-            return countryDays.filter { day in
-                selectedTimeframe.contains(day.date, now: now, calendar: calendar)
+        let normalizedTarget = CountryCodeNormalizer.normalize(countryCode)
+        var results: [PresenceDay] = []
+
+        let now = Date()
+        let calendar = Calendar.current
+        let isTimeframeRestricted = (ledgerRangeFilter == .timeframe)
+
+        for day in allPresenceDays {
+            let normalizedDay = CountryCodeNormalizer.normalize(day.countryCode)
+            let matchesCountry: Bool
+            if let target = normalizedTarget, let code = normalizedDay {
+                matchesCountry = (target == code)
+            } else {
+                matchesCountry = ((day.countryName ?? "") == countryName)
             }
-        case .allTime:
-            return countryDays
+
+            if matchesCountry {
+                if isTimeframeRestricted {
+                    if selectedTimeframe.contains(day.date, now: now, calendar: calendar) {
+                        results.append(day)
+                    }
+                } else {
+                    results.append(day)
+                }
+            }
         }
+
+        return results
     }
 
     private var countryConfig: CountryConfig? {
