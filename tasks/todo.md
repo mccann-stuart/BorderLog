@@ -26,3 +26,19 @@
 ## Review (Flighty Unicode Route Parsing)
 
 - Pending implementation.
+
+---
+
+# Task Plan (Weekly Changelog Update - 2026-03-13)
+
+- [x] Review existing `README.md` Weekly Changelog structure and the last automation memory entry.
+- [x] Collect this week's repo-backed highlights from git history since last update.
+- [x] Collect key PR links from merge commits/reference patterns in repo history (or explicitly state none).
+- [x] Update `README.md` changelog section in the existing format with only supported items.
+- [x] Verify diff accuracy against git history and finalize review notes.
+
+## Review (Weekly Changelog Update - 2026-03-13)
+
+- Added `Week of Mar 9-15, 2026` section to `README.md` using the existing `Highlights` + `Key PRs` structure.
+- Sourced highlights from week commits in repo history: `e559169`, `08006b5`, `7ad1f39`, `ab1d149`, `c5d85f6`, `0c9fdf3`.
+- Linked key merged PRs from merge commits in history: `#111` (`91be6a5`), `#112` (`53f3cb1`), and `#113` (`20c2919`).
