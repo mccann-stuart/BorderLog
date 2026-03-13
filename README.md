@@ -10,6 +10,20 @@ Pricing: Free (no subscriptions, no paid tiers)
 
 Weekly Changelog
 
+Week of Mar 9-15, 2026
+
+Highlights:
+- Improved ledger performance by consolidating metric/filter work into single-pass iterations for `ContentView`, `DashboardView`, and `CountryDetailView`.
+- Strengthened logging safety by replacing raw `print()` calls with `os.Logger` usage (including private modifiers).
+- Improved calendar flight inference reliability with destination-first parsing updates and follow-up country inference fixes.
+
+Key PRs:
+- [#113](https://github.com/mccann-stuart/BorderLog/pull/113) Single-pass iteration in `DashboardView` and `CountryDetailView`.
+- [#112](https://github.com/mccann-stuart/BorderLog/pull/112) Replace `print()` with `os.Logger`.
+- [#111](https://github.com/mccann-stuart/BorderLog/pull/111) Optimize `ContentView` ledger metrics with a single-pass calculation.
+
+⸻
+
 Week of Feb 24-Mar 1, 2026
 
 Highlights:
