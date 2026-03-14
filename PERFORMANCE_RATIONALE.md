@@ -288,3 +288,30 @@ return bucket.timeZoneScores.max(by: { ... })?.key ?? fallback
 ## Verification
 - **Time Complexity**: Reduced from O(N log N) to O(N).
 - **Space Complexity**: Reduced from O(N) allocation of a new array to O(1).
+
+# Performance Optimization Rationale: Lazy Evaluation for UI Previews
+
+## Current State
+In `ContentView.swift`, the `filteredPresenceDays` property previously used standard eager filtering:
+```swift
+return presenceDays.filter { day in
+    day.countryCode == nil && day.countryName == nil
+}
+```
+This computed array was then immediately passed to a `.prefix(5)` operation inside the main view `body` for rendering.
+
+## Problem
+1. **Unnecessary O(N) Computation**: Standard `.filter` scans the entire `presenceDays` array (which could contain thousands of entries spanning years of history) and evaluates the closure for every single element, even though the view only displays a maximum of 5 matching days.
+2. **Intermediate Array Allocations**: The eager filter allocates and populates a completely new array containing all matching elements across the entire history. This leads to heavy ARC and garbage collection pressure every time the view re-renders or the array updates.
+
+## Optimization
+Rename the property to `previewPresenceDays` (to clearly indicate its semantic boundary) and replace the eager filtering with a chained `.lazy` mapping, applying `.prefix(5)` immediately, and casting back into an array constraint for the UI to consume:
+```swift
+return Array(presenceDays.lazy.filter { day in
+    day.countryCode == nil && day.countryName == nil
+}.prefix(5))
+```
+
+## Verification
+- **Time Complexity**: Reduced from `O(N)` strict to an expected `O(K)` where `K` is the number of elements scanned to locate 5 matches. When rendering "All" items, `K = 5` strictly, providing instantaneous lookups.
+- **Space Complexity**: Reduced from `O(N)` transient memory allocation (allocating the entire matched history) to strictly `O(1)` memory (allocating only an array of up to 5 elements), removing massive memory pressure during UI updates.

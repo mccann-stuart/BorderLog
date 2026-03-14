@@ -37,3 +37,7 @@
 ## 2026-04-14 - Optimize Top-K Selection to Avoid Sorting
 **Learning:** Finding the top 1 or 2 elements from a dictionary/array (e.g., top-scoring countries) by calling `.sorted { ... }` sorts the entire collection. This incurs an unnecessary O(N log N) processing cost and extra memory allocations. Inside hot loops (like processing thousands of presence days), this accumulates and degrades performance.
 **Action:** When you only need the highest scoring element or the top few, use a single O(N) iteration that manually tracks the "winner" and "runner-up", or use `.max(by:)` if only the absolute best is needed.
+
+## 2026-02-18 - Lazy Evaluation for Limited Prefix Filtering
+**Learning:** Filtering a large array using standard `.filter { ... }` executes immediately across all N elements, allocating a full intermediate array in memory. If the consuming logic only needs a small subset (e.g., `.prefix(5)` or `.isEmpty`), the vast majority of that computational work and memory allocation is wasted.
+**Action:** Use `.lazy.filter { ... }.prefix(5)` before converting back to an Array. This transforms the operation from an O(N) full scan/allocation into an O(K) operation (where K is the number of elements checked to find the 5 matches), significantly reducing CPU time and completely eliminating the large intermediate array allocation.
