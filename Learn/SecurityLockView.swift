@@ -1,7 +1,9 @@
 import SwiftUI
 import LocalAuthentication
+import os
 
 struct SecurityLockView: View {
+    private static let logger = Logger(subsystem: "com.MCCANN.Border", category: "SecurityLockView")
     @Binding var isUnlocked: Bool
     @State private var authenticationError: String?
 
@@ -46,7 +48,10 @@ struct SecurityLockView: View {
                         self.authenticationError = nil
                     } else {
                         self.isUnlocked = false
-                        self.authenticationError = authError?.localizedDescription ?? "Authentication failed."
+                        if let authError = authError {
+                            Self.logger.error("Authentication failed: \(authError, privacy: .private)")
+                        }
+                        self.authenticationError = "Authentication failed. Please try again."
                     }
                 }
             }
@@ -61,7 +66,10 @@ struct SecurityLockView: View {
                             self.authenticationError = nil
                         } else {
                             self.isUnlocked = false
-                            self.authenticationError = authError?.localizedDescription ?? "Authentication failed."
+                            if let authError = authError {
+                                Self.logger.error("Authentication failed: \(authError, privacy: .private)")
+                            }
+                            self.authenticationError = "Authentication failed. Please try again."
                         }
                     }
                 }
