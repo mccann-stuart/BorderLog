@@ -256,8 +256,22 @@ struct PresenceInferenceEngine {
                 continue
             }
 
-            let sortedCountries = bucket.countries.sorted { $0.value.score > $1.value.score }
-            guard let winner = sortedCountries.first else {
+            // ⚡ Bolt: Single O(N) pass to find top two countries instead of full O(N log N) sort
+            var winner: Dictionary<CountryIdentity, SignalScores>.Element? = nil
+            var runnerUp: Dictionary<CountryIdentity, SignalScores>.Element? = nil
+            var totalScore: Double = 0
+
+            for element in bucket.countries {
+                totalScore += element.value.score
+                if winner == nil || element.value.score > winner!.value.score {
+                    runnerUp = winner
+                    winner = element
+                } else if runnerUp == nil || element.value.score > runnerUp!.value.score {
+                    runnerUp = element
+                }
+            }
+
+            guard let winner = winner else {
                 let result = PresenceDayResult(
                     dayKey: dayKey,
                     date: date,
@@ -279,7 +293,6 @@ struct PresenceInferenceEngine {
             }
 
             let winnerScore = winner.value.score
-            let totalScore = bucket.countries.values.reduce(0) { $0 + $1.score }
             let confidence = totalScore > 0 ? min(1.0, max(0.0, winnerScore / totalScore)) : 0
 
             let confidenceLabel: ConfidenceLabel
@@ -313,8 +326,8 @@ struct PresenceInferenceEngine {
             }
 
             var isDisputed = false
-            if sortedCountries.count > 1 && sortedCountries[1].value.score > 0 {
-                let scoreDelta = winner.value.score - sortedCountries[1].value.score
+            if let runnerUp = runnerUp, runnerUp.value.score > 0 {
+                let scoreDelta = winner.value.score - runnerUp.value.score
                 let confidenceDelta = totalScore > 0 ? scoreDelta / totalScore : 0
                 if confidenceDelta <= 0.5 {
                     isDisputed = true
@@ -333,10 +346,10 @@ struct PresenceInferenceEngine {
             var suggestedName2: String? = nil
 
             if isDisputed {
-                suggestedCode1 = sortedCountries[0].key.code
-                suggestedName1 = sortedCountries[0].key.name
-                suggestedCode2 = sortedCountries[1].key.code
-                suggestedName2 = sortedCountries[1].key.name
+                suggestedCode1 = winner.key.code
+                suggestedName1 = winner.key.name
+                suggestedCode2 = runnerUp?.key.code
+                suggestedName2 = runnerUp?.key.name
             }
 
             let result = PresenceDayResult(

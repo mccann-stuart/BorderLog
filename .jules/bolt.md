@@ -33,3 +33,7 @@
 ## 2026-03-09 - Avoid O(N log N) Sorting when Extracting a Single Max/Min
 **Learning:** Sorting an array or dictionary (`.sorted { ... }`) to extract only the top element (`.first`) results in unnecessary O(N log N) processing and allocates a new sequence in memory.
 **Action:** When finding the highest or lowest scoring item in a Swift collection, always use `.max(by:)` or `.min(by:)` to perform a single O(N) pass with O(1) space complexity instead of sorting.
+
+## 2026-04-14 - Optimize Top-K Selection to Avoid Sorting
+**Learning:** Finding the top 1 or 2 elements from a dictionary/array (e.g., top-scoring countries) by calling `.sorted { ... }` sorts the entire collection. This incurs an unnecessary O(N log N) processing cost and extra memory allocations. Inside hot loops (like processing thousands of presence days), this accumulates and degrades performance.
+**Action:** When you only need the highest scoring element or the top few, use a single O(N) iteration that manually tracks the "winner" and "runner-up", or use `.max(by:)` if only the absolute best is needed.
