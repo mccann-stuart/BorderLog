@@ -445,7 +445,8 @@ struct SettingsView: View {
             do {
                 try await CloudKitDataResetService.deleteAllUserData()
             } catch {
-                await MainActor.run { cloudKitDeleteError = error.localizedDescription }
+                Self.logger.error("CloudKit deletion failed: \(error, privacy: .private)")
+                await MainActor.run { cloudKitDeleteError = "An error occurred while deleting data." }
             }
             await MainActor.run { isDeletingCloudKitData = false }
         }
@@ -485,7 +486,8 @@ struct SettingsView: View {
                 let ingestor = PhotoSignalIngestor(modelContainer: container, resolver: CLGeocoderCountryResolver())
                 _ = try await ingestor.ingest(mode: .sequenced)
             } catch {
-                ingestionError = error.localizedDescription
+                Self.logger.error("Data ingestion failed: \(error, privacy: .private)")
+                ingestionError = "An error occurred during scanning."
             }
         }
     }
@@ -499,7 +501,8 @@ struct SettingsView: View {
                 let ingestor = CalendarSignalIngestor(modelContainer: container, resolver: CLGeocoderCountryResolver())
                 _ = try await ingestor.ingest(mode: .manualFullScan)
             } catch {
-                ingestionError = error.localizedDescription
+                Self.logger.error("Data ingestion failed: \(error, privacy: .private)")
+                ingestionError = "An error occurred during scanning."
             }
         }
     }
