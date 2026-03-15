@@ -1,7 +1,10 @@
 import SwiftUI
 import LocalAuthentication
+import os
 
 struct SecurityLockView: View {
+    private let logger = Logger(subsystem: "com.MCCANN.Border", category: "SecurityLockView")
+
     @Binding var isUnlocked: Bool
     @State private var authenticationError: String?
 
@@ -40,13 +43,16 @@ struct SecurityLockView: View {
         if context.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: &error) {
             let reason = "Unlock BorderLog to access your travel data."
             context.evaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, localizedReason: reason) { success, authError in
+                if let authError = authError {
+                    self.logger.error("Biometric authentication failed: \(authError, privacy: .private)")
+                }
                 DispatchQueue.main.async {
                     if success {
                         self.isUnlocked = true
                         self.authenticationError = nil
                     } else {
                         self.isUnlocked = false
-                        self.authenticationError = authError?.localizedDescription ?? "Authentication failed."
+                        self.authenticationError = "Authentication failed. Please try again."
                     }
                 }
             }
@@ -55,13 +61,16 @@ struct SecurityLockView: View {
             let fallbackReason = "Unlock BorderLog."
             if context.canEvaluatePolicy(.deviceOwnerAuthentication, error: &error) {
                 context.evaluatePolicy(.deviceOwnerAuthentication, localizedReason: fallbackReason) { success, authError in
+                    if let authError = authError {
+                        self.logger.error("Device passcode authentication failed: \(authError, privacy: .private)")
+                    }
                     DispatchQueue.main.async {
                         if success {
                             self.isUnlocked = true
                             self.authenticationError = nil
                         } else {
                             self.isUnlocked = false
-                            self.authenticationError = authError?.localizedDescription ?? "Authentication failed."
+                            self.authenticationError = "Authentication failed. Please try again."
                         }
                     }
                 }

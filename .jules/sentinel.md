@@ -19,3 +19,7 @@
 **Vulnerability:** Replacing `print` with `os.Logger` while using `privacy: .public` for error objects actually worsens the data leakage vulnerability since unified logging persists the plain text data in OS logs.
 **Learning:** `Error` objects and user-state variables must NEVER be logged with `.public` modifiers.
 **Prevention:** Use `privacy: .private` explicitly or omit the privacy modifier (which defaults dynamic variables to `<private>`) when logging potential user data or stack traces containing sensitive context.
+## 2026-04-18 - Overly Verbose Biometric Error Messages
+**Vulnerability:** In user-facing authentication screens (like `SecurityLockView`), directly exposing framework error descriptions (e.g., `LAError`'s `localizedDescription`) can inadvertently leak implementation details or sensitive system states.
+**Learning:** Directly exposing underlying system error details in the UI violates the principle of failing securely and providing only necessary feedback to the end user.
+**Prevention:** Use generic, safe error messages (like "Authentication failed. Please try again.") in the UI while logging the actual error internally using `os.Logger` with the explicit `.private` privacy modifier to assist with debugging.
