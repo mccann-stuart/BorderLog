@@ -37,18 +37,18 @@ struct ContentView: View {
     @State private var schengenState = SchengenState()
     @State private var ledgerFilter: LedgerFilter = .all
 
-    private var filteredPresenceDays: [PresenceDay] {
+    private var previewPresenceDays: [PresenceDay] {
         switch ledgerFilter {
         case .all:
-            return presenceDays
+            return Array(presenceDays.prefix(5))
         case .unknown:
-            return presenceDays.filter { day in
+            return Array(presenceDays.lazy.filter { day in
                 day.countryCode == nil && day.countryName == nil
-            }
+            }.prefix(5))
         case .manual:
-            return presenceDays.filter { $0.isManuallyModified }
+            return Array(presenceDays.lazy.filter { $0.isManuallyModified }.prefix(5))
         case .disputed:
-            return presenceDays.filter { $0.isDisputed && !$0.isManuallyModified }
+            return Array(presenceDays.lazy.filter { $0.isDisputed && !$0.isManuallyModified }.prefix(5))
         }
     }
 
@@ -99,14 +99,14 @@ struct ContentView: View {
                     .listRowInsets(EdgeInsets())
                     .padding(.bottom, 8)
 
-                    if filteredPresenceDays.isEmpty {
+                    if previewPresenceDays.isEmpty {
                         ContentUnavailableView(
                             "No ledger data",
                             systemImage: "calendar",
                             description: Text("No days match the selected filter.")
                         )
                     } else {
-                        ForEach(filteredPresenceDays.prefix(5)) { day in
+                        ForEach(previewPresenceDays) { day in
                             NavigationLink {
                                 PresenceDayDetailView(day: day)
                             } label: {
