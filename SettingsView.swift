@@ -445,7 +445,8 @@ struct SettingsView: View {
             do {
                 try await CloudKitDataResetService.deleteAllUserData()
             } catch {
-                await MainActor.run { cloudKitDeleteError = error.localizedDescription }
+                Self.logger.error("Failed to delete CloudKit data: \(error, privacy: .private)")
+                await MainActor.run { cloudKitDeleteError = "Failed to delete iCloud data. Please try again." }
             }
             await MainActor.run { isDeletingCloudKitData = false }
         }
@@ -485,7 +486,8 @@ struct SettingsView: View {
                 let ingestor = PhotoSignalIngestor(modelContainer: container, resolver: CLGeocoderCountryResolver())
                 _ = try await ingestor.ingest(mode: .sequenced)
             } catch {
-                ingestionError = error.localizedDescription
+                Self.logger.error("Failed to ingest photos: \(error, privacy: .private)")
+                ingestionError = "Failed to scan photos. Please try again."
             }
         }
     }
@@ -499,7 +501,8 @@ struct SettingsView: View {
                 let ingestor = CalendarSignalIngestor(modelContainer: container, resolver: CLGeocoderCountryResolver())
                 _ = try await ingestor.ingest(mode: .manualFullScan)
             } catch {
-                ingestionError = error.localizedDescription
+                Self.logger.error("Failed to ingest calendar: \(error, privacy: .private)")
+                ingestionError = "Failed to scan calendar. Please try again."
             }
         }
     }
