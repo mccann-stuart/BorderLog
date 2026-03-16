@@ -23,3 +23,7 @@
 **Vulnerability:** In user-facing authentication screens (like `SecurityLockView`), directly exposing framework error descriptions (e.g., `LAError`'s `localizedDescription`) can inadvertently leak implementation details or sensitive system states.
 **Learning:** Directly exposing underlying system error details in the UI violates the principle of failing securely and providing only necessary feedback to the end user.
 **Prevention:** Use generic, safe error messages (like "Authentication failed. Please try again.") in the UI while logging the actual error internally using `os.Logger` with the explicit `.private` privacy modifier to assist with debugging.
+## 2026-04-19 - Prevent sensitive error detail leakage in SettingsView
+**Vulnerability:** The UI directly exposes error.localizedDescription for CloudKit deletion errors and ingestion errors. This leaks system error details (like underlying framework paths, SQL/CoreData states, or network specifics) to the user, which violates the security principle of failing securely.
+**Learning:** Directly exposing underlying system error details in the UI violates the principle of failing securely and providing only necessary feedback to the end user.
+**Prevention:** Use generic, safe error messages in the UI while logging the actual error internally using os.Logger with the explicit .private privacy modifier to assist with debugging.
