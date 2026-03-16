@@ -41,3 +41,7 @@
 ## 2026-02-18 - Lazy Evaluation for Limited Prefix Filtering
 **Learning:** Filtering a large array using standard `.filter { ... }` executes immediately across all N elements, allocating a full intermediate array in memory. If the consuming logic only needs a small subset (e.g., `.prefix(5)` or `.isEmpty`), the vast majority of that computational work and memory allocation is wasted.
 **Action:** Use `.lazy.filter { ... }.prefix(5)` before converting back to an Array. This transforms the operation from an O(N) full scan/allocation into an O(K) operation (where K is the number of elements checked to find the 5 matches), significantly reducing CPU time and completely eliminating the large intermediate array allocation.
+
+## 2026-02-16 - Replace nested O(M) array scans with O(1) dictionary lookups in SwiftUI Forms
+**Learning:** Using `.first(where:)` on an array of 250 elements (like all countries) inside a `.compactMap` operating on another array (like ledger counts) creates a hidden O(N * M) performance penalty that can degrade rendering performance, especially when typing or scrolling through SwiftUI Pickers.
+**Action:** Replace linear `.first(where:)` scans with O(1) Dictionary lookups (`static let byCode: [String: CountryOption] = Dictionary(uniqueKeysWithValues: all.map { ($0.code, $0) })`) to instantly fetch static mapping data.

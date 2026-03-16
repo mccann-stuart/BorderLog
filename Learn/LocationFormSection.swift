@@ -32,18 +32,21 @@ struct LocationFormSection: View {
 
     // MARK: - Computed Sections
 
+    // ⚡ Bolt: Use O(1) dictionary lookups instead of O(M) linear scans over ~250 countries.
+    // This reduces the time complexity from O(N * M) to O(N) when resolving country codes.
     private var suggestionOptions: [CountryOption] {
         suggestedCodes.compactMap { code in
-            allCountryOptions.first(where: { $0.code == code.uppercased() })
+            CountryOptions.byCode[code.uppercased()]
         }
     }
 
+    // ⚡ Bolt: Fast O(1) lookups for the ledger summary options, improving UI picker render times.
     private var ledgerOptions: [CountryOption] {
         let suggestedSet = Set(suggestedCodes.map { $0.uppercased() })
         return ledgerCountryCounts.compactMap { item in
             let code = item.code.uppercased()
             guard !suggestedSet.contains(code) else { return nil }
-            return allCountryOptions.first(where: { $0.code == code })
+            return CountryOptions.byCode[code]
         }
     }
 
@@ -164,7 +167,8 @@ struct LocationFormSection: View {
             countryCode = normalized
         }
 
-        if let option = allCountryOptions.first(where: { $0.code == normalized }) {
+        // ⚡ Bolt: O(1) lookup to find a country option's translated name synchronously.
+        if let option = CountryOptions.byCode[normalized] {
             countryName = option.name
         } else if let localized = Locale.autoupdatingCurrent.localizedString(forRegionCode: normalized) {
             countryName = localized
@@ -191,6 +195,10 @@ enum CountryOptions {
             lhs.name.localizedCaseInsensitiveCompare(rhs.name) == .orderedAscending
         }
     }()
+
+    // ⚡ Bolt: Precomputed lookup dictionary reducing O(M) linear array scans into O(1) fetches.
+    // Safe initialization with `uniquingKeysWith` to prevent potential runtime duplicate crashes.
+    static let byCode: [String: CountryOption] = Dictionary(all.map { ($0.code, $0) }, uniquingKeysWith: { first, _ in first })
 }
 
 #Preview {
