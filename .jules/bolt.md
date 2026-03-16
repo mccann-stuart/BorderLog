@@ -45,3 +45,9 @@
 ## 2026-02-16 - Replace nested O(M) array scans with O(1) dictionary lookups in SwiftUI Forms
 **Learning:** Using `.first(where:)` on an array of 250 elements (like all countries) inside a `.compactMap` operating on another array (like ledger counts) creates a hidden O(N * M) performance penalty that can degrade rendering performance, especially when typing or scrolling through SwiftUI Pickers.
 **Action:** Replace linear `.first(where:)` scans with O(1) Dictionary lookups (`static let byCode: [String: CountryOption] = Dictionary(uniqueKeysWithValues: all.map { ($0.code, $0) })`) to instantly fetch static mapping data.
+## 2026-02-18 - Early Break on Reverse Sorted Sequences
+**Learning:** Filtering reverse-chronological datasets (like `PresenceDay` history) by time bounds using standard `.filter` or full `for` loops evaluates all N items unnecessarily.
+**Action:** When iterating over a reverse-sorted dataset to find a specific time window, calculate the window's `Range<Date>` beforehand and use an early `break` when the current item is older than the `lowerBound`, turning O(N) into an O(K) operation.
+## 2026-03-09 - Safe Dictionary Initialization
+**Learning:** Using `Dictionary(uniqueKeysWithValues:)` to convert an array into a dictionary map is dangerous because it will crash the app if the source array contains duplicate keys (which can happen with dynamic database queries).
+**Action:** Always use `Dictionary(_:uniquingKeysWith: { first, _ in first })` when initializing dictionaries from collections to guarantee safety against duplicate keys.

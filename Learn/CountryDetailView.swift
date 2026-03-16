@@ -34,8 +34,14 @@ struct CountryDetailView: View {
         let now = Date()
         let calendar = Calendar.current
         let isTimeframeRestricted = (ledgerRangeFilter == .timeframe)
+        let dateRange = selectedTimeframe.dateRange(now: now, calendar: calendar)
 
         for day in allPresenceDays {
+            // allPresenceDays is sorted reverse-chronologically (newest first).
+            if isTimeframeRestricted, let range = dateRange, day.date < range.lowerBound {
+                break // Early exit: we have evaluated everything inside our window
+            }
+
             let normalizedDay = CountryCodeNormalizer.normalize(day.countryCode)
             let matchesCountry: Bool
             if let target = normalizedTarget, let code = normalizedDay {
@@ -46,7 +52,11 @@ struct CountryDetailView: View {
 
             if matchesCountry {
                 if isTimeframeRestricted {
-                    if selectedTimeframe.contains(day.date, now: now, calendar: calendar) {
+                    if let range = dateRange {
+                        if day.date < range.upperBound {
+                            results.append(day)
+                        }
+                    } else if selectedTimeframe.contains(day.date, now: now, calendar: calendar) {
                         results.append(day)
                     }
                 } else {
