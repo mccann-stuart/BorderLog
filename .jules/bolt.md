@@ -49,3 +49,9 @@
 ## 2026-06-12 - Replace Prefix of Sorted Array with O(N) Top-K Selection
 **Learning:** Finding the top K elements (e.g., top 3 most visited countries) by calling `.sorted { ... }.prefix(K)` sorts the entire collection. This incurs an unnecessary O(N log N) processing cost and extra memory allocations. Inside widget generation paths or main loops, this degrades performance and creates ARC overhead.
 **Action:** When you only need the highest scoring elements (like top 3), use a single O(N) iteration that manually tracks the top K items instead of sorting the whole array.
+## 2026-02-18 - Early Break on Reverse Sorted Sequences
+**Learning:** Filtering reverse-chronological datasets (like `PresenceDay` history) by time bounds using standard `.filter` or full `for` loops evaluates all N items unnecessarily.
+**Action:** When iterating over a reverse-sorted dataset to find a specific time window, calculate the window's `Range<Date>` beforehand and use an early `break` when the current item is older than the `lowerBound`, turning O(N) into an O(K) operation.
+## 2026-03-09 - Safe Dictionary Initialization
+**Learning:** Using `Dictionary(uniqueKeysWithValues:)` to convert an array into a dictionary map is dangerous because it will crash the app if the source array contains duplicate keys (which can happen with dynamic database queries).
+**Action:** Always use `Dictionary(_:uniquingKeysWith: { first, _ in first })` when initializing dictionaries from collections to guarantee safety against duplicate keys.
