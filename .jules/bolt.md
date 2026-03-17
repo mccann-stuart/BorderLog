@@ -45,3 +45,7 @@
 ## 2026-02-16 - Replace nested O(M) array scans with O(1) dictionary lookups in SwiftUI Forms
 **Learning:** Using `.first(where:)` on an array of 250 elements (like all countries) inside a `.compactMap` operating on another array (like ledger counts) creates a hidden O(N * M) performance penalty that can degrade rendering performance, especially when typing or scrolling through SwiftUI Pickers.
 **Action:** Replace linear `.first(where:)` scans with O(1) Dictionary lookups (`static let byCode: [String: CountryOption] = Dictionary(uniqueKeysWithValues: all.map { ($0.code, $0) })`) to instantly fetch static mapping data.
+
+## 2026-06-12 - Replace Prefix of Sorted Array with O(N) Top-K Selection
+**Learning:** Finding the top K elements (e.g., top 3 most visited countries) by calling `.sorted { ... }.prefix(K)` sorts the entire collection. This incurs an unnecessary O(N log N) processing cost and extra memory allocations. Inside widget generation paths or main loops, this degrades performance and creates ARC overhead.
+**Action:** When you only need the highest scoring elements (like top 3), use a single O(N) iteration that manually tracks the top K items instead of sorting the whole array.
