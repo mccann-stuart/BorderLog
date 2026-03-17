@@ -42,10 +42,26 @@ struct DashboardView: View {
         let calendar = Calendar.current
         let now = Date()
         
+        // ⚡ Bolt: Pre-calculate date range to allow early loop termination, turning O(N) into O(K) where K is days in timeframe.
+        let dateRange = selectedTimeframe.dateRange(now: now, calendar: calendar)
+
+        // ⚡ Bolt: Pre-compute dictionary of max allowed days to avoid O(N) lookup per country
+        let configDict = Dictionary(countryConfigs.map { ($0.countryCode, $0.maxAllowedDays) }, uniquingKeysWith: { first, _ in first })
+
         for day in presenceDays {
-            // ⚡ Bolt: Avoid intermediate array allocation `timeframeDays`. Evaluate conditions inline.
-            // Some timeframes (e.g. .lastYear) skip recent days, so we cannot safely early break without calculating min date.
-            if !selectedTimeframe.contains(day.date, now: now, calendar: calendar) {
+            // presenceDays is sorted reverse-chronologically (newest first).
+            // If we've passed the oldest date in our timeframe range, we can stop evaluating entirely.
+            if let range = dateRange, day.date < range.lowerBound {
+                break
+            }
+
+            // For timeframes like "Last Year", skip days that are newer than the upper bound
+            if let range = dateRange, day.date >= range.upperBound {
+                continue
+            }
+
+            // Fallback for cases where dateRange couldn't be computed
+            if dateRange == nil && !selectedTimeframe.contains(day.date, now: now, calendar: calendar) {
                 continue
             }
 
@@ -57,7 +73,7 @@ struct DashboardView: View {
                 // ⚡ Bolt: Mutate the struct in-place to avoid reallocating new IDs and structs during aggregation
                 countryDict[key]?.totalDays += 1
             } else {
-                let maxDays = countryConfigs.first { $0.countryCode == (normalizedCode ?? "") }?.maxAllowedDays
+                let maxDays = configDict[normalizedCode ?? ""] ?? nil
                 countryDict[key] = CountryDaysInfo(
                     countryName: countryName,
                     countryCode: normalizedCode,
