@@ -27,3 +27,8 @@
 **Vulnerability:** The UI directly exposes error.localizedDescription for CloudKit deletion errors and ingestion errors. This leaks system error details (like underlying framework paths, SQL/CoreData states, or network specifics) to the user, which violates the security principle of failing securely.
 **Learning:** Directly exposing underlying system error details in the UI violates the principle of failing securely and providing only necessary feedback to the end user.
 **Prevention:** Use generic, safe error messages in the UI while logging the actual error internally using os.Logger with the explicit .private privacy modifier to assist with debugging.
+
+## 2026-03-18 - Prevent Sensitive Data Leakage in fatalError Logs
+**Vulnerability:** Interpolating raw `Error` objects directly into `fatalError` strings leaks sensitive internal system data to crash logs.
+**Learning:** `fatalError` does not support privacy redaction.
+**Prevention:** Use a generic fallback message in `fatalError` and rely on a preceding `os.Logger` statement using `.private` modifiers to capture specific failure details.

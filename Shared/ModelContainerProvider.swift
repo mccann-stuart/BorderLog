@@ -321,7 +321,8 @@ enum ModelContainerProvider {
             do {
                 return try makeTemporaryFallbackContainer(schema: schema)
             } catch {
-                fatalError("Unable to initialize any SwiftData container: \(error)")
+                logger.critical("Unable to initialize any SwiftData container: \(error, privacy: .private)")
+                fatalError("Unable to initialize any SwiftData container")
             }
         }
     }
