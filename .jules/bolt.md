@@ -55,3 +55,7 @@
 ## 2026-03-09 - Safe Dictionary Initialization
 **Learning:** Using `Dictionary(uniqueKeysWithValues:)` to convert an array into a dictionary map is dangerous because it will crash the app if the source array contains duplicate keys (which can happen with dynamic database queries).
 **Action:** Always use `Dictionary(_:uniquingKeysWith: { first, _ in first })` when initializing dictionaries from collections to guarantee safety against duplicate keys.
+
+## 2026-06-12 - Safe Reverse-Sorted Array Evaluation
+**Learning:** Applying an early `break` inside a loop assuming an array is reverse-sorted is dangerous if the sort order isn't guaranteed. Checking if `array.first >= array.last` is an unsafe heuristic because an unsorted array might accidentally satisfy this condition and cause the loop to prematurely skip valid elements in the middle.
+**Action:** To safely apply early-exit optimizations on sorted data (like SwiftData `@Query` results), pass an explicit boolean flag (e.g., `isReverseSorted: Bool`) from the call-site rather than guessing the array's sort order via heuristics.

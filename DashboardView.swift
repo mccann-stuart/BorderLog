@@ -17,7 +17,7 @@ struct DashboardView: View {
     @State private var selectedTimeframe: VisitedCountriesTimeframe = .last12Months
     
     private var schengenSummary: SchengenLedgerSummary {
-        SchengenLedgerCalculator.summary(for: presenceDays, asOf: Date())
+        SchengenLedgerCalculator.summary(for: presenceDays, asOf: Date(), isReverseSorted: true)
     }
     
     private var unknownSchengenDays: [PresenceDay] {
