@@ -1,10 +1,12 @@
 const SECURITY_HEADERS = {
   "X-Content-Type-Options": "nosniff",
-  "Strict-Transport-Security": "max-age=31536000; includeSubDomains",
+  "Strict-Transport-Security": "max-age=31536000; includeSubDomains; preload",
   "Content-Security-Policy": "default-src 'none'; frame-ancestors 'none'; sandbox",
   "X-Frame-Options": "DENY",
   "Referrer-Policy": "strict-origin-when-cross-origin",
-  "Permissions-Policy": "accelerometer=(), camera=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), payment=(), usb=(), interest-cohort=()"
+  "Permissions-Policy": "accelerometer=(), camera=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), payment=(), usb=(), interest-cohort=()",
+  "Cross-Origin-Opener-Policy": "same-origin",
+  "Cross-Origin-Resource-Policy": "same-origin"
 };
 
 const DEFAULT_SECURITY_HEADERS = new Headers(SECURITY_HEADERS);
