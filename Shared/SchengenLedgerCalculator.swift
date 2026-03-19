@@ -23,7 +23,8 @@ enum SchengenLedgerCalculator {
     static func summary(
         for days: [PresenceDay],
         asOf referenceDate: Date = Date(),
-        calendar: Calendar = .current
+        calendar: Calendar = .current,
+        isReverseSorted: Bool = false
     ) -> SchengenLedgerSummary {
         let windowEnd = calendar.startOfDay(for: referenceDate)
         let windowStart = calendar.date(byAdding: .day, value: -(windowSize - 1), to: windowEnd) ?? windowEnd
@@ -34,6 +35,13 @@ enum SchengenLedgerCalculator {
         // Optimization: Replace multiple .filter() calls (which create intermediate arrays)
         // with a single pass through the sequence.
         for day in days {
+            // ⚡ Bolt: Explicitly handle pre-sorted data (like from @Query) to allow early loop termination,
+            // dropping evaluation from O(N) to O(W) where W is the bounded window.
+            if isReverseSorted {
+                if day.date > windowEnd { continue }
+                if day.date < windowStart { break }
+            }
+
             if day.date >= windowStart && day.date <= windowEnd {
                 if day.countryCode != nil || day.countryName != nil {
                     knownDays += 1
