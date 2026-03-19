@@ -59,3 +59,7 @@
 ## 2026-06-12 - Safe Reverse-Sorted Array Evaluation
 **Learning:** Applying an early `break` inside a loop assuming an array is reverse-sorted is dangerous if the sort order isn't guaranteed. Checking if `array.first >= array.last` is an unsafe heuristic because an unsorted array might accidentally satisfy this condition and cause the loop to prematurely skip valid elements in the middle.
 **Action:** To safely apply early-exit optimizations on sorted data (like SwiftData `@Query` results), pass an explicit boolean flag (e.g., `isReverseSorted: Bool`) from the call-site rather than guessing the array's sort order via heuristics.
+
+## 2026-03-19 - Optimize Unicode scalar preprocessing in flight parsing
+**Learning:** Chaining `.unicodeScalars.filter`, `String(UnicodeScalarView(...))`, and `replacingOccurrences` in Swift causes multiple O(N) heap allocations and passes over the string.
+**Action:** Use `raw.unicodeScalars.lazy.compactMap { ... }` and a `switch` statement on `scalar.value` to combine filtering and mapping into a single lazy pass, then initialize the result string directly with `String(scalars)`.
