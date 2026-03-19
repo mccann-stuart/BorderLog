@@ -200,10 +200,29 @@ struct TopCountriesWidgetProvider: TimelineProvider {
                 }
             }
 
-            let sorted = countryDict.values.sorted { $0.totalDays > $1.totalDays }
-            let top3 = Array(sorted.prefix(3))
+            // ⚡ Bolt: Use a single O(N) iteration to find the top 3 countries instead of
+            // O(N log N) sorting the entire dictionary values array. This avoids unnecessary
+            // memory allocation and processing overhead in the widget timeline provider.
+            var top1: WidgetCountryDaysInfo? = nil
+            var top2: WidgetCountryDaysInfo? = nil
+            var top3: WidgetCountryDaysInfo? = nil
 
-            let entry = TopCountriesEntry(date: now, topCountries: top3)
+            for info in countryDict.values {
+                if top1 == nil || info.totalDays > top1!.totalDays {
+                    top3 = top2
+                    top2 = top1
+                    top1 = info
+                } else if top2 == nil || info.totalDays > top2!.totalDays {
+                    top3 = top2
+                    top2 = info
+                } else if top3 == nil || info.totalDays > top3!.totalDays {
+                    top3 = info
+                }
+            }
+
+            let top3Array = [top1, top2, top3].compactMap { $0 }
+
+            let entry = TopCountriesEntry(date: now, topCountries: top3Array)
             let nextUpdate = Calendar.current.date(byAdding: .hour, value: 3, to: now) ?? now.addingTimeInterval(10800)
             let timeline = Timeline(entries: [entry], policy: .after(nextUpdate))
             completion(timeline)
