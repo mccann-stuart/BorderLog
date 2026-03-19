@@ -8,7 +8,7 @@
 import Foundation
 
 enum DayIdentity {
-    static func canonicalTimeZone(
+    nonisolated static func canonicalTimeZone(
         preferredTimeZoneId: String?,
         fallback: TimeZone = .current
     ) -> TimeZone {
@@ -19,7 +19,7 @@ enum DayIdentity {
         return fallback
     }
 
-    static func canonicalDay(
+    nonisolated static func canonicalDay(
         for date: Date,
         preferredTimeZoneId: String? = nil,
         fallback: TimeZone = .current
@@ -30,7 +30,7 @@ enum DayIdentity {
         return (dayKey: dayKey, dayTimeZoneId: timeZone.identifier, normalizedDate: normalizedDate)
     }
 
-    static func normalizedDate(
+    nonisolated static func normalizedDate(
         for dayKey: String,
         dayTimeZoneId: String?,
         fallback: TimeZone = .current
@@ -39,7 +39,7 @@ enum DayIdentity {
         return DayKey.date(for: dayKey, timeZone: timeZone) ?? Date()
     }
 
-    static func dayWindow(
+    nonisolated static func dayWindow(
         dayKey: String,
         dayTimeZoneId: String?,
         fallback: TimeZone = .current

@@ -40,9 +40,17 @@ struct MainNavigationView: View {
                 }
                 
                 NavigationStack {
-                    ContentView()
+                    CalendarTabView()
                 }
                 .tag(1)
+                .tabItem {
+                    Label("Calendar", systemImage: "calendar")
+                }
+
+                NavigationStack {
+                    ContentView()
+                }
+                .tag(2)
                 .tabItem {
                     Label("Details", systemImage: "list.bullet")
                 }
@@ -50,7 +58,7 @@ struct MainNavigationView: View {
                 NavigationStack {
                     SettingsView()
                 }
-                .tag(2)
+                .tag(3)
                 .tabItem {
                     Label("Settings", systemImage: "gearshape.fill")
                 }

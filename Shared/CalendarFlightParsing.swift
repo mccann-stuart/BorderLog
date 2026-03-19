@@ -140,7 +140,7 @@ enum CalendarFlightParsing {
                 return scalar
             }
         }
-        return String(scalars)
+        return String(scalars.map { Character($0) })
     }
 
     private static func collapseWhitespace(_ raw: String) -> String {
