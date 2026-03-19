@@ -1,0 +1,42 @@
+Command line invocation:
+    /Applications/Xcode.app/Contents/Developer/usr/bin/xcodebuild -scheme Learn -configuration Debug -destination "platform=iOS Simulator,name=iPhone 17" -derivedDataPath Build/DerivedData build
+
+2026-03-19 23:58:38.022 xcodebuild[2812:2543320] [MT] IDELogStore: Failed to open log store at /Users/mccannstuart/Library/CloudStorage/OneDrive-TheBostonConsultingGroup,Inc/Documents/GitHub/BorderLog/Build/DerivedData/Logs/Build
+2026-03-19 23:58:38.024 xcodebuild[2812:2543320] [MT] IDELogStore: Failed to open Build log store: Error Domain=NSCocoaErrorDomain Code=513 "You don’t have permission to save the file “LogStoreManifest.plist” in the folder “Build”." UserInfo={NSURL=file:///Users/mccannstuart/Library/CloudStorage/OneDrive-TheBostonConsultingGroup,Inc/Documents/GitHub/BorderLog/Build/DerivedData/Logs/Build/LogStoreManifest.plist, NSUnderlyingError=0x974826eb0 {Error Domain=NSPOSIXErrorDomain Code=1 "Operation not permitted"}, NSUserStringVariant=Folder}. User info: {
+    NSURL = "file:///Users/mccannstuart/Library/CloudStorage/OneDrive-TheBostonConsultingGroup,Inc/Documents/GitHub/BorderLog/Build/DerivedData/Logs/Build/LogStoreManifest.plist";
+    NSUnderlyingError = "Error Domain=NSPOSIXErrorDomain Code=1 \"Operation not permitted\"";
+    NSUserStringVariant = Folder;
+}.
+2026-03-19 23:58:38.056 xcodebuild[2812:2543320] [MT] IDELogStore: Failed to open log store at /Users/mccannstuart/Library/CloudStorage/OneDrive-TheBostonConsultingGroup,Inc/Documents/GitHub/BorderLog/Build/DerivedData/Logs/Localization
+2026-03-19 23:58:38.057 xcodebuild[2812:2543320] [MT] IDELogStore: Failed to open Localization log store: Error Domain=NSCocoaErrorDomain Code=513 "You don’t have permission to save the file “LogStoreManifest.plist” in the folder “Localization”." UserInfo={NSUnderlyingError=0x973c09fe0 {Error Domain=NSPOSIXErrorDomain Code=1 "Operation not permitted"}, NSURL=file:///Users/mccannstuart/Library/CloudStorage/OneDrive-TheBostonConsultingGroup,Inc/Documents/GitHub/BorderLog/Build/DerivedData/Logs/Localization/LogStoreManifest.plist, NSUserStringVariant=Folder}. User info: {
+    NSURL = "file:///Users/mccannstuart/Library/CloudStorage/OneDrive-TheBostonConsultingGroup,Inc/Documents/GitHub/BorderLog/Build/DerivedData/Logs/Localization/LogStoreManifest.plist";
+    NSUnderlyingError = "Error Domain=NSPOSIXErrorDomain Code=1 \"Operation not permitted\"";
+    NSUserStringVariant = Folder;
+}.
+2026-03-19 23:58:38.057 xcodebuild[2812:2543320] [MT] IDELogStore: Failed to open log store at /Users/mccannstuart/Library/CloudStorage/OneDrive-TheBostonConsultingGroup,Inc/Documents/GitHub/BorderLog/Build/DerivedData/Logs/Launch
+2026-03-19 23:58:38.058 xcodebuild[2812:2543320] [MT] IDELogStore: Failed to open Launch log store: Error Domain=NSCocoaErrorDomain Code=513 "You don’t have permission to save the file “LogStoreManifest.plist” in the folder “Launch”." UserInfo={NSUserStringVariant=Folder, NSURL=file:///Users/mccannstuart/Library/CloudStorage/OneDrive-TheBostonConsultingGroup,Inc/Documents/GitHub/BorderLog/Build/DerivedData/Logs/Launch/LogStoreManifest.plist, NSUnderlyingError=0x973c0a220 {Error Domain=NSPOSIXErrorDomain Code=1 "Operation not permitted"}}. User info: {
+    NSURL = "file:///Users/mccannstuart/Library/CloudStorage/OneDrive-TheBostonConsultingGroup,Inc/Documents/GitHub/BorderLog/Build/DerivedData/Logs/Launch/LogStoreManifest.plist";
+    NSUnderlyingError = "Error Domain=NSPOSIXErrorDomain Code=1 \"Operation not permitted\"";
+    NSUserStringVariant = Folder;
+}.
+2026-03-19 23:58:38.059 xcodebuild[2812:2543320] [MT] IDELogStore: Failed to open log store at /Users/mccannstuart/Library/CloudStorage/OneDrive-TheBostonConsultingGroup,Inc/Documents/GitHub/BorderLog/Build/DerivedData/Logs/Package
+2026-03-19 23:58:38.059 xcodebuild[2812:2543320] [MT] IDELogStore: Failed to open Package log store: Error Domain=NSCocoaErrorDomain Code=513 "You don’t have permission to save the file “LogStoreManifest.plist” in the folder “Package”." UserInfo={NSUserStringVariant=Folder, NSUnderlyingError=0x973c0a520 {Error Domain=NSPOSIXErrorDomain Code=1 "Operation not permitted"}, NSURL=file:///Users/mccannstuart/Library/CloudStorage/OneDrive-TheBostonConsultingGroup,Inc/Documents/GitHub/BorderLog/Build/DerivedData/Logs/Package/LogStoreManifest.plist}. User info: {
+    NSURL = "file:///Users/mccannstuart/Library/CloudStorage/OneDrive-TheBostonConsultingGroup,Inc/Documents/GitHub/BorderLog/Build/DerivedData/Logs/Package/LogStoreManifest.plist";
+    NSUnderlyingError = "Error Domain=NSPOSIXErrorDomain Code=1 \"Operation not permitted\"";
+    NSUserStringVariant = Folder;
+}.
+2026-03-19 23:58:38.100 xcodebuild[2812:2543320] [MT] IDELogStore: Failed to open log store at /Users/mccannstuart/Library/CloudStorage/OneDrive-TheBostonConsultingGroup,Inc/Documents/GitHub/BorderLog/Build/DerivedData/Logs/Test
+2026-03-19 23:58:38.101 xcodebuild[2812:2543320] [MT] IDELogStore: Failed to open Test log store: Error Domain=NSCocoaErrorDomain Code=513 "You don’t have permission to save the file “LogStoreManifest.plist” in the folder “Test”." UserInfo={NSUserStringVariant=Folder, NSURL=file:///Users/mccannstuart/Library/CloudStorage/OneDrive-TheBostonConsultingGroup,Inc/Documents/GitHub/BorderLog/Build/DerivedData/Logs/Test/LogStoreManifest.plist, NSUnderlyingError=0x973c0af10 {Error Domain=NSPOSIXErrorDomain Code=1 "Operation not permitted"}}. User info: {
+    NSURL = "file:///Users/mccannstuart/Library/CloudStorage/OneDrive-TheBostonConsultingGroup,Inc/Documents/GitHub/BorderLog/Build/DerivedData/Logs/Test/LogStoreManifest.plist";
+    NSUnderlyingError = "Error Domain=NSPOSIXErrorDomain Code=1 \"Operation not permitted\"";
+    NSUserStringVariant = Folder;
+}.
+Build Preparation
+Couldn't create workspace arena folder '/Users/mccannstuart/Library/CloudStorage/OneDrive-TheBostonConsultingGroup,Inc/Documents/GitHub/BorderLog/Build/DerivedData': Unable to write to info file '<DVTFilePath:0x9769c2d60:'/Users/mccannstuart/Library/CloudStorage/OneDrive-TheBostonConsultingGroup,Inc/Documents/GitHub/BorderLog/Build/DerivedData/info.plist'>'.
+
+** BUILD FAILED **
+
+
+The following build commands failed:
+	Building project Learn with scheme Learn and configuration Debug
+(1 failure)
