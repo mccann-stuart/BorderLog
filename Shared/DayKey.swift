@@ -8,9 +8,9 @@
 import Foundation
 
 enum DayKey {
-    static let format = "yyyy-MM-dd"
+    nonisolated static let format = "yyyy-MM-dd"
 
-    static func make(from date: Date, timeZone: TimeZone) -> String {
+    nonisolated static func make(from date: Date, timeZone: TimeZone) -> String {
         let cal = calendar(for: timeZone)
         let components = cal.dateComponents([.year, .month, .day], from: date)
 
@@ -21,7 +21,7 @@ enum DayKey {
         return "\(y)-\(m < 10 ? "0" : "")\(m)-\(d < 10 ? "0" : "")\(d)"
     }
 
-    static func date(for dayKey: String, timeZone: TimeZone) -> Date? {
+    nonisolated static func date(for dayKey: String, timeZone: TimeZone) -> Date? {
         let parts = dayKey.split(separator: "-")
         if parts.count == 3,
            let y = Int(parts[0]),
@@ -34,7 +34,7 @@ enum DayKey {
         return formatter(for: timeZone).date(from: dayKey)
     }
 
-    private static func calendar(for timeZone: TimeZone) -> Calendar {
+    private nonisolated static func calendar(for timeZone: TimeZone) -> Calendar {
         let key = "DayKeyCalendar_" + timeZone.identifier
         let dictionary = Thread.current.threadDictionary
 
@@ -49,7 +49,7 @@ enum DayKey {
         return calendar
     }
 
-    private static func formatter(for timeZone: TimeZone) -> DateFormatter {
+    private nonisolated static func formatter(for timeZone: TimeZone) -> DateFormatter {
         let key = "DayKeyFormatter_" + timeZone.identifier
         let dictionary = Thread.current.threadDictionary
 

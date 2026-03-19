@@ -2,7 +2,7 @@ import Foundation
 
 enum SchengenMembers {
     // Hard-coded Schengen membership for M1 (illustrative; updateable in later milestones)
-    static let iso2: Set<String> = [
+    nonisolated static let iso2: Set<String> = [
         "AT", // Austria
         "BE", // Belgium
         "CZ", // Czechia
@@ -32,12 +32,12 @@ enum SchengenMembers {
         "HR"  // Croatia (joined Schengen 2023)
     ]
 
-    static func isMember(_ code: String?) -> Bool {
+    nonisolated static func isMember(_ code: String?) -> Bool {
         guard let code = code?.trimmingCharacters(in: .whitespacesAndNewlines).uppercased(), !code.isEmpty else {
             return false
         }
         return iso2.contains(code)
     }
 
-    static var sortedCodes: [String] { iso2.sorted() }
+    nonisolated static var sortedCodes: [String] { iso2.sorted() }
 }

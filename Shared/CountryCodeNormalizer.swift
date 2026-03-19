@@ -8,7 +8,7 @@
 import Foundation
 
 enum CountryCodeNormalizer {
-    static func normalize(_ code: String?) -> String? {
+    nonisolated static func normalize(_ code: String?) -> String? {
         guard let code else { return nil }
         let trimmed = code.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return nil }

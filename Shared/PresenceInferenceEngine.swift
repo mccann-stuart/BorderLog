@@ -257,8 +257,8 @@ struct PresenceInferenceEngine {
             }
 
             // ⚡ Bolt: Single O(N) pass to find top two countries instead of full O(N log N) sort
-            var winner: Dictionary<CountryIdentity, SignalScores>.Element? = nil
-            var runnerUp: Dictionary<CountryIdentity, SignalScores>.Element? = nil
+            var winner: Dictionary<CountryKey, CountryAccumulator>.Element? = nil
+            var runnerUp: Dictionary<CountryKey, CountryAccumulator>.Element? = nil
             var totalScore: Double = 0
 
             for element in bucket.countries {
