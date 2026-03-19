@@ -39,7 +39,7 @@ struct CalendarTabView: View {
     }
 
     private var weekdaySymbols: [String] {
-        let symbols = calendar.veryShortStandaloneWeekdaySymbols
+        let symbols = calendar.shortStandaloneWeekdaySymbols.map { $0.uppercased() }
         let startIndex = max(calendar.firstWeekday - 1, 0)
         guard startIndex < symbols.count else { return symbols }
         return Array(symbols[startIndex...] + symbols[..<startIndex])
@@ -80,22 +80,18 @@ struct CalendarTabView: View {
 
     var body: some View {
         ScrollView {
-            VStack(spacing: 20) {
-                monthSection
-                tableSection
+            VStack(alignment: .leading, spacing: 24) {
+                monthToolbar
+                monthCard
+                summarySection
             }
-            .padding(.horizontal)
-            .padding(.vertical)
+            .padding(.horizontal, 20)
+            .padding(.vertical, 16)
         }
-        .background {
-            ZStack {
-                Color(UIColor.systemGroupedBackground)
-                LinearGradient(colors: [.blue.opacity(0.05), .purple.opacity(0.05)], startPoint: .topLeading, endPoint: .bottomTrailing)
-            }
-            .ignoresSafeArea()
-        }
+        .scrollIndicators(.hidden)
+        .background(CalendarTabBackground())
         .navigationTitle("Calendar")
-        .navigationBarTitleDisplayMode(.inline)
+        .navigationBarTitleDisplayMode(.large)
         .onAppear {
             Task { await refreshSnapshot() }
         }
@@ -111,62 +107,62 @@ struct CalendarTabView: View {
         }
     }
 
-    private var monthSection: some View {
+    private var monthToolbar: some View {
         VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Text("Travel Calendar")
-                    .font(.system(.title2, design: .rounded).bold())
-                Spacer()
-                if isLoading {
-                    ProgressView()
-                        .controlSize(.small)
+            HStack(alignment: .top, spacing: 16) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(monthTitle)
+                        .font(.system(.title2, design: .rounded).weight(.bold))
+
+                    Text("Flags show unique countries found for each day. Flights add ✈️.")
+                        .font(.system(.subheadline, design: .rounded))
+                        .foregroundStyle(.secondary)
+                }
+
+                Spacer(minLength: 12)
+
+                HStack(spacing: 10) {
+                    MonthNavigationButton(
+                        systemImage: "chevron.left",
+                        isEnabled: canNavigateBackward,
+                        action: { stepMonth(by: -1) }
+                    )
+                    MonthNavigationButton(
+                        systemImage: "chevron.right",
+                        isEnabled: canNavigateForward,
+                        action: { stepMonth(by: 1) }
+                    )
                 }
             }
 
-            HStack {
-                Button {
-                    stepMonth(by: -1)
-                } label: {
-                    Image(systemName: "chevron.left")
-                        .font(.headline.weight(.semibold))
-                        .frame(width: 36, height: 36)
-                        .background(Color.accentColor.opacity(canNavigateBackward ? 0.14 : 0.08))
-                        .clipShape(Circle())
+            if isLoading || loadError != nil {
+                HStack(spacing: 10) {
+                    if isLoading {
+                        ProgressView()
+                            .controlSize(.small)
+                    } else {
+                        Image(systemName: "exclamationmark.circle.fill")
+                            .foregroundStyle(.red)
+                    }
+
+                    Text(loadError ?? "Refreshing calendar…")
+                        .font(.system(.footnote, design: .rounded))
+                        .foregroundStyle(loadError == nil ? Color.secondary : Color.red)
                 }
-                .buttonStyle(.plain)
-                .disabled(!canNavigateBackward)
-
-                Spacer()
-
-                Text(monthTitle)
-                    .font(.system(.title3, design: .rounded).weight(.semibold))
-
-                Spacer()
-
-                Button {
-                    stepMonth(by: 1)
-                } label: {
-                    Image(systemName: "chevron.right")
-                        .font(.headline.weight(.semibold))
-                        .frame(width: 36, height: 36)
-                        .background(Color.accentColor.opacity(canNavigateForward ? 0.14 : 0.08))
-                        .clipShape(Circle())
-                }
-                .buttonStyle(.plain)
-                .disabled(!canNavigateForward)
-            }
-
-            weekdayHeader
-            monthGrid
-
-            if let loadError {
-                Text(loadError)
-                    .font(.caption)
-                    .foregroundStyle(.red)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 10)
+                .background(.thinMaterial, in: Capsule())
             }
         }
-        .padding()
-        .cardShell()
+    }
+
+    private var monthCard: some View {
+        VStack(spacing: 20) {
+            weekdayHeader
+            monthGrid
+        }
+        .padding(20)
+        .calendarSurface()
     }
 
     private var weekdayHeader: some View {
@@ -181,14 +177,13 @@ struct CalendarTabView: View {
     }
 
     private var monthGrid: some View {
-        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 7), spacing: 8) {
+        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: 7), spacing: 14) {
             ForEach(Array(monthGridItems.enumerated()), id: \.offset) { item in
                 if let daySummary = item.element {
                     dayCell(for: daySummary)
                 } else {
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .fill(Color.clear)
-                        .frame(minHeight: 84)
+                    Color.clear
+                        .frame(minHeight: 86)
                 }
             }
         }
@@ -197,7 +192,11 @@ struct CalendarTabView: View {
 
     @ViewBuilder
     private func dayCell(for summary: CalendarDaySummary) -> some View {
-        let cell = CalendarDayCell(summary: summary)
+        let cell = CalendarDayCell(
+            summary: summary,
+            isInteractive: presenceDaysByKey[summary.dayKey] != nil
+        )
+
         if let presenceDay = presenceDaysByKey[summary.dayKey] {
             NavigationLink {
                 PresenceDayDetailView(day: presenceDay)
@@ -210,45 +209,69 @@ struct CalendarTabView: View {
         }
     }
 
-    private var tableSection: some View {
+    private var summarySection: some View {
         let rows = countryRows
-        return VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Text("Country Days")
-                    .font(.system(.title2, design: .rounded).bold())
-                Spacer()
-                Picker("Range", selection: $summaryRange) {
-                    ForEach(CalendarCountrySummaryRange.allCases) { range in
-                        Text(range.rawValue).tag(range)
-                    }
+
+        return VStack(alignment: .leading, spacing: 18) {
+            HStack(alignment: .top, spacing: 16) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Travel Summary")
+                        .font(.system(.headline, design: .rounded).weight(.semibold))
+
+                    Text("Each country counts once per day, even when multiple sources agree.")
+                        .font(.system(.subheadline, design: .rounded))
+                        .foregroundStyle(.secondary)
                 }
-                .tint(.secondary)
+
+                Spacer(minLength: 12)
+
+                Menu {
+                    Picker("Range", selection: $summaryRange) {
+                        ForEach(CalendarCountrySummaryRange.allCases) { range in
+                            Text(range.rawValue).tag(range)
+                        }
+                    }
+                } label: {
+                    HStack(spacing: 8) {
+                        Image(systemName: "line.3.horizontal.decrease.circle")
+                            .font(.subheadline.weight(.semibold))
+                        Text(summaryRange.rawValue)
+                            .font(.system(.subheadline, design: .rounded).weight(.medium))
+                            .lineLimit(1)
+                    }
+                    .foregroundStyle(.primary)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 10)
+                    .background(.thinMaterial, in: Capsule())
+                }
             }
 
             if rows.isEmpty {
-                ContentUnavailableView(
-                    "No country days",
-                    systemImage: "globe",
-                    description: Text("No countries were found in the selected calendar range.")
-                )
-                .frame(height: 200)
-                .cardShell()
-            } else {
-                LazyVStack(spacing: 0) {
-                    ForEach(rows) { info in
-                        CountryDaysRow(info: info, warningThreshold: 80)
-                            .padding(.horizontal)
-                            .padding(.vertical, 8)
+                VStack(spacing: 10) {
+                    Image(systemName: "globe")
+                        .font(.title2)
+                        .foregroundStyle(.secondary)
 
-                        if info.id != rows.last?.id {
-                            Divider()
-                                .padding(.leading, 60)
-                        }
+                    Text("No country days found")
+                        .font(.system(.headline, design: .rounded))
+
+                    Text("Change the month or summary range to see travel evidence.")
+                        .font(.system(.subheadline, design: .rounded))
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 28)
+            } else {
+                LazyVStack(spacing: 14) {
+                    ForEach(rows) { info in
+                        CalendarCountrySummaryRow(info: info)
                     }
                 }
-                .cardShell()
             }
         }
+        .padding(20)
+        .calendarSurface()
     }
 
     private var monthSwipeGesture: some Gesture {
@@ -322,7 +345,7 @@ struct CalendarTabView: View {
             return
         }
 
-        withAnimation(.easeInOut(duration: 0.2)) {
+        withAnimation(.spring(response: 0.32, dampingFraction: 0.86)) {
             visibleMonthStart = normalizedNextMonth
         }
     }
@@ -333,8 +356,69 @@ struct CalendarTabView: View {
     }
 }
 
+private struct CalendarTabBackground: View {
+    var body: some View {
+        ZStack {
+            Color(UIColor.systemGroupedBackground)
+
+            LinearGradient(
+                colors: [
+                    Color.white.opacity(0.72),
+                    Color.blue.opacity(0.05),
+                    Color(uiColor: .systemGroupedBackground)
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+
+            RadialGradient(
+                colors: [
+                    Color.accentColor.opacity(0.14),
+                    Color.clear
+                ],
+                center: .topLeading,
+                startRadius: 0,
+                endRadius: 280
+            )
+            .offset(x: -80, y: -120)
+
+            RadialGradient(
+                colors: [
+                    Color.white.opacity(0.55),
+                    Color.clear
+                ],
+                center: .topTrailing,
+                startRadius: 0,
+                endRadius: 240
+            )
+            .offset(x: 80, y: -40)
+        }
+        .ignoresSafeArea()
+    }
+}
+
+private struct MonthNavigationButton: View {
+    let systemImage: String
+    let isEnabled: Bool
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: systemImage)
+                .font(.headline.weight(.semibold))
+                .foregroundStyle(isEnabled ? .primary : .secondary)
+                .frame(width: 44, height: 44)
+                .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .disabled(!isEnabled)
+        .opacity(isEnabled ? 1 : 0.55)
+    }
+}
+
 private struct CalendarDayCell: View {
     let summary: CalendarDaySummary
+    let isInteractive: Bool
 
     private var emojiSummary: String {
         let flags = summary.countries.map { country in
@@ -348,51 +432,178 @@ private struct CalendarDayCell: View {
         return parts.joined(separator: " ")
     }
 
-    private var backgroundFill: Color {
+    private var dayBubbleFill: Color {
         if summary.isToday {
-            return Color.accentColor.opacity(0.16)
+            return .accentColor
         }
-        if !summary.countries.isEmpty || summary.hasFlight {
-            return Color.accentColor.opacity(0.08)
+        if !emojiSummary.isEmpty {
+            return Color(UIColor.secondarySystemGroupedBackground)
+        }
+        return Color(UIColor.tertiarySystemFill)
+    }
+
+    private var dayBubbleStroke: Color {
+        if summary.isToday {
+            return Color.accentColor.opacity(0.3)
+        }
+        if !emojiSummary.isEmpty {
+            return Color.white.opacity(0.85)
+        }
+        return .clear
+    }
+
+    private var containerFill: Color {
+        if summary.isToday {
+            return Color.accentColor.opacity(0.12)
+        }
+        if !emojiSummary.isEmpty {
+            return Color(UIColor.systemBackground).opacity(0.72)
+        }
+        return .clear
+    }
+
+    private var containerStroke: Color {
+        if summary.isToday {
+            return Color.accentColor.opacity(0.24)
+        }
+        if !emojiSummary.isEmpty {
+            return Color.white.opacity(0.5)
+        }
+        return .clear
+    }
+
+    private var dayNumberColor: Color {
+        summary.isToday ? .white : .primary
+    }
+
+    var body: some View {
+        VStack(spacing: 8) {
+            ZStack {
+                Circle()
+                    .fill(dayBubbleFill)
+
+                Circle()
+                    .stroke(dayBubbleStroke, lineWidth: summary.isToday ? 3 : 1)
+                    .padding(summary.isToday ? -4 : 0)
+
+                Text("\(summary.dayNumber)")
+                    .font(.system(.headline, design: .rounded).weight(.semibold))
+                    .foregroundStyle(dayNumberColor)
+            }
+            .frame(width: 42, height: 42)
+
+            if !emojiSummary.isEmpty {
+                Text(emojiSummary)
+                    .font(.system(size: 15))
+                    .multilineTextAlignment(.center)
+                    .lineLimit(3)
+                    .minimumScaleFactor(0.65)
+                    .frame(maxWidth: .infinity, minHeight: 18, alignment: .top)
+            } else {
+                Spacer(minLength: 18)
+            }
+        }
+        .frame(maxWidth: .infinity, minHeight: 86, alignment: .top)
+        .padding(.vertical, 6)
+        .background(
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .fill(containerFill)
+        )
+        .overlay {
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .strokeBorder(containerStroke, lineWidth: 1)
+        }
+        .opacity(isInteractive || !emojiSummary.isEmpty || summary.isToday ? 1 : 0.88)
+        .contentShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+    }
+}
+
+private struct CalendarCountrySummaryRow: View {
+    let info: CountryDaysInfo
+
+    private var badgeTint: Color {
+        if info.totalDays >= 90 {
+            return .red
+        } else if info.totalDays >= 80 {
+            return .orange
+        }
+        return .primary
+    }
+
+    private var badgeBackground: Color {
+        if info.totalDays >= 90 {
+            return .red.opacity(0.12)
+        } else if info.totalDays >= 80 {
+            return .orange.opacity(0.12)
         }
         return Color(UIColor.secondarySystemGroupedBackground)
     }
 
+    private var badgeTitle: String {
+        "\(info.totalDays)d"
+    }
+
+    private var badgeSubtitle: String {
+        if let maxAllowedDays = info.maxAllowedDays {
+            return "of \(maxAllowedDays) allowed"
+        }
+        return "unique days"
+    }
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack(alignment: .top) {
-                Text("\(summary.dayNumber)")
-                    .font(.system(.subheadline, design: .rounded).weight(.semibold))
+        HStack(spacing: 14) {
+            ZStack {
+                Circle()
+                    .fill(Color(UIColor.secondarySystemGroupedBackground))
 
-                Spacer(minLength: 6)
+                Text(info.flagEmoji)
+                    .font(.system(size: 24))
+            }
+            .frame(width: 44, height: 44)
 
-                if summary.isToday {
-                    Text("Today")
-                        .font(.system(size: 9, weight: .semibold, design: .rounded))
-                        .padding(.horizontal, 5)
-                        .padding(.vertical, 3)
-                        .background(Color.accentColor.opacity(0.18))
-                        .clipShape(Capsule())
-                }
+            VStack(alignment: .leading, spacing: 3) {
+                Text(info.countryName)
+                    .font(.system(.body, design: .rounded).weight(.semibold))
+
+                Text(info.region.rawValue)
+                    .font(.system(.caption, design: .rounded))
+                    .foregroundStyle(.secondary)
             }
 
-            if !emojiSummary.isEmpty {
-                Text(emojiSummary)
+            Spacer(minLength: 12)
+
+            VStack(alignment: .trailing, spacing: 2) {
+                Text(badgeTitle)
+                    .font(.system(.headline, design: .rounded).weight(.bold))
+                    .foregroundStyle(badgeTint)
+
+                Text(badgeSubtitle)
                     .font(.system(.caption2, design: .rounded))
-                    .multilineTextAlignment(.leading)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .foregroundStyle(.secondary)
             }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .background(badgeBackground, in: Capsule())
+        }
+        .padding(.horizontal, 2)
+    }
+}
 
-            Spacer(minLength: 0)
-        }
-        .padding(8)
-        .frame(minHeight: 84, alignment: .topLeading)
-        .background(backgroundFill)
-        .overlay {
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .strokeBorder(Color.white.opacity(summary.isToday ? 0.5 : 0.22), lineWidth: 1)
-        }
-        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+private struct CalendarSurface: ViewModifier {
+    func body(content: Content) -> some View {
+        content
+            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 30, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 30, style: .continuous)
+                    .strokeBorder(Color.white.opacity(0.65), lineWidth: 1)
+            }
+            .shadow(color: .black.opacity(0.06), radius: 24, y: 14)
+    }
+}
+
+private extension View {
+    func calendarSurface() -> some View {
+        modifier(CalendarSurface())
     }
 }
 
