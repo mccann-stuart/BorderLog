@@ -130,11 +130,17 @@ enum CalendarFlightParsing {
     private static func preprocessCandidateText(_ raw: String) -> String {
         guard !raw.isEmpty else { return "" }
 
-        let separators = CharacterSet(charactersIn: "\u{200B}\u{200C}\u{200D}\u{2060}\u{FEFF}")
-        let filteredScalars = raw.unicodeScalars.filter { !separators.contains($0) }
-        var value = String(String.UnicodeScalarView(filteredScalars))
-        value = value.replacingOccurrences(of: "\u{00A0}", with: " ")
-        return value
+        let scalars = raw.unicodeScalars.lazy.compactMap { scalar -> UnicodeScalar? in
+            switch scalar.value {
+            case 0x200B, 0x200C, 0x200D, 0x2060, 0xFEFF:
+                return nil
+            case 0x00A0:
+                return " "
+            default:
+                return scalar
+            }
+        }
+        return String(scalars)
     }
 
     private static func collapseWhitespace(_ raw: String) -> String {
