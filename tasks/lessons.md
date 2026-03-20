@@ -55,3 +55,7 @@
 ## UICalendarView Margin Assumption
 - **Pattern**: Assumed `UICalendarView` would honor `layoutMargins`/`directionalLayoutMargins` for its native month header and chevrons, but the screenshot showed those elements still rendering flush to the edges.
 - **Lesson**: For `UICalendarView`, prefer wrapping the calendar in a container view and constraining it with explicit horizontal insets when the whole control, including the native header, needs to move together.
+
+## Unknown Bucket Coverage
+- **Pattern**: Fixed country-count aggregation paths without also surfacing days whose `PresenceDay` exists but still resolves to no country, which hid part of the selected range from total-count views.
+- **Lesson**: Whenever a range summary buckets days by country, treat unresolved days as a first-class `Unknown` bucket with the same selection scope and drill-down behavior as the named-country rows.

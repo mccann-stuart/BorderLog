@@ -1,3 +1,24 @@
+# Task Plan (Unknown Summary Drill-Downs)
+
+- Spec: wherever aggregate day totals are shown for a selected range, expose an `Unknown` count when days in that same range have no resolved location.
+- Spec: tapping `Unknown` should open a filtered day list scoped to the current selection, using the existing day-detail flow.
+- Spec: keep the count/range logic aligned with the current Dashboard timeframe picker and Calendar Travel Summary range picker.
+- [x] Add unknown-day summary metadata for Calendar range snapshots.
+- [x] Update Dashboard Visited Countries and Calendar Travel Summary to surface unknown counts with drill-down navigation.
+- [x] Add regression coverage for Calendar unknown summary metadata and record the targeted verification blocker.
+- [x] Record the implementation and verification result.
+
+## Review (Unknown Summary Drill-Downs)
+
+- Root cause: aggregate country totals only rendered known-country buckets, so days with a persisted `PresenceDay` but no resolved country disappeared from Dashboard and Calendar summaries even though those same day records existed for drill-down.
+- Fix applied: Dashboard `Visited Countries` now collects timeframe-scoped unknown `PresenceDay` rows into an `Unknown` summary row that opens `FilteredLedgerView`, and Calendar `Travel Summary` now carries summary-range unknown day keys through `CalendarTabSnapshot` so the same drill-down works outside the visible month.
+- Regression coverage: added a `CalendarTabDataServiceTests` case that proves `summaryUnknownDayKeys` includes an unknown `PresenceDay` inside the selected summary range without polluting the visible-month day grid.
+- Verification: `git diff --check -- DashboardView.swift Learn/CalendarTabView.swift Shared/CalendarTabDataService.swift LearnTests/CalendarTabDataServiceTests.swift tasks/todo.md tasks/lessons.md` passed on March 20, 2026.
+- Verification blocker: `xcodebuild test -scheme Learn -destination 'platform=iOS Simulator,name=iPhone 17' -derivedDataPath /tmp/BorderLogDerivedData -only-testing:LearnTests/CalendarTabDataServiceTests` could not run because this machine currently reports no usable simulator runtimes (`Unable to discover any Simulator runtimes` / `Unable to find a device matching the provided destination specifier`).
+- Verification blocker: `xcodebuild build-for-testing -scheme Learn -destination 'generic/platform=iOS Simulator' -derivedDataPath /tmp/BorderLogDerivedData -only-testing:LearnTests/CalendarTabDataServiceTests` is also blocked in the current toolchain by a SwiftData macro/plugin failure in `Shared/Stay.swift` (`SwiftDataMacros.PersistentModelMacro ... produced malformed response`).
+
+---
+
 # Task Plan (Inference Canonical Country Resolution)
 
 - Spec: canonical country resolution must happen inside `PresenceInferenceEngine`, before `PresenceDay` results are persisted or consumed by downstream summaries.

@@ -101,6 +101,7 @@ struct CalendarTabSnapshot: Sendable {
     let visibleMonthStart: Date
     let daySummaries: [CalendarDaySummary]
     let countrySummaries: [CalendarCountryDaysSummary]
+    let summaryUnknownDayKeys: [String]
     let earliestAvailableMonth: Date
     let latestAvailableMonth: Date
 
@@ -123,6 +124,7 @@ struct CalendarTabSnapshot: Sendable {
             visibleMonthStart: normalizedMonthStart,
             daySummaries: daySummaries,
             countrySummaries: [],
+            summaryUnknownDayKeys: [],
             earliestAvailableMonth: normalizedMonthStart,
             latestAvailableMonth: latestMonth
         )
@@ -240,6 +242,14 @@ actor CalendarTabDataService {
             now: now,
             calendar: calendar
         )
+        let summaryUnknownDayKeys = makeSummaryUnknownDayKeys(
+            presenceDays: presenceDays,
+            summaryDayKeys: summaryDayRange.dayKeys,
+            summaryRange: summaryRange,
+            visibleMonthStart: normalizedVisibleMonth,
+            now: now,
+            calendar: calendar
+        )
 
         let earliestMonth = try fetchEarliestAvailableMonth(fallback: normalizedVisibleMonth, calendar: calendar)
         let latestMonth = Self.monthStart(for: now, calendar: calendar)
@@ -248,6 +258,7 @@ actor CalendarTabDataService {
             visibleMonthStart: normalizedVisibleMonth,
             daySummaries: daySummaries,
             countrySummaries: countrySummaries,
+            summaryUnknownDayKeys: summaryUnknownDayKeys,
             earliestAvailableMonth: earliestMonth,
             latestAvailableMonth: latestMonth
         )
@@ -501,6 +512,34 @@ actor CalendarTabDataService {
                 }
                 return lhs.totalDays > rhs.totalDays
             }
+    }
+
+    private func makeSummaryUnknownDayKeys(
+        presenceDays: [PresenceDay],
+        summaryDayKeys: [String],
+        summaryRange: CalendarCountrySummaryRange,
+        visibleMonthStart: Date,
+        now: Date,
+        calendar: Calendar
+    ) -> [String] {
+        let resolvedDayMap = Dictionary(uniqueKeysWithValues: presenceDays.map { ($0.dayKey, $0) })
+        var unknownDayKeys: [String] = []
+
+        for dayKey in summaryDayKeys {
+            guard summaryRange.contains(dayKey: dayKey, visibleMonthStart: visibleMonthStart, now: now, calendar: calendar),
+                  let resolvedDay = resolvedDayMap[dayKey] else {
+                continue
+            }
+
+            if Self.normalizedCountry(
+                countryCode: resolvedDay.countryCode,
+                countryName: resolvedDay.countryName
+            ) == nil {
+                unknownDayKeys.append(dayKey)
+            }
+        }
+
+        return unknownDayKeys
     }
 
     nonisolated fileprivate static func monthStart(for date: Date, calendar: Calendar) -> Date {

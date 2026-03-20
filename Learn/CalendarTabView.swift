@@ -44,6 +44,12 @@ struct CalendarTabView: View {
         }
     }
 
+    private var summaryUnknownDays: [PresenceDay] {
+        snapshot.summaryUnknownDayKeys
+            .compactMap { presenceDaysByKey[$0] }
+            .sorted { $0.date > $1.date }
+    }
+
     var body: some View {
         List {
             Section {
@@ -85,12 +91,20 @@ struct CalendarTabView: View {
             }
 
             Section {
-                if countryRows.isEmpty {
+                if countryRows.isEmpty && snapshot.summaryUnknownDayKeys.isEmpty {
                     Text("No country days found")
                         .foregroundStyle(.secondary)
                 } else {
                     ForEach(countryRows) { info in
                         CalendarCountrySummaryRow(info: info)
+                    }
+
+                    if !snapshot.summaryUnknownDayKeys.isEmpty {
+                        NavigationLink {
+                            FilteredLedgerView(days: summaryUnknownDays, title: "Unknown Days")
+                        } label: {
+                            UnknownDaysSummaryRow(count: snapshot.summaryUnknownDayKeys.count)
+                        }
                     }
                 }
             }
@@ -141,16 +155,21 @@ struct CalendarTabView: View {
             guard requestedMonth == visibleMonthStart, requestedRange == summaryRange else { return }
 
             snapshot = loadedSnapshot
-            loadPresenceDays(for: loadedSnapshot.daySummaries.map(\.dayKey))
+            loadPresenceDays(for: summaryPresenceDayKeys(from: loadedSnapshot))
         } catch {
             guard requestedMonth == visibleMonthStart, requestedRange == summaryRange else { return }
             loadError = error.localizedDescription
-            loadPresenceDays(for: snapshot.daySummaries.map(\.dayKey))
+            loadPresenceDays(for: summaryPresenceDayKeys(from: snapshot))
         }
 
         if requestedMonth == visibleMonthStart, requestedRange == summaryRange {
             isLoading = false
         }
+    }
+
+    private func summaryPresenceDayKeys(from snapshot: CalendarTabSnapshot) -> [String] {
+        let visibleMonthKeys = Set(snapshot.daySummaries.map(\.dayKey))
+        return Array(visibleMonthKeys.union(snapshot.summaryUnknownDayKeys)).sorted()
     }
 
     private func loadPresenceDays(for dayKeys: [String]) {

@@ -336,4 +336,56 @@ final class CalendarTabDataServiceTests: XCTestCase {
         let march16 = try XCTUnwrap(snapshot.daySummaries.first { $0.dayKey == "2026-03-16" })
         XCTAssertEqual(march16.countries.map(\.id), ["ES"])
     }
+
+    func testSnapshotTracksUnknownSummaryDaysForSelectedRange() async throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+
+        context.insert(
+            PresenceDay(
+                dayKey: "2025-10-01",
+                date: normalizedDate(for: "2025-10-01"),
+                timeZoneId: TimeZone.current.identifier,
+                countryCode: nil,
+                countryName: nil,
+                confidence: 0,
+                confidenceLabel: .low,
+                sources: .none,
+                isOverride: false,
+                stayCount: 0,
+                photoCount: 0,
+                locationCount: 0,
+                calendarCount: 0
+            )
+        )
+        context.insert(
+            PresenceDay(
+                dayKey: "2026-03-15",
+                date: normalizedDate(for: "2026-03-15"),
+                timeZoneId: TimeZone.current.identifier,
+                countryCode: "US",
+                countryName: localizedCountryName("US"),
+                confidence: 1,
+                confidenceLabel: .high,
+                sources: .location,
+                isOverride: false,
+                stayCount: 0,
+                photoCount: 0,
+                locationCount: 1,
+                calendarCount: 0
+            )
+        )
+        try context.save()
+
+        let service = CalendarTabDataService(modelContainer: container)
+        let snapshot = try await service.snapshot(
+            visibleMonthStart: makeDate(2026, 3, 1),
+            summaryRange: .last12Months,
+            now: makeDate(2026, 3, 19)
+        )
+
+        XCTAssertEqual(snapshot.summaryUnknownDayKeys, ["2025-10-01"])
+        XCTAssertEqual(snapshot.countrySummaries.map(\.id), ["US"])
+        XCTAssertNil(snapshot.daySummaries.first { $0.dayKey == "2025-10-01" })
+    }
 }
