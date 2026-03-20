@@ -39,3 +39,7 @@
 ## Responsive Calendar Grid
 - **Pattern**: Styled a seven-column calendar with fixed-size day content, which caused the month grid to push outside the safe area on smaller screens.
 - **Lesson**: For dense calendar layouts, size day cells from the available container width instead of assuming fixed dimensions; add safe-area-aware outer padding only after the internal grid is responsive.
+
+## Calendar Row Insets
+- **Pattern**: Removed all `List` row insets around a `UICalendarView`, which left the native calendar flush to the screen edge and visually outside the intended safe zone.
+- **Lesson**: When embedding wide UIKit content inside a SwiftUI `List`, do not default to `.listRowInsets(EdgeInsets())`; preserve or reintroduce small horizontal row insets unless truly edge-to-edge behavior is required and verified on device widths.

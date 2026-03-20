@@ -57,7 +57,7 @@ struct CalendarTabView: View {
                     }
                 )
                 .frame(minHeight: 450)
-                .listRowInsets(EdgeInsets())
+                .listRowInsets(EdgeInsets(top: 0, leading: 12, bottom: 0, trailing: 12))
                 .listRowBackground(Color.clear)
             }
             
