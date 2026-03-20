@@ -51,3 +51,7 @@
 ## Calendar Header Coverage
 - **Pattern**: Fixed the calendar body safe-area issue by changing only the row container and assumed the native `UICalendarView` header content would align automatically.
 - **Lesson**: When adjusting margins for embedded UIKit calendars, verify the month header and weekday subtitle row separately; prefer a single inset applied to the calendar surface itself when both header and grid need to move together.
+
+## UICalendarView Margin Assumption
+- **Pattern**: Assumed `UICalendarView` would honor `layoutMargins`/`directionalLayoutMargins` for its native month header and chevrons, but the screenshot showed those elements still rendering flush to the edges.
+- **Lesson**: For `UICalendarView`, prefer wrapping the calendar in a container view and constraining it with explicit horizontal insets when the whole control, including the native header, needs to move together.

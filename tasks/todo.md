@@ -9,12 +9,14 @@
 - Spec: keep the native `UICalendarView` and the existing 12pt calendar margin.
 - Spec: extend that same horizontal inset to the calendar header content, including the native month title and weekday subtitle row.
 - Spec: prefer the smallest layout change that affects the whole embedded calendar surface rather than adding separate ad hoc offsets.
-- [ ] Update the Calendar tab layout so the native calendar header and body share the same horizontal inset.
-- [ ] Run an app build and record the verification result.
+- [x] Update the Calendar tab layout so the native calendar header and body share the same horizontal inset.
+- [x] Stop before running builds/tests because the user explicitly requested a code-only change.
 
 ## Review (Calendar Header Safe Area Margins)
 
-- In progress.
+- Previous attempt failed: setting `UICalendarView` `layoutMargins` and `directionalLayoutMargins` did not move the native month header or chevrons.
+- Fix applied: embedded `UICalendarView` inside a container `UIView` and constrained it to the container’s 12pt horizontal `layoutMarginsGuide`, so the entire native calendar surface is inset together.
+- Verification: not run, per user instruction to avoid testing.
 
 ---
 

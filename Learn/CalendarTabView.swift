@@ -185,14 +185,12 @@ struct NativeCalendarView: UIViewRepresentable {
     let snapshot: CalendarTabSnapshot
     let onDateSelected: (String) -> Void
 
-    func makeUIView(context: Context) -> UICalendarView {
-        let calendarView = UICalendarView()
-        let horizontalInset: CGFloat = 12
+    func makeUIView(context: Context) -> CalendarContainerView {
+        let containerView = CalendarContainerView(horizontalInset: 12)
+        let calendarView = containerView.calendarView
         calendarView.calendar = Calendar.current
         calendarView.locale = Locale.current
         calendarView.fontDesign = .rounded
-        calendarView.layoutMargins = UIEdgeInsets(top: 0, left: horizontalInset, bottom: 0, right: horizontalInset)
-        calendarView.directionalLayoutMargins = NSDirectionalEdgeInsets(top: 0, leading: horizontalInset, bottom: 0, trailing: horizontalInset)
         calendarView.delegate = context.coordinator
         
         let selection = UICalendarSelectionSingleDate(delegate: context.coordinator)
@@ -200,17 +198,18 @@ struct NativeCalendarView: UIViewRepresentable {
         
         calendarView.visibleDateComponents = Calendar.current.dateComponents([.year, .month], from: visibleMonthStart)
 
-        return calendarView
+        return containerView
     }
 
-    func updateUIView(_ uiView: UICalendarView, context: Context) {
+    func updateUIView(_ uiView: CalendarContainerView, context: Context) {
+        let calendarView = uiView.calendarView
         context.coordinator.snapshot = snapshot
         
         // Sync visible date if it changed upstream
         let targetMonthComponent = Calendar.current.dateComponents([.year, .month], from: visibleMonthStart)
-        if uiView.visibleDateComponents.year != targetMonthComponent.year || 
-           uiView.visibleDateComponents.month != targetMonthComponent.month {
-            uiView.setVisibleDateComponents(targetMonthComponent, animated: true)
+        if calendarView.visibleDateComponents.year != targetMonthComponent.year || 
+           calendarView.visibleDateComponents.month != targetMonthComponent.month {
+            calendarView.setVisibleDateComponents(targetMonthComponent, animated: true)
         }
         
         // Reload decorations for displayed month
@@ -218,12 +217,37 @@ struct NativeCalendarView: UIViewRepresentable {
             let datesToReload = summaries.map { summary in
                 Calendar.current.dateComponents([.year, .month, .day], from: summary.date)
             }
-            uiView.reloadDecorations(forDateComponents: datesToReload, animated: true)
+            calendarView.reloadDecorations(forDateComponents: datesToReload, animated: true)
         }
     }
 
     func makeCoordinator() -> Coordinator {
         Coordinator(self, visibleMonthStart: $visibleMonthStart, onDateSelected: onDateSelected)
+    }
+
+    final class CalendarContainerView: UIView {
+        let calendarView = UICalendarView()
+
+        init(horizontalInset: CGFloat) {
+            super.init(frame: .zero)
+            layoutMargins = UIEdgeInsets(top: 0, left: horizontalInset, bottom: 0, right: horizontalInset)
+            directionalLayoutMargins = NSDirectionalEdgeInsets(top: 0, leading: horizontalInset, bottom: 0, trailing: horizontalInset)
+
+            addSubview(calendarView)
+            calendarView.translatesAutoresizingMaskIntoConstraints = false
+
+            NSLayoutConstraint.activate([
+                calendarView.leadingAnchor.constraint(equalTo: layoutMarginsGuide.leadingAnchor),
+                calendarView.trailingAnchor.constraint(equalTo: layoutMarginsGuide.trailingAnchor),
+                calendarView.topAnchor.constraint(equalTo: topAnchor),
+                calendarView.bottomAnchor.constraint(equalTo: bottomAnchor)
+            ])
+        }
+
+        @available(*, unavailable)
+        required init?(coder: NSCoder) {
+            fatalError("init(coder:) has not been implemented")
+        }
     }
 
     class Coordinator: NSObject, UICalendarViewDelegate, UICalendarSelectionSingleDateDelegate {
