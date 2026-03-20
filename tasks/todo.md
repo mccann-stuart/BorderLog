@@ -1,3 +1,23 @@
+# Task Plan (Resolved Country Normalization)
+
+- Spec: treat a resolved country name and its ISO country code as the same country identity everywhere counts, flags, and map totals are computed.
+- Spec: when a `PresenceDay` has a resolved country name but no stored code, derive the canonical country code for summaries, flags, map coverage, country drill-downs, and Schengen counting.
+- Spec: calendar day decorations should prefer the resolved `PresenceDay` country when available, so a day with a Summary location shows a flag even if raw evidence is empty.
+- [x] Add a shared canonical country-resolution helper for code-or-name inputs.
+- [x] Apply the canonical country resolution to dashboard totals, country detail filtering, Schengen totals, and calendar snapshot output.
+- [x] Add regression coverage for name-only resolved days contributing to coded totals and flags.
+- [x] Run targeted verification and record the outcome.
+
+## Review (Resolved Country Normalization)
+
+- Root cause: resolved days with `countryName` but no `countryCode` were treated as a separate country identity, which split totals, dropped those days from flag/map views, and left calendar decorations blank even when the day Summary had a location.
+- Fix applied: added canonical country resolution from either code or name, then used it in dashboard visited-country aggregation, country detail filtering, Schengen counting, row flag rendering, and calendar snapshot summaries.
+- Calendar behavior change: month day decorations now prefer the resolved `PresenceDay` country when one exists, so inferred/name-only days show a flag that matches the Summary result while still preserving raw flight markers.
+- Regression coverage: expanded `CalendarTabDataServiceTests` to verify name-only resolved days still show an `ES` flag and merge into coded `ES` totals, and added a `SchengenLedgerCalculatorTests` case for a name-only Schengen day.
+- Verification: `xcodebuild test -scheme Learn -destination 'platform=iOS Simulator,name=iPhone 17' -derivedDataPath /tmp/BorderLogDerivedData -only-testing:LearnTests/CalendarTabDataServiceTests -only-testing:LearnTests/SchengenLedgerCalculatorTests` succeeded on March 20, 2026. Existing unrelated Swift 6 isolation warnings in `CountryResolver.swift` and `CalendarTabDataService.swift` remain.
+
+---
+
 # Task Plan (Bridge-Day Presence Counts)
 
 - Spec: treat the resolved `PresenceDay` location as the source of truth for counting visited-country totals, including inferred bridge days with no direct stay, calendar, photo, or location evidence.

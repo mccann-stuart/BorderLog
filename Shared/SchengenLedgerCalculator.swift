@@ -45,7 +45,10 @@ enum SchengenLedgerCalculator {
             if day.date >= windowStart && day.date <= windowEnd {
                 if day.countryCode != nil || day.countryName != nil {
                     knownDays += 1
-                    if let code = day.countryCode, SchengenMembers.isMember(code) {
+                    if let code = CountryCodeNormalizer.canonicalCode(
+                        countryCode: day.countryCode,
+                        countryName: day.countryName
+                    ), SchengenMembers.isMember(code) {
                         schengenDays += 1
                     }
                 }

@@ -115,6 +115,7 @@ struct CalendarTabSnapshot: Sendable {
         let daySummaries = CalendarTabDataService.makeMonthDaySummaries(
             for: normalizedMonthStart,
             accumulators: [:],
+            presenceDays: [],
             calendar: calendar,
             now: now
         )
@@ -225,6 +226,7 @@ actor CalendarTabDataService {
         let daySummaries = Self.makeMonthDaySummaries(
             for: normalizedVisibleMonth,
             accumulators: accumulators,
+            presenceDays: presenceDays,
             calendar: calendar,
             now: now
         )
@@ -368,7 +370,7 @@ actor CalendarTabDataService {
         countryName: String?
     ) {
         guard var accumulator = accumulators[dayKey],
-              let country = normalizedCountry(countryCode: countryCode, countryName: countryName) else {
+              let country = Self.normalizedCountry(countryCode: countryCode, countryName: countryName) else {
             return
         }
         accumulator.countriesByID[country.id] = country
@@ -414,20 +416,18 @@ actor CalendarTabDataService {
         }
     }
 
-    private func normalizedCountry(
+    private nonisolated static func normalizedCountry(
         countryCode: String?,
         countryName: String?
     ) -> CalendarDayCountry? {
-        let normalizedCode = CountryCodeNormalizer.normalize(countryCode)
-        let trimmedName = countryName?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-        guard normalizedCode != nil || !trimmedName.isEmpty else { return nil }
-
-        let resolvedName: String
-        if !trimmedName.isEmpty {
-            resolvedName = trimmedName
-        } else if let normalizedCode {
-            resolvedName = Locale.current.localizedString(forRegionCode: normalizedCode) ?? normalizedCode
-        } else {
+        let normalizedCode = CountryCodeNormalizer.canonicalCode(
+            countryCode: countryCode,
+            countryName: countryName
+        )
+        guard let resolvedName = CountryCodeNormalizer.canonicalName(
+            countryCode: normalizedCode,
+            countryName: countryName
+        ) ?? normalizedCode else {
             return nil
         }
 
@@ -466,7 +466,7 @@ actor CalendarTabDataService {
             }
 
             if let resolvedDay = resolvedDayMap[dayKey] {
-                guard let country = normalizedCountry(
+                guard let country = Self.normalizedCountry(
                     countryCode: resolvedDay.countryCode,
                     countryName: resolvedDay.countryName
                 ) else {
@@ -564,17 +564,28 @@ actor CalendarTabDataService {
     nonisolated fileprivate static func makeMonthDaySummaries(
         for visibleMonthStart: Date,
         accumulators: [String: DayAccumulator],
+        presenceDays: [PresenceDay],
         calendar: Calendar,
         now: Date
     ) -> [CalendarDaySummary] {
         let monthRange = makeMonthRange(for: visibleMonthStart, calendar: calendar)
         let todayKey = DayKey.make(from: now, timeZone: calendar.timeZone)
+        let resolvedDayMap = Dictionary(uniqueKeysWithValues: presenceDays.map { ($0.dayKey, $0) })
 
         return monthRange.dayKeys.compactMap { dayKey in
             guard let date = DayKey.date(for: dayKey, timeZone: calendar.timeZone) else { return nil }
-            let countries = accumulators[dayKey]?.countriesByID.values.sorted { lhs, rhs in
-                lhs.countryName.localizedCaseInsensitiveCompare(rhs.countryName) == .orderedAscending
-            } ?? []
+            let countries: [CalendarDayCountry]
+            if let resolvedDay = resolvedDayMap[dayKey],
+               let resolvedCountry = Self.normalizedCountry(
+                countryCode: resolvedDay.countryCode,
+                countryName: resolvedDay.countryName
+               ) {
+                countries = [resolvedCountry]
+            } else {
+                countries = accumulators[dayKey]?.countriesByID.values.sorted { lhs, rhs in
+                    lhs.countryName.localizedCaseInsensitiveCompare(rhs.countryName) == .orderedAscending
+                } ?? []
+            }
             return CalendarDaySummary(
                 dayKey: dayKey,
                 date: date,

@@ -36,6 +36,10 @@ final class CalendarTabDataServiceTests: XCTestCase {
         DayKey.date(for: dayKey, timeZone: timeZone) ?? Date()
     }
 
+    private func localizedCountryName(_ code: String) -> String {
+        Locale.autoupdatingCurrent.localizedString(forRegionCode: code) ?? code
+    }
+
     func testSnapshotDedupesCountriesPerDayAndMarksFlights() async throws {
         let container = try makeContainer()
         let context = container.mainContext
@@ -238,14 +242,15 @@ final class CalendarTabDataServiceTests: XCTestCase {
         let context = container.mainContext
         let bridgeDayKey = "2026-03-16"
         let bridgeDate = normalizedDate(for: bridgeDayKey)
+        let spainName = localizedCountryName("ES")
 
         context.insert(
             PresenceDay(
                 dayKey: bridgeDayKey,
                 date: bridgeDate,
                 timeZoneId: TimeZone.current.identifier,
-                countryCode: "ES",
-                countryName: "Spain",
+                countryCode: nil,
+                countryName: spainName,
                 confidence: 0.5,
                 confidenceLabel: .medium,
                 sources: .none,
@@ -266,11 +271,69 @@ final class CalendarTabDataServiceTests: XCTestCase {
         )
 
         let bridgeDay = try XCTUnwrap(snapshot.daySummaries.first { $0.dayKey == bridgeDayKey })
-        XCTAssertTrue(bridgeDay.countries.isEmpty)
+        XCTAssertEqual(bridgeDay.countries.map(\.id), ["ES"])
+        XCTAssertEqual(bridgeDay.countries.first?.countryCode, "ES")
 
         let totals = Dictionary(uniqueKeysWithValues: snapshot.countrySummaries.map { ($0.id, $0) })
-        XCTAssertEqual(totals["ES"]?.countryName, "Spain")
+        XCTAssertEqual(totals["ES"]?.countryName, spainName)
         XCTAssertEqual(totals["ES"]?.totalDays, 1)
         XCTAssertEqual(snapshot.countrySummaries.count, 1)
+    }
+
+    func testSnapshotMergesNameOnlyResolvedDaysIntoCodedCountrySummary() async throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let spainName = localizedCountryName("ES")
+
+        context.insert(
+            PresenceDay(
+                dayKey: "2026-03-15",
+                date: normalizedDate(for: "2026-03-15"),
+                timeZoneId: TimeZone.current.identifier,
+                countryCode: "ES",
+                countryName: spainName,
+                confidence: 1,
+                confidenceLabel: .high,
+                sources: .location,
+                isOverride: false,
+                stayCount: 0,
+                photoCount: 0,
+                locationCount: 1,
+                calendarCount: 0
+            )
+        )
+        context.insert(
+            PresenceDay(
+                dayKey: "2026-03-16",
+                date: normalizedDate(for: "2026-03-16"),
+                timeZoneId: TimeZone.current.identifier,
+                countryCode: nil,
+                countryName: spainName,
+                confidence: 0.5,
+                confidenceLabel: .medium,
+                sources: .none,
+                isOverride: false,
+                stayCount: 0,
+                photoCount: 0,
+                locationCount: 0,
+                calendarCount: 0
+            )
+        )
+        try context.save()
+
+        let service = CalendarTabDataService(modelContainer: container)
+        let snapshot = try await service.snapshot(
+            visibleMonthStart: makeDate(2026, 3, 1),
+            summaryRange: .visibleMonth,
+            now: makeDate(2026, 3, 19)
+        )
+
+        XCTAssertEqual(snapshot.countrySummaries.count, 1)
+        XCTAssertEqual(snapshot.countrySummaries.first?.id, "ES")
+        XCTAssertEqual(snapshot.countrySummaries.first?.countryName, spainName)
+        XCTAssertEqual(snapshot.countrySummaries.first?.totalDays, 2)
+
+        let march16 = try XCTUnwrap(snapshot.daySummaries.first { $0.dayKey == "2026-03-16" })
+        XCTAssertEqual(march16.countries.map(\.id), ["ES"])
     }
 }

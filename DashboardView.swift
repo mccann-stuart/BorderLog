@@ -65,8 +65,16 @@ struct DashboardView: View {
                 continue
             }
 
-            guard let countryName = day.countryName ?? day.countryCode else { continue }
-            let normalizedCode = CountryCodeNormalizer.normalize(day.countryCode)
+            let normalizedCode = CountryCodeNormalizer.canonicalCode(
+                countryCode: day.countryCode,
+                countryName: day.countryName
+            )
+            guard let countryName = CountryCodeNormalizer.canonicalName(
+                countryCode: normalizedCode,
+                countryName: day.countryName
+            ) ?? normalizedCode else {
+                continue
+            }
             let key = normalizedCode ?? countryName
 
             if countryDict[key] != nil {

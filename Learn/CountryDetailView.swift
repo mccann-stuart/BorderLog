@@ -28,7 +28,14 @@ struct CountryDetailView: View {
     // ⚡ Bolt: Single-pass iteration to filter country and timeframe simultaneously,
     // without creating intermediate arrays (`countryDays`).
     private var filteredCountryDays: [PresenceDay] {
-        let normalizedTarget = CountryCodeNormalizer.normalize(countryCode)
+        let normalizedTarget = CountryCodeNormalizer.canonicalCode(
+            countryCode: countryCode,
+            countryName: countryName
+        )
+        let canonicalTargetName = CountryCodeNormalizer.canonicalName(
+            countryCode: countryCode,
+            countryName: countryName
+        ) ?? countryName
         var results: [PresenceDay] = []
 
         let now = Date()
@@ -42,12 +49,19 @@ struct CountryDetailView: View {
                 break // Early exit: we have evaluated everything inside our window
             }
 
-            let normalizedDay = CountryCodeNormalizer.normalize(day.countryCode)
+            let normalizedDay = CountryCodeNormalizer.canonicalCode(
+                countryCode: day.countryCode,
+                countryName: day.countryName
+            )
             let matchesCountry: Bool
             if let target = normalizedTarget, let code = normalizedDay {
                 matchesCountry = (target == code)
             } else {
-                matchesCountry = ((day.countryName ?? "") == countryName)
+                let canonicalDayName = CountryCodeNormalizer.canonicalName(
+                    countryCode: day.countryCode,
+                    countryName: day.countryName
+                ) ?? ""
+                matchesCountry = (canonicalDayName == canonicalTargetName)
             }
 
             if matchesCountry {
@@ -69,7 +83,10 @@ struct CountryDetailView: View {
     }
 
     private var countryConfig: CountryConfig? {
-        let key = CountryCodeNormalizer.normalize(countryCode) ?? countryName
+        let key = CountryCodeNormalizer.canonicalCode(
+            countryCode: countryCode,
+            countryName: countryName
+        ) ?? countryName
         return allCountryConfigs.first { $0.countryCode == key }
     }
 
@@ -140,7 +157,10 @@ struct CountryDetailView: View {
     }
 
     private func saveConfig(newValue: String) {
-        let key = CountryCodeNormalizer.normalize(countryCode) ?? countryName
+        let key = CountryCodeNormalizer.canonicalCode(
+            countryCode: countryCode,
+            countryName: countryName
+        ) ?? countryName
         let parsedDays = Int(newValue)
 
         if let existing = countryConfig {

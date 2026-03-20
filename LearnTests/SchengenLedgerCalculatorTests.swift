@@ -37,5 +37,28 @@ final class SchengenLedgerCalculatorTests: XCTestCase {
         XCTAssertEqual(summary.usedDays, 1)
         XCTAssertEqual(summary.unknownDays, 179)
     }
+
+    func testSchengenLedgerCountsNameOnlySchengenDay() {
+        let ref = day(2026, 2, 15)
+        let spainName = Locale.autoupdatingCurrent.localizedString(forRegionCode: "ES") ?? "Spain"
+        let day1 = PresenceDay(
+            dayKey: "2026-02-15",
+            date: ref,
+            timeZoneId: calendar.timeZone.identifier,
+            countryCode: nil,
+            countryName: spainName,
+            confidence: 0.9,
+            confidenceLabel: .medium,
+            sources: .none,
+            isOverride: false,
+            stayCount: 0,
+            photoCount: 0,
+            locationCount: 0
+        )
+
+        let summary = SchengenLedgerCalculator.summary(for: [day1], asOf: ref, calendar: calendar)
+        XCTAssertEqual(summary.usedDays, 1)
+        XCTAssertEqual(summary.unknownDays, 179)
+    }
 }
 #endif

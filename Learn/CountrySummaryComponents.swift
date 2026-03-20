@@ -34,11 +34,15 @@ struct CountryDaysInfo: Identifiable {
     var maxAllowedDays: Int?
 
     var id: String {
-        CountryCodeNormalizer.normalize(countryCode) ?? countryName
+        CountryCodeNormalizer.canonicalCode(countryCode: countryCode, countryName: countryName)
+            ?? CountryCodeNormalizer.canonicalName(countryCode: countryCode, countryName: countryName)
+            ?? countryName
     }
 
     var flagEmoji: String {
-        guard let code = countryCode?.uppercased() else { return "🌍" }
+        guard let code = CountryCodeNormalizer.canonicalCode(countryCode: countryCode, countryName: countryName) else {
+            return "🌍"
+        }
         return countryCodeToEmoji(code)
     }
 }
