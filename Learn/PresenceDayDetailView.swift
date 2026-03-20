@@ -155,11 +155,7 @@ struct PresenceDayDetailView: View {
                 }
             }
 
-            EvidenceSection(
-                dayKey: day.dayKey,
-                date: day.date,
-                dayTimeZoneId: day.timeZoneId
-            )
+            EvidenceSection(day: day)
         }
         .navigationTitle("Day Details")
         .navigationBarTitleDisplayMode(.inline)
@@ -267,9 +263,7 @@ struct PresenceDayDetailView: View {
 
 
 private struct EvidenceSection: View {
-    let dayKey: String
-    let date: Date
-    let dayTimeZoneId: String?
+    let day: PresenceDay
     
     @Environment(\.modelContext) private var modelContext
 
@@ -279,13 +273,7 @@ private struct EvidenceSection: View {
     @State private var calendarSignals: [CalendarSignal] = []
     
     private var dayTimeZone: TimeZone {
-        DayIdentity.canonicalTimeZone(preferredTimeZoneId: dayTimeZoneId)
-    }
-
-    init(dayKey: String, date: Date, dayTimeZoneId: String?) {
-        self.dayKey = dayKey
-        self.date = date
-        self.dayTimeZoneId = dayTimeZoneId
+        DayIdentity.canonicalTimeZone(preferredTimeZoneId: day.timeZoneId)
     }
     
     var body: some View {
@@ -397,16 +385,27 @@ private struct EvidenceSection: View {
             }
         }
         .onAppear { loadData() }
-        .onChange(of: dayKey) { loadData() }
-        .onChange(of: date) { loadData() }
-        .onChange(of: dayTimeZoneId) { loadData() }
+        .onChange(of: day.dayKey) { loadData() }
+        .onChange(of: day.date) { loadData() }
+        .onChange(of: day.timeZoneId) { loadData() }
+        .onChange(of: day.countryCode) { loadData() }
+        .onChange(of: day.countryName) { loadData() }
+        .onChange(of: day.calendarCount) { loadData() }
+        .onChange(of: day.sourcesRaw) { loadData() }
     }
     
     private func loadData() {
+        let selectedDayKey = day.dayKey
+        let selectedTimeZoneId = day.timeZoneId
+        let selectedCountryCode = day.countryCode
+        let selectedCountryName = day.countryName
+        let selectedCalendarCount = day.calendarCount
+        let selectedSources = day.sources
+
         // Locations for this dayKey, sorted by timestamp
         do {
             let locPredicate = #Predicate<LocationSample> { target in
-                target.dayKey == dayKey
+                target.dayKey == selectedDayKey
             }
             var locFetch = FetchDescriptor<LocationSample>(predicate: locPredicate)
             locFetch.sortBy = [SortDescriptor(\.timestamp, order: .forward)]
@@ -418,7 +417,7 @@ private struct EvidenceSection: View {
         // Photos for this dayKey, sorted by timestamp
         do {
             let photoPredicate = #Predicate<PhotoSignal> { target in
-                target.dayKey == dayKey
+                target.dayKey == selectedDayKey
             }
             var photoFetch = FetchDescriptor<PhotoSignal>(predicate: photoPredicate)
             photoFetch.sortBy = [SortDescriptor(\.timestamp, order: .forward)]
@@ -429,12 +428,37 @@ private struct EvidenceSection: View {
 
         // Calendar signals for this dayKey, sorted by timestamp
         do {
-            let calPredicate = #Predicate<CalendarSignal> { target in
-                target.dayKey == dayKey
+            let sameDayPredicate = #Predicate<CalendarSignal> { target in
+                target.dayKey == selectedDayKey
             }
-            var calFetch = FetchDescriptor<CalendarSignal>(predicate: calPredicate)
-            calFetch.sortBy = [SortDescriptor(\.timestamp, order: .forward)]
-            calendarSignals = try modelContext.fetch(calFetch)
+            var sameDayFetch = FetchDescriptor<CalendarSignal>(predicate: sameDayPredicate)
+            sameDayFetch.sortBy = [SortDescriptor(\.timestamp, order: .forward)]
+            let sameDaySignals = try modelContext.fetch(sameDayFetch)
+
+            let adjacentSignals: [CalendarSignal]
+            let adjacentDayKeys = CalendarEvidenceResolver.adjacentDayKeys(
+                for: selectedDayKey,
+                dayTimeZoneId: selectedTimeZoneId
+            )
+            if adjacentDayKeys.isEmpty {
+                adjacentSignals = []
+            } else {
+                let adjacentPredicate = #Predicate<CalendarSignal> { target in
+                    adjacentDayKeys.contains(target.dayKey)
+                }
+                var adjacentFetch = FetchDescriptor<CalendarSignal>(predicate: adjacentPredicate)
+                adjacentFetch.sortBy = [SortDescriptor(\.timestamp, order: .forward)]
+                adjacentSignals = try modelContext.fetch(adjacentFetch)
+            }
+
+            calendarSignals = CalendarEvidenceResolver.resolve(
+                sameDaySignals: sameDaySignals,
+                adjacentSignals: adjacentSignals,
+                dayCountryCode: selectedCountryCode,
+                dayCountryName: selectedCountryName,
+                calendarCount: selectedCalendarCount,
+                sources: selectedSources
+            )
         } catch {
             calendarSignals = []
         }
@@ -442,8 +466,8 @@ private struct EvidenceSection: View {
         // Stays sorted by enteredOn, reverse order
         do {
             let window = DayIdentity.dayWindow(
-                dayKey: dayKey,
-                dayTimeZoneId: dayTimeZoneId,
+                dayKey: selectedDayKey,
+                dayTimeZoneId: selectedTimeZoneId,
                 fallback: dayTimeZone
             )
             let startOfDay = window.start

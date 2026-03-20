@@ -71,3 +71,7 @@
 ## Flight Day-Key Equality Trap
 - **Pattern**: Used `origin.dayKey != destination.dayKey` as the gate for preserving origin-flight context, which dropped valid origin evidence for timezone-crossing flights that still resolved to the same string day key.
 - **Lesson**: Do not use day-key equality as the proxy for whether a destination-based flight needs origin context. Preserve the origin-side signal whenever the origin resolves, then keep it out of the base winner and apply it only in the targeted inference pass that backfills the flight day and previous unknown day.
+
+## Same-Day Evidence Fetch Assumption
+- **Pattern**: Fixed flight-day inference but left the day-detail evidence loader fetching calendar rows only by the selected day’s `dayKey`, so adjacent inferred days still rendered `No calendar evidence` even though their calendar-derived evidence existed on the neighboring flight day.
+- **Lesson**: When a day can inherit calendar evidence from an adjacent flight signal, day-detail evidence loading must resolve linked adjacent-day signals instead of assuming all supporting `CalendarSignal` rows share the selected day’s key.

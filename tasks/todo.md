@@ -1,3 +1,23 @@
+# Task Plan (Adjacent Flight Event Evidence)
+
+- Spec: when a day is inferred from a flight on the immediately next or previous day, the inferred day should still show that flight in the Calendar Events evidence section instead of appearing to have no calendar evidence.
+- Spec: preserve the current destination-day and origin-day inference rules without duplicating unrelated calendar events onto adjacent days.
+- Spec: fix the data flow so the linked flight evidence survives recompute and appears consistently in day details and any other evidence-driven surfaces.
+- [x] Inspect the calendar-signal, inference, and day-detail evidence paths to find where adjacent inferred days lose their source flight event.
+- [x] Patch the model/view pipeline so adjacent inferred flight days carry a linked calendar event reference.
+- [x] Add focused regression coverage and record verification results or blockers.
+
+## Review (Adjacent Flight Event Evidence)
+
+- Root cause: `PresenceDayDetailView` fetched calendar evidence strictly by the selected day’s `dayKey`, but adjacent inferred flight days do not have a same-day `CalendarSignal`; their evidence lives on the neighboring flight day, so the detail screen showed `No calendar evidence` even when the day itself was calendar-derived.
+- Fix applied: added `CalendarEvidenceResolver` to load same-day calendar signals first, then fall back to adjacent-day flight evidence only when the selected day is calendar-derived and lacks same-day signals; it prefers `CalendarFlightOrigin` signals and falls back narrowly to adjacent regular calendar signals that match the inferred country.
+- UI behavior change: day details now show the adjacent flight event that caused the inference instead of an empty calendar evidence section for those inferred previous/next days.
+- Regression coverage: added `CalendarEvidenceResolverTests` for adjacent origin-signal recovery, unknown-day fallback, same-day precedence, and bounded fallback to adjacent regular calendar signals.
+- Verification: `git diff --check -- Learn/PresenceDayDetailView.swift Shared/CalendarEvidenceResolver.swift LearnTests/CalendarEvidenceResolverTests.swift tasks/todo.md` passed on March 20, 2026.
+- Verification blocker: `xcodebuild build-for-testing -scheme Learn -destination 'generic/platform=iOS Simulator' -derivedDataPath /tmp/BorderLogDerivedData -only-testing:LearnTests/CalendarEvidenceResolverTests` still fails in this environment before test execution because CoreSimulator cannot discover usable runtimes and SwiftData macro expansion is already failing in `Shared/Stay.swift` (`SwiftDataMacros.PersistentModelMacro ... produced malformed response`).
+
+---
+
 # Task Plan (Flight-Origin Same-Day Regression)
 
 - Spec: preserve destination-based flight inference while restoring origin-country backfill for routes whose origin and destination still resolve to the same string `dayKey`.
