@@ -32,6 +32,26 @@ struct CalendarSignalInfo: Sendable {
     let countryName: String
     let timeZoneId: String?
     let bucketingTimeZoneId: String?
+    let eventIdentifier: String?
+    let source: String?
+
+    init(
+        dayKey: String,
+        countryCode: String?,
+        countryName: String,
+        timeZoneId: String?,
+        bucketingTimeZoneId: String?,
+        eventIdentifier: String? = nil,
+        source: String? = nil
+    ) {
+        self.dayKey = dayKey
+        self.countryCode = countryCode
+        self.countryName = countryName
+        self.timeZoneId = timeZoneId
+        self.bucketingTimeZoneId = bucketingTimeZoneId
+        self.eventIdentifier = eventIdentifier
+        self.source = source
+    }
 }
 
 struct LocationSignalInfo: Sendable {

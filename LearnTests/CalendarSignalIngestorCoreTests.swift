@@ -91,6 +91,38 @@ final class CalendarSignalIngestorCoreTests: XCTestCase {
         XCTAssertTrue(selection.usesCoordinate)
     }
 
+    func testShouldPersistOriginSignalForOvernightDestinationFlight() async throws {
+        let ingestor = try makeIngestor()
+        let start = Date(timeIntervalSince1970: 1_000)
+        let end = Date(timeIntervalSince1970: 90_000)
+
+        let shouldPersist = await ingestor.testShouldPersistOriginSignal(
+            originDayKey: "2026-03-09",
+            destinationDayKey: "2026-03-10",
+            eventStartDate: start,
+            eventEndDate: end,
+            eventTimeZoneId: "Europe/London"
+        )
+
+        XCTAssertTrue(shouldPersist)
+    }
+
+    func testDoesNotPersistOriginSignalWhenDestinationResolvesToSameDay() async throws {
+        let ingestor = try makeIngestor()
+        let start = Date(timeIntervalSince1970: 1_000)
+        let end = Date(timeIntervalSince1970: 2_000)
+
+        let shouldPersist = await ingestor.testShouldPersistOriginSignal(
+            originDayKey: "2026-03-09",
+            destinationDayKey: "2026-03-09",
+            eventStartDate: start,
+            eventEndDate: end,
+            eventTimeZoneId: "Europe/London"
+        )
+
+        XCTAssertFalse(shouldPersist)
+    }
+
     func testDestinationFirstLegacyEndCleanupRemovesStaleEndSignal() async throws {
         let ingestor = try makeIngestor()
         let resolved = CalendarSignalIngestor.ResolvedCalendarSignal(

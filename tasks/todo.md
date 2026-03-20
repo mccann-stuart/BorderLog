@@ -18,6 +18,26 @@
 
 ---
 
+# Task Plan (Flight-Origin Backfill)
+
+- Spec: preserve the existing destination-day flight inference for calendar events and add origin-country context only where it improves unknown-day recovery.
+- Spec: when an overnight flight has a known origin country, treat the departure day and the immediately previous unknown day as that origin country with medium confidence.
+- Spec: do not create same-day origin/destination conflicts for ordinary same-day flights.
+- [x] Patch calendar flight ingestion to preserve overnight origin-country context without regressing the current destination-day behavior.
+- [x] Update inference to promote overnight origin-flight departure days and the previous unknown day to medium confidence.
+- [x] Add focused regression coverage and run targeted verification, recording blockers if the environment still prevents xcodebuild.
+
+## Review (Flight-Origin Backfill)
+
+- Root cause: destination-first calendar ingestion preserved the arrival country for overnight flights but dropped the origin-country context entirely, so the departure day stayed low-confidence or unknown and the immediately previous unknown day had nothing flight-based to inherit.
+- Fix applied: overnight destination-based flights now persist a second calendar signal on the departure day with source `CalendarFlightOrigin`, and `PresenceInferenceEngine` uses that origin signal to promote the departure day plus the immediately previous unknown day to medium-confidence calendar-based results.
+- Regression coverage: added `InferenceEngineTests.testOvernightOriginFlightPromotesDepartureDayAndPreviousUnknownDay` and `CalendarSignalIngestorCoreTests` coverage for keeping origin signals only when the flight actually spans into a different day.
+- Verification: `git diff --check -- Shared/SignalTypes.swift Shared/LedgerRecomputeService.swift Shared/CalendarSignalIngestor.swift Shared/PresenceInferenceEngine.swift LearnTests/InferenceEngineTests.swift LearnTests/CalendarSignalIngestorCoreTests.swift tasks/todo.md tasks/lessons.md` passed on March 20, 2026.
+- Verification blocker: `xcodebuild test -scheme Learn -destination 'platform=iOS Simulator,name=iPhone 17' -derivedDataPath /tmp/BorderLogDerivedData -only-testing:LearnTests/InferenceEngineTests -only-testing:LearnTests/CalendarSignalIngestorCoreTests` could not run because this machine currently reports no usable simulator runtimes (`Unable to discover any Simulator runtimes` / `Unable to find a device matching the provided destination specifier`).
+- Verification blocker: `xcodebuild build-for-testing -scheme Learn -destination 'generic/platform=iOS Simulator' -derivedDataPath /tmp/BorderLogDerivedData -only-testing:LearnTests/InferenceEngineTests -only-testing:LearnTests/CalendarSignalIngestorCoreTests` is blocked in the current toolchain by a SwiftData macro/plugin failure in `Shared/Stay.swift` (`SwiftDataMacros.PersistentModelMacro ... produced malformed response`).
+
+---
+
 # Task Plan (Unknown Summary Drill-Downs)
 
 - Spec: wherever aggregate day totals are shown for a selected range, expose an `Unknown` count when days in that same range have no resolved location.

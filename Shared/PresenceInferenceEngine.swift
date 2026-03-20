@@ -95,6 +95,56 @@ struct PresenceInferenceEngine {
             resolvedCountry(for: result) != nil
         }
 
+        func isOvernightOriginFlightSignal(_ signal: CalendarSignalInfo) -> Bool {
+            if signal.source == "CalendarFlightOrigin" {
+                return true
+            }
+            return signal.eventIdentifier?.hasSuffix("#origin") == true
+        }
+
+        func shouldPromoteDepartureDay(
+            _ result: PresenceDayResult,
+            to originCountry: ResolvedCountry
+        ) -> Bool {
+            guard let currentCountry = resolvedCountry(for: result) else {
+                return true
+            }
+
+            return currentCountry.id == originCountry.id &&
+                result.confidenceLabel == .low &&
+                result.sources == .calendar &&
+                result.stayCount == 0 &&
+                result.photoCount == 0 &&
+                result.locationCount == 0
+        }
+
+        func promotedCalendarAssumption(
+            from result: PresenceDayResult,
+            country: ResolvedCountry,
+            timeZoneId: String?,
+            calendarCount: Int
+        ) -> PresenceDayResult {
+            var sources = result.sources
+            sources.formUnion(.calendar)
+
+            return PresenceDayResult(
+                dayKey: result.dayKey,
+                date: result.date,
+                timeZoneId: timeZoneId ?? result.timeZoneId,
+                countryCode: country.code,
+                countryName: country.name,
+                confidence: max(result.confidence, 0.5),
+                confidenceLabel: .medium,
+                sources: sources,
+                isOverride: false,
+                isDisputed: false,
+                stayCount: result.stayCount,
+                photoCount: result.photoCount,
+                locationCount: result.locationCount,
+                calendarCount: max(result.calendarCount, calendarCount)
+            )
+        }
+
         func addScore(
             dayKey: String,
             countryCode: String?,
@@ -432,6 +482,41 @@ struct PresenceInferenceEngine {
         }
 
         var sortedResults = results.sorted { $0.date < $1.date }
+        var overnightOriginFlightsByDayKey: [String: (country: ResolvedCountry, count: Int)] = [:]
+
+        do {
+            var groupedOriginFlights: [String: [String: (country: ResolvedCountry, count: Int)]] = [:]
+            for signal in calendarSignals where isOvernightOriginFlightSignal(signal) {
+                guard let country = resolvedCountry(
+                    countryCode: signal.countryCode,
+                    countryName: signal.countryName
+                ) else {
+                    continue
+                }
+
+                var dayFlights = groupedOriginFlights[signal.dayKey] ?? [:]
+                var entry = dayFlights[country.id] ?? (country: country, count: 0)
+                entry.count += 1
+                dayFlights[country.id] = entry
+                groupedOriginFlights[signal.dayKey] = dayFlights
+            }
+
+            for (dayKey, dayFlights) in groupedOriginFlights {
+                let rankedFlights = dayFlights.values.sorted { lhs, rhs in
+                    if lhs.count == rhs.count {
+                        return lhs.country.id < rhs.country.id
+                    }
+                    return lhs.count > rhs.count
+                }
+                guard let winner = rankedFlights.first else { continue }
+                if rankedFlights.count > 1,
+                   rankedFlights[1].count == winner.count,
+                   rankedFlights[1].country.id != winner.country.id {
+                    continue
+                }
+                overnightOriginFlightsByDayKey[dayKey] = winner
+            }
+        }
 
         var i = 0
         while i < sortedResults.count {
@@ -475,6 +560,35 @@ struct PresenceInferenceEngine {
                 i = j
             } else {
                 i += 1
+            }
+        }
+
+        if !overnightOriginFlightsByDayKey.isEmpty {
+            for index in 0..<sortedResults.count {
+                let current = sortedResults[index]
+                guard let originFlight = overnightOriginFlightsByDayKey[current.dayKey] else {
+                    continue
+                }
+
+                if shouldPromoteDepartureDay(current, to: originFlight.country) {
+                    sortedResults[index] = promotedCalendarAssumption(
+                        from: current,
+                        country: originFlight.country,
+                        timeZoneId: current.timeZoneId,
+                        calendarCount: originFlight.count
+                    )
+                }
+
+                guard index > 0 else { continue }
+                let previous = sortedResults[index - 1]
+                guard !isKnownCountry(previous) else { continue }
+
+                sortedResults[index - 1] = promotedCalendarAssumption(
+                    from: previous,
+                    country: originFlight.country,
+                    timeZoneId: current.timeZoneId ?? previous.timeZoneId,
+                    calendarCount: originFlight.count
+                )
             }
         }
 

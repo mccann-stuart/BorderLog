@@ -252,5 +252,58 @@ final class InferenceEngineTests: XCTestCase {
             XCTAssertNil(result?.countryCode)
         }
     }
+
+    func testOvernightOriginFlightPromotesDepartureDayAndPreviousUnknownDay() {
+        let previousDate = day(2026, 2, 1)
+        let departureDate = day(2026, 2, 2)
+        let arrivalDate = day(2026, 2, 3)
+
+        let previousDayKey = DayKey.make(from: previousDate, timeZone: calendar.timeZone)
+        let departureDayKey = DayKey.make(from: departureDate, timeZone: calendar.timeZone)
+        let arrivalDayKey = DayKey.make(from: arrivalDate, timeZone: calendar.timeZone)
+
+        let results = PresenceInferenceEngine.compute(
+            dayKeys: [previousDayKey, departureDayKey, arrivalDayKey],
+            stays: [],
+            overrides: [],
+            locations: [],
+            photos: [],
+            calendarSignals: [
+                CalendarSignalInfo(
+                    dayKey: departureDayKey,
+                    countryCode: "GB",
+                    countryName: localizedCountryName("GB"),
+                    timeZoneId: "Europe/London",
+                    bucketingTimeZoneId: "Europe/London",
+                    eventIdentifier: "flight-overnight#origin",
+                    source: "CalendarFlightOrigin"
+                ),
+                CalendarSignalInfo(
+                    dayKey: arrivalDayKey,
+                    countryCode: "US",
+                    countryName: localizedCountryName("US"),
+                    timeZoneId: "America/New_York",
+                    bucketingTimeZoneId: "America/New_York",
+                    eventIdentifier: "flight-overnight",
+                    source: "Calendar"
+                )
+            ],
+            rangeEnd: arrivalDate,
+            calendar: calendar
+        )
+
+        let previous = results.first { $0.dayKey == previousDayKey }
+        XCTAssertEqual(previous?.countryCode, "GB")
+        XCTAssertEqual(previous?.confidenceLabel, .medium)
+        XCTAssertTrue(previous?.sources.contains(.calendar) == true)
+
+        let departure = results.first { $0.dayKey == departureDayKey }
+        XCTAssertEqual(departure?.countryCode, "GB")
+        XCTAssertEqual(departure?.confidenceLabel, .medium)
+        XCTAssertTrue(departure?.sources.contains(.calendar) == true)
+
+        let arrival = results.first { $0.dayKey == arrivalDayKey }
+        XCTAssertEqual(arrival?.countryCode, "US")
+    }
 }
 #endif

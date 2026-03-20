@@ -123,7 +123,9 @@ public actor LedgerRecomputeService {
                 countryCode: signal.countryCode,
                 countryName: name,
                 timeZoneId: signal.timeZoneId,
-                bucketingTimeZoneId: signal.bucketingTimeZoneId
+                bucketingTimeZoneId: signal.bucketingTimeZoneId,
+                eventIdentifier: signal.eventIdentifier,
+                source: signal.source
             )
         }
 

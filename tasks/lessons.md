@@ -63,3 +63,7 @@
 ## MapKit Country Extraction
 - **Pattern**: Treated MapKit region fields as country identity and, in calendar search results, discarded matches unless a country code already existed, which caused usable name-only country matches to fall through to `Unknown`.
 - **Lesson**: For MapKit-backed country inference, prefer placemark `countryCode`/`country` first and normalize name-only matches instead of requiring a code before persisting the signal.
+
+## Overnight Flight Origin Context
+- **Pattern**: Preserved only the destination-side country for overnight flight events, which left the departure day and the immediately previous unknown day without the origin-country context needed to reduce `Unknown`.
+- **Lesson**: When using destination-first calendar flight ingestion, also preserve origin-country context for overnight flights and apply it narrowly in inference so departure-adjacent unknown days can inherit a medium-confidence origin country without creating same-day route conflicts.

@@ -12,6 +12,11 @@ import MapKit
 
 @ModelActor
 actor CalendarSignalIngestor {
+    private static let primarySignalSource = "Calendar"
+    private static let overnightOriginSignalSource = "CalendarFlightOrigin"
+    private static let originSignalSuffix = "#origin"
+    private static let legacyEndSignalSuffix = "#end"
+
     enum IngestMode {
         case auto
         case manualFullScan
@@ -129,7 +134,8 @@ actor CalendarSignalIngestor {
             }
 
             let id = event.eventIdentifier ?? event.calendarItemIdentifier
-            let endId = id + "#end"
+            let originId = id + Self.originSignalSuffix
+            let endId = id + Self.legacyEndSignalSuffix
             var eventMutations = 0
             let snapshot = eventSnapshot(for: event)
 
@@ -140,11 +146,17 @@ actor CalendarSignalIngestor {
                     touchedDayKeys: &touchedDayKeys
                 )
                 eventMutations += deleteSignalIfExists(
+                    identifier: originId,
+                    existingSignalByIdentifier: &existingSignalByIdentifier,
+                    touchedDayKeys: &touchedDayKeys
+                )
+                eventMutations += deleteSignalIfExists(
                     identifier: endId,
                     existingSignalByIdentifier: &existingSignalByIdentifier,
                     touchedDayKeys: &touchedDayKeys
                 )
                 seenIdentifiers.insert(id)
+                seenIdentifiers.insert(originId)
                 seenIdentifiers.insert(endId)
 
                 if eventMutations > 0 {
@@ -176,12 +188,27 @@ actor CalendarSignalIngestor {
                 activeResolver: activeResolver
             )
 
+            let originResolved: ResolvedCalendarSignal?
+            if primarySelection.usesDestinationRule,
+               let originLocation = nonEmptyLocation(parsedFrom) {
+                originResolved = await resolveSignal(
+                    locationString: originLocation,
+                    coordinate: nil,
+                    date: eventStartDate,
+                    event: event,
+                    activeResolver: activeResolver
+                )
+            } else {
+                originResolved = nil
+            }
+
             seenIdentifiers.insert(id)
             if let startResolved {
                 if upsertSignal(
                     identifier: id,
                     resolved: startResolved,
                     title: event.title,
+                    source: Self.primarySignalSource,
                     existingSignalByIdentifier: &existingSignalByIdentifier,
                     touchedDayKeys: &touchedDayKeys
                 ) {
@@ -190,6 +217,33 @@ actor CalendarSignalIngestor {
             } else {
                 eventMutations += deleteSignalIfExists(
                     identifier: id,
+                    existingSignalByIdentifier: &existingSignalByIdentifier,
+                    touchedDayKeys: &touchedDayKeys
+                )
+            }
+
+            seenIdentifiers.insert(originId)
+            let shouldPersistOriginSignal = shouldPersistOriginSignal(
+                originResolved: originResolved,
+                destinationResolved: startResolved,
+                eventStartDate: eventStartDate,
+                eventEndDate: event.endDate,
+                eventTimeZoneId: event.timeZone?.identifier
+            )
+            if shouldPersistOriginSignal, let originResolved {
+                if upsertSignal(
+                    identifier: originId,
+                    resolved: originResolved,
+                    title: event.title,
+                    source: Self.overnightOriginSignalSource,
+                    existingSignalByIdentifier: &existingSignalByIdentifier,
+                    touchedDayKeys: &touchedDayKeys
+                ) {
+                    eventMutations += 1
+                }
+            } else {
+                eventMutations += deleteSignalIfExists(
+                    identifier: originId,
                     existingSignalByIdentifier: &existingSignalByIdentifier,
                     touchedDayKeys: &touchedDayKeys
                 )
@@ -286,6 +340,26 @@ actor CalendarSignalIngestor {
         )
     }
 
+    private func shouldPersistOriginSignal(
+        originResolved: ResolvedCalendarSignal?,
+        destinationResolved: ResolvedCalendarSignal?,
+        eventStartDate: Date,
+        eventEndDate: Date?,
+        eventTimeZoneId: String?
+    ) -> Bool {
+        guard let originResolved else { return false }
+
+        if let destinationResolved {
+            return originResolved.dayKey != destinationResolved.dayKey
+        }
+
+        guard let eventEndDate else { return false }
+        let eventTimeZone = DayIdentity.canonicalTimeZone(preferredTimeZoneId: eventTimeZoneId)
+        let startKey = DayKey.make(from: eventStartDate, timeZone: eventTimeZone)
+        let endKey = DayKey.make(from: eventEndDate, timeZone: eventTimeZone)
+        return startKey != endKey
+    }
+
     private func nonEmptyLocation(_ value: String?) -> String? {
         guard let trimmed = value?.trimmingCharacters(in: .whitespacesAndNewlines), !trimmed.isEmpty else {
             return nil
@@ -348,7 +422,8 @@ actor CalendarSignalIngestor {
             countryCode: countryCode,
             countryName: countryName,
             timeZone: resolvedTimeZoneId.flatMap(TimeZone.init(identifier:))
-        ), let resolvedCountryName = resolution.countryName else {
+        ), let resolvedCountryName = resolution.countryName,
+        let resolvedCountryCode = resolution.countryCode else {
             return nil
         }
 
@@ -364,7 +439,7 @@ actor CalendarSignalIngestor {
             bucketingTimeZoneId: bucketingTimeZone.identifier,
             latitude: latitude,
             longitude: longitude,
-            countryCode: resolution.countryCode,
+            countryCode: resolvedCountryCode,
             countryName: resolvedCountryName
         )
     }
@@ -373,6 +448,7 @@ actor CalendarSignalIngestor {
         identifier: String,
         resolved: ResolvedCalendarSignal,
         title: String?,
+        source: String = "Calendar",
         existingSignalByIdentifier: inout [String: CalendarSignal],
         touchedDayKeys: inout Set<String>
     ) -> Bool {
@@ -416,8 +492,8 @@ actor CalendarSignalIngestor {
                 existing.title = title
                 didChange = true
             }
-            if existing.source != "Calendar" {
-                existing.source = "Calendar"
+            if existing.source != source {
+                existing.source = source
                 didChange = true
             }
 
@@ -438,7 +514,7 @@ actor CalendarSignalIngestor {
             bucketingTimeZoneId: resolved.bucketingTimeZoneId,
             eventIdentifier: identifier,
             title: title,
-            source: "Calendar"
+            source: source
         )
         modelContext.insert(signal)
         existingSignalByIdentifier[identifier] = signal
@@ -548,6 +624,45 @@ actor CalendarSignalIngestor {
             usesDestinationRule: selection.usesDestinationRule,
             date: selection.date,
             usesCoordinate: selection.coordinate != nil
+        )
+    }
+
+    func testShouldPersistOriginSignal(
+        originDayKey: String,
+        destinationDayKey: String?,
+        eventStartDate: Date,
+        eventEndDate: Date?,
+        eventTimeZoneId: String?
+    ) -> Bool {
+        let originResolved = ResolvedCalendarSignal(
+            timestamp: eventStartDate,
+            dayKey: originDayKey,
+            timeZoneId: "UTC",
+            bucketingTimeZoneId: "UTC",
+            latitude: 0,
+            longitude: 0,
+            countryCode: "GB",
+            countryName: "United Kingdom"
+        )
+        let destinationResolved = destinationDayKey.map {
+            ResolvedCalendarSignal(
+                timestamp: eventEndDate ?? eventStartDate,
+                dayKey: $0,
+                timeZoneId: "UTC",
+                bucketingTimeZoneId: "UTC",
+                latitude: 0,
+                longitude: 0,
+                countryCode: "US",
+                countryName: "United States"
+            )
+        }
+
+        return shouldPersistOriginSignal(
+            originResolved: originResolved,
+            destinationResolved: destinationResolved,
+            eventStartDate: eventStartDate,
+            eventEndDate: eventEndDate,
+            eventTimeZoneId: eventTimeZoneId
         )
     }
 
