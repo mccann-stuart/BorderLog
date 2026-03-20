@@ -305,5 +305,53 @@ final class InferenceEngineTests: XCTestCase {
         let arrival = results.first { $0.dayKey == arrivalDayKey }
         XCTAssertEqual(arrival?.countryCode, "US")
     }
+
+    func testSameDateOriginFlightPromotesFlightDayAndPreviousUnknownDay() {
+        let previousDate = day(2026, 3, 14)
+        let flightDate = day(2026, 3, 15)
+
+        let previousDayKey = DayKey.make(from: previousDate, timeZone: calendar.timeZone)
+        let flightDayKey = DayKey.make(from: flightDate, timeZone: calendar.timeZone)
+
+        let results = PresenceInferenceEngine.compute(
+            dayKeys: [previousDayKey, flightDayKey],
+            stays: [],
+            overrides: [],
+            locations: [],
+            photos: [],
+            calendarSignals: [
+                CalendarSignalInfo(
+                    dayKey: flightDayKey,
+                    countryCode: "GB",
+                    countryName: localizedCountryName("GB"),
+                    timeZoneId: "Europe/London",
+                    bucketingTimeZoneId: "Europe/London",
+                    eventIdentifier: "flight-same-day#origin",
+                    source: "CalendarFlightOrigin"
+                ),
+                CalendarSignalInfo(
+                    dayKey: flightDayKey,
+                    countryCode: "US",
+                    countryName: localizedCountryName("US"),
+                    timeZoneId: "America/Los_Angeles",
+                    bucketingTimeZoneId: "America/Los_Angeles",
+                    eventIdentifier: "flight-same-day",
+                    source: "Calendar"
+                )
+            ],
+            rangeEnd: flightDate,
+            calendar: calendar
+        )
+
+        let previous = results.first { $0.dayKey == previousDayKey }
+        XCTAssertEqual(previous?.countryCode, "GB")
+        XCTAssertEqual(previous?.confidenceLabel, .medium)
+        XCTAssertEqual(previous?.timeZoneId, "Europe/London")
+
+        let flightDay = results.first { $0.dayKey == flightDayKey }
+        XCTAssertEqual(flightDay?.countryCode, "GB")
+        XCTAssertEqual(flightDay?.confidenceLabel, .medium)
+        XCTAssertEqual(flightDay?.timeZoneId, "Europe/London")
+    }
 }
 #endif

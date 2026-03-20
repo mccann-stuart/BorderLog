@@ -1,3 +1,23 @@
+# Task Plan (Flight-Origin Same-Day Regression)
+
+- Spec: preserve destination-based flight inference while restoring origin-country backfill for routes whose origin and destination still resolve to the same string `dayKey`.
+- Spec: when a destination-based flight has a known origin country, use that origin context to promote the flight day when it is only low-confidence calendar evidence, and to promote the immediately previous unknown day.
+- Spec: keep origin-side flight signals out of the base calendar winner so origin and destination evidence do not fight on the same day.
+- [x] Patch flight ingestion so destination-based flights keep an origin-side calendar signal even when origin and destination share the same resolved day key.
+- [x] Update inference so origin-side flight signals apply only in a targeted post-pass that promotes the flight day and previous unknown day to the origin country.
+- [x] Add focused regression coverage for the same-date timezone-crossing case and record verification blockers.
+
+## Review (Flight-Origin Same-Day Regression)
+
+- Root cause: the previous flight-origin backfill path compared origin and destination `dayKey` values and dropped the origin signal whenever they matched, which broke westbound and other timezone-crossing routes that still land on the same string day key even though the departure-side country context should remain available.
+- Fix applied: destination-based flights now keep a `CalendarFlightOrigin` signal whenever the origin resolves; `PresenceInferenceEngine` excludes that signal from base calendar scoring and uses it only in a targeted post-pass to promote the flight day when it is still unknown or calendar-only low confidence, plus the immediately previous unknown day, to a medium-confidence origin-country result.
+- Regression coverage: added `InferenceEngineTests.testSameDateOriginFlightPromotesFlightDayAndPreviousUnknownDay` and updated `CalendarSignalIngestorCoreTests` to require origin-signal persistence even when origin and destination resolve to the same day key.
+- Verification: `git diff --check -- Shared/CalendarSignalIngestor.swift Shared/PresenceInferenceEngine.swift LearnTests/InferenceEngineTests.swift LearnTests/CalendarSignalIngestorCoreTests.swift tasks/todo.md tasks/lessons.md` passed on March 20, 2026.
+- Verification blocker: `xcodebuild test -scheme Learn -destination 'platform=iOS Simulator,name=iPhone 17' -derivedDataPath /tmp/BorderLogDerivedData -only-testing:LearnTests/InferenceEngineTests -only-testing:LearnTests/CalendarSignalIngestorCoreTests` could not run because this machine currently reports no usable simulator runtimes (`Unable to discover any Simulator runtimes` / `Unable to find a device matching the provided destination specifier`).
+- Verification blocker: `xcodebuild build-for-testing -scheme Learn -destination 'generic/platform=iOS Simulator' -derivedDataPath /tmp/BorderLogDerivedData -only-testing:LearnTests/InferenceEngineTests -only-testing:LearnTests/CalendarSignalIngestorCoreTests` is blocked in the current toolchain by a SwiftData macro/plugin failure in `Shared/CalendarSignal.swift` and `Shared/DayOverride.swift` (`SwiftDataMacros.PersistentModelMacro ... produced malformed response`).
+
+---
+
 # Task Plan (Reduce Unknown Country Inference)
 
 - Spec: preserve existing calendar-event destination-day and up-to-7-day bridge inference behavior while reducing days that fall through to `Unknown`.

@@ -13,7 +13,7 @@ import MapKit
 @ModelActor
 actor CalendarSignalIngestor {
     private static let primarySignalSource = "Calendar"
-    private static let overnightOriginSignalSource = "CalendarFlightOrigin"
+    private static let flightOriginSignalSource = "CalendarFlightOrigin"
     private static let originSignalSuffix = "#origin"
     private static let legacyEndSignalSuffix = "#end"
 
@@ -224,18 +224,14 @@ actor CalendarSignalIngestor {
 
             seenIdentifiers.insert(originId)
             let shouldPersistOriginSignal = shouldPersistOriginSignal(
-                originResolved: originResolved,
-                destinationResolved: startResolved,
-                eventStartDate: eventStartDate,
-                eventEndDate: event.endDate,
-                eventTimeZoneId: event.timeZone?.identifier
+                originResolved: originResolved
             )
             if shouldPersistOriginSignal, let originResolved {
                 if upsertSignal(
                     identifier: originId,
                     resolved: originResolved,
                     title: event.title,
-                    source: Self.overnightOriginSignalSource,
+                    source: Self.flightOriginSignalSource,
                     existingSignalByIdentifier: &existingSignalByIdentifier,
                     touchedDayKeys: &touchedDayKeys
                 ) {
@@ -341,23 +337,9 @@ actor CalendarSignalIngestor {
     }
 
     private func shouldPersistOriginSignal(
-        originResolved: ResolvedCalendarSignal?,
-        destinationResolved: ResolvedCalendarSignal?,
-        eventStartDate: Date,
-        eventEndDate: Date?,
-        eventTimeZoneId: String?
+        originResolved: ResolvedCalendarSignal?
     ) -> Bool {
-        guard let originResolved else { return false }
-
-        if let destinationResolved {
-            return originResolved.dayKey != destinationResolved.dayKey
-        }
-
-        guard let eventEndDate else { return false }
-        let eventTimeZone = DayIdentity.canonicalTimeZone(preferredTimeZoneId: eventTimeZoneId)
-        let startKey = DayKey.make(from: eventStartDate, timeZone: eventTimeZone)
-        let endKey = DayKey.make(from: eventEndDate, timeZone: eventTimeZone)
-        return startKey != endKey
+        return originResolved != nil
     }
 
     private func nonEmptyLocation(_ value: String?) -> String? {
@@ -644,26 +626,10 @@ actor CalendarSignalIngestor {
             countryCode: "GB",
             countryName: "United Kingdom"
         )
-        let destinationResolved = destinationDayKey.map {
-            ResolvedCalendarSignal(
-                timestamp: eventEndDate ?? eventStartDate,
-                dayKey: $0,
-                timeZoneId: "UTC",
-                bucketingTimeZoneId: "UTC",
-                latitude: 0,
-                longitude: 0,
-                countryCode: "US",
-                countryName: "United States"
-            )
-        }
-
-        return shouldPersistOriginSignal(
-            originResolved: originResolved,
-            destinationResolved: destinationResolved,
-            eventStartDate: eventStartDate,
-            eventEndDate: eventEndDate,
-            eventTimeZoneId: eventTimeZoneId
-        )
+        _ = destinationDayKey
+        _ = eventEndDate
+        _ = eventTimeZoneId
+        return shouldPersistOriginSignal(originResolved: originResolved)
     }
 
     func testDestinationFirstLegacyEndCleanup(

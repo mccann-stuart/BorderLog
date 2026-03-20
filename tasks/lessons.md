@@ -67,3 +67,7 @@
 ## Overnight Flight Origin Context
 - **Pattern**: Preserved only the destination-side country for overnight flight events, which left the departure day and the immediately previous unknown day without the origin-country context needed to reduce `Unknown`.
 - **Lesson**: When using destination-first calendar flight ingestion, also preserve origin-country context for overnight flights and apply it narrowly in inference so departure-adjacent unknown days can inherit a medium-confidence origin country without creating same-day route conflicts.
+
+## Flight Day-Key Equality Trap
+- **Pattern**: Used `origin.dayKey != destination.dayKey` as the gate for preserving origin-flight context, which dropped valid origin evidence for timezone-crossing flights that still resolved to the same string day key.
+- **Lesson**: Do not use day-key equality as the proxy for whether a destination-based flight needs origin context. Preserve the origin-side signal whenever the origin resolves, then keep it out of the base winner and apply it only in the targeted inference pass that backfills the flight day and previous unknown day.
