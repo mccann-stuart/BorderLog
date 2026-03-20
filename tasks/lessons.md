@@ -59,3 +59,7 @@
 ## Unknown Bucket Coverage
 - **Pattern**: Fixed country-count aggregation paths without also surfacing days whose `PresenceDay` exists but still resolves to no country, which hid part of the selected range from total-count views.
 - **Lesson**: Whenever a range summary buckets days by country, treat unresolved days as a first-class `Unknown` bucket with the same selection scope and drill-down behavior as the named-country rows.
+
+## MapKit Country Extraction
+- **Pattern**: Treated MapKit region fields as country identity and, in calendar search results, discarded matches unless a country code already existed, which caused usable name-only country matches to fall through to `Unknown`.
+- **Lesson**: For MapKit-backed country inference, prefer placemark `countryCode`/`country` first and normalize name-only matches instead of requiring a code before persisting the signal.

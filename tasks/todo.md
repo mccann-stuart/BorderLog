@@ -1,3 +1,23 @@
+# Task Plan (Reduce Unknown Country Inference)
+
+- Spec: preserve existing calendar-event destination-day and up-to-7-day bridge inference behavior while reducing days that fall through to `Unknown`.
+- Spec: fix the signal-ingestion layer first so name-only country resolutions still become usable inference inputs.
+- Spec: add regression coverage for the affected calendar/location resolution path and record targeted verification.
+- [x] Patch country resolution and calendar signal ingestion so country name-only results still feed inference.
+- [x] Add focused regression coverage for the recovered inference path.
+- [x] Run targeted verification and record the result.
+
+## Review (Reduce Unknown Country Inference)
+
+- Root cause: the shared `CountryResolver` and the text-search branch of `CalendarSignalIngestor` preferred MapKit region fields and, in the calendar path, dropped results outright unless a country code was present, so name-only matches never reached inference and bridge logic had nothing to work with.
+- Fix applied: country resolution now normalizes placemark country fields first and preserves name-only matches through `CountryResolution.normalized(...)`; calendar signal ingestion uses the same normalization instead of requiring a preexisting code.
+- Regression coverage: added `CountryResolutionTests` for canonical name-only resolution and fallback name preservation.
+- Verification: `git diff --check -- Shared/CountryResolver.swift Shared/CalendarSignalIngestor.swift LearnTests/CountryResolutionTests.swift tasks/todo.md tasks/lessons.md` passed on March 20, 2026.
+- Verification blocker: `xcodebuild test -scheme Learn -destination 'platform=iOS Simulator,name=iPhone 17' -derivedDataPath /tmp/BorderLogDerivedData -only-testing:LearnTests/InferenceEngineTests -only-testing:LearnTests/CountryResolutionTests -only-testing:LearnTests/CalendarSignalIngestorCoreTests` could not run because this machine currently reports no usable simulator runtimes (`Unable to discover any Simulator runtimes` / `Unable to find a device matching the provided destination specifier`).
+- Verification blocker: `xcodebuild build-for-testing -scheme Learn -destination 'generic/platform=iOS Simulator' -derivedDataPath /tmp/BorderLogDerivedData -only-testing:LearnTests/InferenceEngineTests -only-testing:LearnTests/CountryResolutionTests -only-testing:LearnTests/CalendarSignalIngestorCoreTests` is blocked in the current toolchain by a SwiftData macro/plugin failure in `Shared/DayOverride.swift` and `Shared/CalendarSignal.swift` (`SwiftDataMacros.PersistentModelMacro ... produced malformed response`).
+
+---
+
 # Task Plan (Unknown Summary Drill-Downs)
 
 - Spec: wherever aggregate day totals are shown for a selected range, expose an `Unknown` count when days in that same range have no resolved location.

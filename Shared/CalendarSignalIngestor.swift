@@ -333,17 +333,24 @@ actor CalendarSignalIngestor {
 
                 if let response = try? await search.start(),
                    let item = response.mapItems.first {
+                    let placemark = item.placemark
                     let location = item.location
                     latitude = location.coordinate.latitude
                     longitude = location.coordinate.longitude
-                    countryCode = item.addressRepresentations?.region?.identifier
-                    countryName = item.addressRepresentations?.regionName
-                    resolvedTimeZoneId = item.timeZone?.identifier
+                    countryCode = placemark.countryCode ?? item.addressRepresentations?.region?.identifier
+                    countryName = placemark.country ?? item.addressRepresentations?.regionName
+                    resolvedTimeZoneId = item.timeZone?.identifier ?? placemark.timeZone?.identifier
                 }
             }
         }
 
-        guard let resolvedCountryCode = countryCode else { return nil }
+        guard let resolution = CountryResolution.normalized(
+            countryCode: countryCode,
+            countryName: countryName,
+            timeZone: resolvedTimeZoneId.flatMap(TimeZone.init(identifier:))
+        ), let resolvedCountryName = resolution.countryName else {
+            return nil
+        }
 
         let bucketingTimeZone = DayIdentity.canonicalTimeZone(
             preferredTimeZoneId: resolvedTimeZoneId ?? event.timeZone?.identifier
@@ -357,8 +364,8 @@ actor CalendarSignalIngestor {
             bucketingTimeZoneId: bucketingTimeZone.identifier,
             latitude: latitude,
             longitude: longitude,
-            countryCode: resolvedCountryCode,
-            countryName: countryName ?? Locale.current.localizedString(forRegionCode: resolvedCountryCode) ?? resolvedCountryCode
+            countryCode: resolution.countryCode,
+            countryName: resolvedCountryName
         )
     }
 

@@ -13,6 +13,31 @@ struct CountryResolution: Sendable {
     let countryCode: String?
     let countryName: String?
     let timeZone: TimeZone?
+
+    static func normalized(
+        countryCode: String?,
+        countryName: String?,
+        timeZone: TimeZone?
+    ) -> CountryResolution? {
+        let canonicalCode = CountryCodeNormalizer.canonicalCode(
+            countryCode: countryCode,
+            countryName: countryName
+        )
+        let canonicalName = CountryCodeNormalizer.canonicalName(
+            countryCode: canonicalCode ?? countryCode,
+            countryName: countryName
+        )
+
+        guard canonicalCode != nil || canonicalName != nil else {
+            return nil
+        }
+
+        return CountryResolution(
+            countryCode: canonicalCode,
+            countryName: canonicalName,
+            timeZone: timeZone
+        )
+    }
 }
 
 protocol CountryResolving {
@@ -64,13 +89,14 @@ actor GeocodeCoordinator {
                 }
                 let mapItems = try await request.mapItems
                 let mapItem = mapItems.first
+                let placemark = mapItem?.placemark
                 let addressRepresentations = mapItem?.addressRepresentations
-                let resolution = CountryResolution(
-                    countryCode: addressRepresentations?.region?.identifier,
-                    countryName: addressRepresentations?.regionName,
-                    timeZone: mapItem?.timeZone
+                let resolution = CountryResolution.normalized(
+                    countryCode: placemark?.countryCode ?? addressRepresentations?.region?.identifier,
+                    countryName: placemark?.country ?? addressRepresentations?.regionName,
+                    timeZone: mapItem?.timeZone ?? placemark?.timeZone
                 )
-                if resolution.countryCode != nil || resolution.countryName != nil {
+                if let resolution {
                     await self.store(resolution, for: key)
                 }
                 return resolution
