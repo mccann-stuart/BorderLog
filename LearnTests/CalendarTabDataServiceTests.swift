@@ -232,4 +232,45 @@ final class CalendarTabDataServiceTests: XCTestCase {
         )
         XCTAssertEqual(fallbackInfo.flagEmoji, "🌍")
     }
+
+    func testSnapshotCountsResolvedBridgeDaysWithoutRawEvidence() async throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let bridgeDayKey = "2026-03-16"
+        let bridgeDate = normalizedDate(for: bridgeDayKey)
+
+        context.insert(
+            PresenceDay(
+                dayKey: bridgeDayKey,
+                date: bridgeDate,
+                timeZoneId: TimeZone.current.identifier,
+                countryCode: "ES",
+                countryName: "Spain",
+                confidence: 0.5,
+                confidenceLabel: .medium,
+                sources: .none,
+                isOverride: false,
+                stayCount: 0,
+                photoCount: 0,
+                locationCount: 0,
+                calendarCount: 0
+            )
+        )
+        try context.save()
+
+        let service = CalendarTabDataService(modelContainer: container)
+        let snapshot = try await service.snapshot(
+            visibleMonthStart: makeDate(2026, 3, 1),
+            summaryRange: .visibleMonth,
+            now: makeDate(2026, 3, 19)
+        )
+
+        let bridgeDay = try XCTUnwrap(snapshot.daySummaries.first { $0.dayKey == bridgeDayKey })
+        XCTAssertTrue(bridgeDay.countries.isEmpty)
+
+        let totals = Dictionary(uniqueKeysWithValues: snapshot.countrySummaries.map { ($0.id, $0) })
+        XCTAssertEqual(totals["ES"]?.countryName, "Spain")
+        XCTAssertEqual(totals["ES"]?.totalDays, 1)
+        XCTAssertEqual(snapshot.countrySummaries.count, 1)
+    }
 }

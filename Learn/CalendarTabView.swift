@@ -81,7 +81,7 @@ struct CalendarTabView: View {
             } header: {
                 Text("Travel Summary")
             } footer: {
-                Text("Each country counts once per day, even when multiple sources agree.")
+                Text("Totals use the day's resolved Summary location, including inferred bridge days.")
             }
 
             Section {

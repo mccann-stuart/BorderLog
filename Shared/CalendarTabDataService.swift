@@ -166,6 +166,7 @@ actor CalendarTabDataService {
         let locations = try fetchLocations(dayKeys: fetchDayKeys)
         let photos = try fetchPhotos(dayKeys: fetchDayKeys)
         let calendarSignals = try fetchCalendarSignals(dayKeys: fetchDayKeys)
+        let presenceDays = try fetchPresenceDays(dayKeys: fetchDayKeys)
         let stays = try fetchStays(rangeStartKey: rangeStartKey, rangeEndKey: rangeEndKey)
         let countryConfigs = try modelContext.fetch(FetchDescriptor<CountryConfig>())
 
@@ -229,6 +230,7 @@ actor CalendarTabDataService {
         )
         let countrySummaries = makeCountrySummaries(
             from: accumulators,
+            presenceDays: presenceDays,
             summaryDayKeys: summaryDayRange.dayKeys,
             summaryRange: summaryRange,
             visibleMonthStart: normalizedVisibleMonth,
@@ -284,6 +286,16 @@ actor CalendarTabDataService {
         let descriptor = FetchDescriptor<CalendarSignal>(
             predicate: #Predicate { signal in
                 dayKeys.contains(signal.dayKey)
+            }
+        )
+        return try modelContext.fetch(descriptor)
+    }
+
+    private func fetchPresenceDays(dayKeys: [String]) throws -> [PresenceDay] {
+        guard !dayKeys.isEmpty else { return [] }
+        let descriptor = FetchDescriptor<PresenceDay>(
+            predicate: #Predicate { day in
+                dayKeys.contains(day.dayKey)
             }
         )
         return try modelContext.fetch(descriptor)
@@ -437,6 +449,7 @@ actor CalendarTabDataService {
 
     private func makeCountrySummaries(
         from accumulators: [String: DayAccumulator],
+        presenceDays: [PresenceDay],
         summaryDayKeys: [String],
         summaryRange: CalendarCountrySummaryRange,
         visibleMonthStart: Date,
@@ -445,13 +458,26 @@ actor CalendarTabDataService {
         calendar: Calendar
     ) -> [CalendarCountryDaysSummary] {
         var counts: [String: (country: CalendarDayCountry, totalDays: Int)] = [:]
+        let resolvedDayMap = Dictionary(uniqueKeysWithValues: presenceDays.map { ($0.dayKey, $0) })
 
         for dayKey in summaryDayKeys {
-            guard summaryRange.contains(dayKey: dayKey, visibleMonthStart: visibleMonthStart, now: now, calendar: calendar),
-                  let accumulator = accumulators[dayKey] else {
+            guard summaryRange.contains(dayKey: dayKey, visibleMonthStart: visibleMonthStart, now: now, calendar: calendar) else {
                 continue
             }
 
+            if let resolvedDay = resolvedDayMap[dayKey] {
+                guard let country = normalizedCountry(
+                    countryCode: resolvedDay.countryCode,
+                    countryName: resolvedDay.countryName
+                ) else {
+                    continue
+                }
+                let current = counts[country.id] ?? (country, 0)
+                counts[country.id] = (country: current.country, totalDays: current.totalDays + 1)
+                continue
+            }
+
+            guard let accumulator = accumulators[dayKey] else { continue }
             for country in accumulator.countriesByID.values {
                 let current = counts[country.id] ?? (country, 0)
                 counts[country.id] = (country: current.country, totalDays: current.totalDays + 1)

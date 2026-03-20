@@ -1,3 +1,22 @@
+# Task Plan (Bridge-Day Presence Counts)
+
+- Spec: treat the resolved `PresenceDay` location as the source of truth for counting visited-country totals, including inferred bridge days with no direct stay, calendar, photo, or location evidence.
+- Spec: keep calendar day decorations and evidence inspection driven by raw signals, but make Travel Summary totals align with the Summary section shown for each day.
+- Spec: limit behavior changes to counting/summary paths; do not weaken existing day-detail evidence visibility.
+- [x] Review lessons and inspect the counting paths for dashboard, country detail, daily ledger, and calendar summaries.
+- [x] Update the shared summary logic so bridge-day `PresenceDay` records contribute to Travel Summary and country totals.
+- [x] Add regression coverage for inferred bridge days with no raw evidence.
+- [x] Run targeted verification and record the outcome.
+
+## Review (Bridge-Day Presence Counts)
+
+- Root cause: `CalendarTabDataService` rebuilt Travel Summary totals from raw stays, photos, location samples, and calendar events, so inferred `PresenceDay` bridge days with `sources: .none` were omitted even though the day Summary showed a resolved country.
+- Fix applied: Travel Summary counting now prefers the resolved `PresenceDay` for each day key and falls back to raw evidence only when no `PresenceDay` exists, while month decorations and flight markers still use the raw-signal accumulator.
+- Regression coverage: added a `CalendarTabDataServiceTests` case that inserts a bridge-day `PresenceDay` with no raw evidence and verifies the day remains decoration-empty but still counts toward the country summary.
+- Verification: `xcodebuild test -scheme Learn -destination 'platform=iOS Simulator,name=iPhone 17' -derivedDataPath /tmp/BorderLogDerivedData -only-testing:LearnTests/CalendarTabDataServiceTests` succeeded on March 20, 2026.
+
+---
+
 # Task Plan: Fix Git Sync
 
 - [ ] Sync local main branch with remote origin/main.
