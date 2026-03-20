@@ -8,12 +8,14 @@
 import Foundation
 
 struct PresenceInferenceEngine {
-    private struct CountryKey: Hashable {
+    private struct ResolvedCountry: Hashable {
+        let id: String
         let code: String?
         let name: String
     }
 
     private struct CountryAccumulator {
+        var country: ResolvedCountry
         var score: Double = 0
         var stayCount: Int = 0
         var photoCount: Int = 0
@@ -22,7 +24,7 @@ struct PresenceInferenceEngine {
     }
 
     private struct DayBucket {
-        var countries: [CountryKey: CountryAccumulator] = [:]
+        var countries: [String: CountryAccumulator] = [:]
         var timeZoneScores: [String: Double] = [:]
     }
 
@@ -53,6 +55,46 @@ struct PresenceInferenceEngine {
             buckets[dayKey] = current
         }
 
+        func normalizedCountryIdentity(_ name: String) -> String {
+            name.folding(
+                options: [.caseInsensitive, .diacriticInsensitive, .widthInsensitive],
+                locale: Locale(identifier: "en_US_POSIX")
+            )
+            .lowercased()
+        }
+
+        func resolvedCountry(
+            countryCode: String?,
+            countryName: String?
+        ) -> ResolvedCountry? {
+            let canonicalCode = CountryCodeNormalizer.canonicalCode(
+                countryCode: countryCode,
+                countryName: countryName
+            )
+            let trimmedName = countryName?.trimmingCharacters(in: .whitespacesAndNewlines)
+            let resolvedName: String
+            if let canonicalCode {
+                resolvedName = trimmedName
+                    ?? Locale.autoupdatingCurrent.localizedString(forRegionCode: canonicalCode)
+                    ?? canonicalCode
+            } else if let trimmedName, !trimmedName.isEmpty {
+                resolvedName = trimmedName
+            } else {
+                return nil
+            }
+
+            let identity = canonicalCode ?? normalizedCountryIdentity(resolvedName)
+            return ResolvedCountry(id: identity, code: canonicalCode, name: resolvedName)
+        }
+
+        func resolvedCountry(for result: PresenceDayResult) -> ResolvedCountry? {
+            resolvedCountry(countryCode: result.countryCode, countryName: result.countryName)
+        }
+
+        func isKnownCountry(_ result: PresenceDayResult) -> Bool {
+            resolvedCountry(for: result) != nil
+        }
+
         func addScore(
             dayKey: String,
             countryCode: String?,
@@ -64,15 +106,24 @@ struct PresenceInferenceEngine {
             calendarSignal: Bool,
             timeZoneId: String?
         ) {
+            guard let country = resolvedCountry(
+                countryCode: countryCode,
+                countryName: countryName
+            ) else {
+                return
+            }
+
             updateBucket(dayKey) { bucket in
-                let key = CountryKey(code: countryCode, name: countryName)
-                var accumulator = bucket.countries[key] ?? CountryAccumulator()
+                var accumulator = bucket.countries[country.id] ?? CountryAccumulator(country: country)
+                if accumulator.country.code == nil, country.code != nil {
+                    accumulator.country = country
+                }
                 accumulator.score += weight
                 if stay { accumulator.stayCount += 1 }
                 if photo { accumulator.photoCount += 1 }
                 if location { accumulator.locationCount += 1 }
                 if calendarSignal { accumulator.calendarCount += 1 }
-                bucket.countries[key] = accumulator
+                bucket.countries[country.id] = accumulator
 
                 if let timeZoneId,
                    TimeZone(identifier: timeZoneId) != nil {
@@ -228,8 +279,13 @@ struct PresenceInferenceEngine {
             let date = DayKey.date(for: dayKey, timeZone: dayTimeZone) ?? calendar.startOfDay(for: rangeEnd)
 
             if let overrideInfo {
-                let overrideKey = CountryKey(code: overrideInfo.countryCode, name: overrideInfo.countryName)
-                let accumulator = bucket.countries[overrideKey] ?? CountryAccumulator()
+                guard let overrideCountry = resolvedCountry(
+                    countryCode: overrideInfo.countryCode,
+                    countryName: overrideInfo.countryName
+                ) else {
+                    continue
+                }
+                let accumulator = bucket.countries[overrideCountry.id] ?? CountryAccumulator(country: overrideCountry)
                 var sources = SignalSourceMask.override
                 if accumulator.stayCount > 0 { sources.formUnion(.stay) }
                 if accumulator.photoCount > 0 { sources.formUnion(.photo) }
@@ -240,8 +296,8 @@ struct PresenceInferenceEngine {
                     dayKey: dayKey,
                     date: date,
                     timeZoneId: dayTimeZone.identifier,
-                    countryCode: overrideInfo.countryCode,
-                    countryName: overrideInfo.countryName,
+                    countryCode: overrideCountry.code,
+                    countryName: overrideCountry.name,
                     confidence: 1.0,
                     confidenceLabel: .high,
                     sources: sources,
@@ -257,17 +313,17 @@ struct PresenceInferenceEngine {
             }
 
             // ⚡ Bolt: Single O(N) pass to find top two countries instead of full O(N log N) sort
-            var winner: Dictionary<CountryKey, CountryAccumulator>.Element? = nil
-            var runnerUp: Dictionary<CountryKey, CountryAccumulator>.Element? = nil
+            var winner: CountryAccumulator? = nil
+            var runnerUp: CountryAccumulator? = nil
             var totalScore: Double = 0
 
-            for element in bucket.countries {
-                totalScore += element.value.score
-                if winner == nil || element.value.score > winner!.value.score {
+            for accumulator in bucket.countries.values {
+                totalScore += accumulator.score
+                if winner == nil || accumulator.score > winner!.score {
                     runnerUp = winner
-                    winner = element
-                } else if runnerUp == nil || element.value.score > runnerUp!.value.score {
-                    runnerUp = element
+                    winner = accumulator
+                } else if runnerUp == nil || accumulator.score > runnerUp!.score {
+                    runnerUp = accumulator
                 }
             }
 
@@ -292,7 +348,7 @@ struct PresenceInferenceEngine {
                 continue
             }
 
-            let winnerScore = winner.value.score
+            let winnerScore = winner.score
             let confidence = totalScore > 0 ? min(1.0, max(0.0, winnerScore / totalScore)) : 0
 
             let confidenceLabel: ConfidenceLabel
@@ -326,8 +382,8 @@ struct PresenceInferenceEngine {
             }
 
             var isDisputed = false
-            if let runnerUp = runnerUp, runnerUp.value.score > 0 {
-                let scoreDelta = winner.value.score - runnerUp.value.score
+            if let runnerUp = runnerUp, runnerUp.score > 0 {
+                let scoreDelta = winner.score - runnerUp.score
                 let confidenceDelta = totalScore > 0 ? scoreDelta / totalScore : 0
                 if confidenceDelta <= 0.5 {
                     isDisputed = true
@@ -335,10 +391,10 @@ struct PresenceInferenceEngine {
             }
 
             var sources = SignalSourceMask()
-            if winner.value.stayCount > 0 { sources.formUnion(.stay) }
-            if winner.value.photoCount > 0 { sources.formUnion(.photo) }
-            if winner.value.locationCount > 0 { sources.formUnion(.location) }
-            if winner.value.calendarCount > 0 { sources.formUnion(.calendar) }
+            if winner.stayCount > 0 { sources.formUnion(.stay) }
+            if winner.photoCount > 0 { sources.formUnion(.photo) }
+            if winner.locationCount > 0 { sources.formUnion(.location) }
+            if winner.calendarCount > 0 { sources.formUnion(.calendar) }
 
             var suggestedCode1: String? = nil
             var suggestedName1: String? = nil
@@ -346,27 +402,27 @@ struct PresenceInferenceEngine {
             var suggestedName2: String? = nil
 
             if isDisputed {
-                suggestedCode1 = winner.key.code
-                suggestedName1 = winner.key.name
-                suggestedCode2 = runnerUp?.key.code
-                suggestedName2 = runnerUp?.key.name
+                suggestedCode1 = winner.country.code
+                suggestedName1 = winner.country.name
+                suggestedCode2 = runnerUp?.country.code
+                suggestedName2 = runnerUp?.country.name
             }
 
             let result = PresenceDayResult(
                 dayKey: dayKey,
                 date: date,
                 timeZoneId: dayTimeZone.identifier,
-                countryCode: winner.key.code,
-                countryName: winner.key.name,
+                countryCode: winner.country.code,
+                countryName: winner.country.name,
                 confidence: confidence,
                 confidenceLabel: confidenceLabel,
                 sources: sources,
                 isOverride: false,
                 isDisputed: isDisputed,
-                stayCount: winner.value.stayCount,
-                photoCount: winner.value.photoCount,
-                locationCount: winner.value.locationCount,
-                calendarCount: winner.value.calendarCount,
+                stayCount: winner.stayCount,
+                photoCount: winner.photoCount,
+                locationCount: winner.locationCount,
+                calendarCount: winner.calendarCount,
                 suggestedCountryCode1: suggestedCode1,
                 suggestedCountryName1: suggestedName1,
                 suggestedCountryCode2: suggestedCode2,
@@ -379,9 +435,9 @@ struct PresenceInferenceEngine {
 
         var i = 0
         while i < sortedResults.count {
-            if sortedResults[i].countryCode == nil {
+            if !isKnownCountry(sortedResults[i]) {
                 var j = i
-                while j < sortedResults.count, sortedResults[j].countryCode == nil {
+                while j < sortedResults.count, !isKnownCountry(sortedResults[j]) {
                     j += 1
                 }
 
@@ -391,17 +447,17 @@ struct PresenceInferenceEngine {
                     let prev = sortedResults[i - 1]
                     let next = sortedResults[j]
 
-                    if let prevCode = prev.countryCode,
-                       let nextCode = next.countryCode,
-                       prevCode == nextCode {
+                    if let prevCountry = resolvedCountry(for: prev),
+                       let nextCountry = resolvedCountry(for: next),
+                       prevCountry.id == nextCountry.id {
                         for k in i..<j {
                             let current = sortedResults[k]
                             sortedResults[k] = PresenceDayResult(
                                 dayKey: current.dayKey,
                                 date: current.date,
                                 timeZoneId: current.timeZoneId ?? prev.timeZoneId,
-                                countryCode: prevCode,
-                                countryName: prev.countryName,
+                                countryCode: prevCountry.code,
+                                countryName: prevCountry.name,
                                 confidence: 0.5,
                                 confidenceLabel: .medium,
                                 sources: .none,
@@ -424,33 +480,31 @@ struct PresenceInferenceEngine {
 
         // Optimization: Precalculate backward and forward suggestions in O(N) linear passes
         // to avoid O(N²) nested loops when filling gap days.
-        var backwardSuggestions = [Optional<(code: String, name: String)>](repeating: nil, count: sortedResults.count)
-        var currentBackward: (code: String, name: String)? = nil
+        var backwardSuggestions = [ResolvedCountry?](repeating: nil, count: sortedResults.count)
+        var currentBackward: ResolvedCountry? = nil
         for i in 0..<sortedResults.count {
             backwardSuggestions[i] = currentBackward
-            if let code = sortedResults[i].countryCode,
-               let name = sortedResults[i].countryName {
-                currentBackward = (code, name)
+            if let country = resolvedCountry(for: sortedResults[i]) {
+                currentBackward = country
             }
         }
 
-        var forwardSuggestions = [Optional<(code: String, name: String)>](repeating: nil, count: sortedResults.count)
-        var currentForward: (code: String, name: String)? = nil
+        var forwardSuggestions = [ResolvedCountry?](repeating: nil, count: sortedResults.count)
+        var currentForward: ResolvedCountry? = nil
         for i in stride(from: sortedResults.count - 1, through: 0, by: -1) {
             forwardSuggestions[i] = currentForward
-            if let code = sortedResults[i].countryCode,
-               let name = sortedResults[i].countryName {
-                currentForward = (code, name)
+            if let country = resolvedCountry(for: sortedResults[i]) {
+                currentForward = country
             }
         }
 
         for i in 0..<sortedResults.count {
-            if sortedResults[i].countryCode == nil || sortedResults[i].confidence == 0 {
-                var suggestions: [(code: String, name: String)] = []
+            if !isKnownCountry(sortedResults[i]) || sortedResults[i].confidence == 0 {
+                var suggestions: [ResolvedCountry] = []
                 if let backwardSuggestion = backwardSuggestions[i] {
                     suggestions.append(backwardSuggestion)
                 }
-                if let forwardSuggestion = forwardSuggestions[i], forwardSuggestion.code != backwardSuggestions[i]?.code {
+                if let forwardSuggestion = forwardSuggestions[i], forwardSuggestion.id != backwardSuggestions[i]?.id {
                     suggestions.append(forwardSuggestion)
                 }
 

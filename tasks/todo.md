@@ -1,3 +1,23 @@
+# Task Plan (Inference Canonical Country Resolution)
+
+- Spec: canonical country resolution must happen inside `PresenceInferenceEngine`, before `PresenceDay` results are persisted or consumed by downstream summaries.
+- Spec: preserve the existing bridge-gap behavior for matching countries across data voids up to 7 days inclusive; a 6- or 7-day void should still infer the matching country.
+- Spec: boundary matching for bridge inference should use canonical country identity, not require both raw `countryCode` values to already be present.
+- [x] Refactor inference-time country normalization so scoring and winners use canonical code-or-name identity.
+- [x] Keep gap bridging at `<= 7` days using canonical boundary country matching.
+- [x] Add inference regression coverage for name-only canonicalization and a 7-day bridge void.
+- [x] Run targeted verification and record the outcome.
+
+## Review (Inference Canonical Country Resolution)
+
+- Root cause: `PresenceInferenceEngine` bucketed evidence by raw `(countryCode, countryName)` pairs and treated gap days as unknown whenever `countryCode == nil`, so name-only evidence could stay uncanonicalized, split the same country into separate buckets, and prevent bridge inference from firing even when the boundary countries matched by name.
+- Fix applied: inference now canonicalizes country identity before scoring, winner selection, dispute suggestions, and `PresenceDayResult` emission, so persisted `PresenceDay` rows already carry canonical country resolution when a code can be derived.
+- Bridge behavior: the gap-fill pass still bridges voids of up to 7 days inclusive, but now it compares canonical boundary countries instead of requiring both raw country codes to already be present.
+- Regression coverage: updated `InferenceEngineTests` to assert name-only known countries canonicalize to `ES`, that a 7-day void bridges when the boundary countries match canonically, and that an 8-day void still does not bridge.
+- Verification: `xcodebuild test -scheme Learn -destination 'platform=iOS Simulator,name=iPhone 17' -derivedDataPath /tmp/BorderLogDerivedData -only-testing:LearnTests/InferenceEngineTests -only-testing:LearnTests/CalendarTabDataServiceTests -only-testing:LearnTests/SchengenLedgerCalculatorTests` succeeded on March 20, 2026. Existing unrelated Swift 6 isolation warnings in `LedgerRecomputeService.swift`, `CountryResolver.swift`, and `CalendarTabDataService.swift` remain.
+
+---
+
 # Task Plan (Resolved Country Normalization)
 
 - Spec: treat a resolved country name and its ISO country code as the same country identity everywhere counts, flags, and map totals are computed.

@@ -16,6 +16,10 @@ final class InferenceEngineTests: XCTestCase {
         return calendar.date(from: comps)!
     }
 
+    private func localizedCountryName(_ code: String) -> String {
+        Locale.autoupdatingCurrent.localizedString(forRegionCode: code) ?? code
+    }
+
     func testOverrideWinsOverSignals() {
         let date = day(2026, 2, 15)
         let dayKey = DayKey.make(from: date, timeZone: calendar.timeZone)
@@ -135,12 +139,13 @@ final class InferenceEngineTests: XCTestCase {
         XCTAssertEqual(results.first?.timeZoneId, "Europe/Paris")
     }
 
-    func testCountryCodeRemainsNilWhenOnlyCountryNameAvailable() {
+    func testCanonicalizesCountryCodeWhenOnlyCountryNameAvailable() {
         let date = day(2026, 2, 15)
         let dayKey = DayKey.make(from: date, timeZone: calendar.timeZone)
+        let spainName = localizedCountryName("ES")
 
         let photos = [
-            PhotoSignalInfo(dayKey: dayKey, countryCode: nil, countryName: "Spain", timeZoneId: "UTC")
+            PhotoSignalInfo(dayKey: dayKey, countryCode: nil, countryName: spainName, timeZoneId: "UTC")
         ]
 
         let results = PresenceInferenceEngine.compute(
@@ -154,8 +159,98 @@ final class InferenceEngineTests: XCTestCase {
             calendar: calendar
         )
 
-        XCTAssertEqual(results.first?.countryName, "Spain")
-        XCTAssertNil(results.first?.countryCode)
+        XCTAssertEqual(results.first?.countryName, spainName)
+        XCTAssertEqual(results.first?.countryCode, "ES")
+    }
+
+    func testBridgesSevenDayVoidWhenCanonicalCountriesMatch() {
+        let start = day(2026, 2, 1)
+        let end = day(2026, 2, 9)
+        let dayKeys = Set((1...9).map { day in
+            DayKey.make(from: self.day(2026, 2, day), timeZone: calendar.timeZone)
+        })
+        let spainName = localizedCountryName("ES")
+
+        let photos = [
+            PhotoSignalInfo(
+                dayKey: DayKey.make(from: start, timeZone: calendar.timeZone),
+                countryCode: nil,
+                countryName: spainName,
+                timeZoneId: "UTC"
+            ),
+            PhotoSignalInfo(
+                dayKey: DayKey.make(from: end, timeZone: calendar.timeZone),
+                countryCode: "ES",
+                countryName: spainName,
+                timeZoneId: "UTC"
+            )
+        ]
+
+        let results = PresenceInferenceEngine.compute(
+            dayKeys: dayKeys,
+            stays: [],
+            overrides: [],
+            locations: [],
+            photos: photos,
+            calendarSignals: [],
+            rangeEnd: end,
+            calendar: calendar
+        )
+
+        let bridgedKeys = (2...8).map { day in
+            DayKey.make(from: self.day(2026, 2, day), timeZone: calendar.timeZone)
+        }
+
+        for key in bridgedKeys {
+            let result = results.first { $0.dayKey == key }
+            XCTAssertEqual(result?.countryCode, "ES")
+            XCTAssertEqual(result?.countryName, spainName)
+            XCTAssertEqual(result?.confidenceLabel, .medium)
+        }
+    }
+
+    func testDoesNotBridgeEightDayVoidWhenCountriesMatch() {
+        let start = day(2026, 2, 1)
+        let end = day(2026, 2, 10)
+        let dayKeys = Set((1...10).map { day in
+            DayKey.make(from: self.day(2026, 2, day), timeZone: calendar.timeZone)
+        })
+        let spainName = localizedCountryName("ES")
+
+        let photos = [
+            PhotoSignalInfo(
+                dayKey: DayKey.make(from: start, timeZone: calendar.timeZone),
+                countryCode: nil,
+                countryName: spainName,
+                timeZoneId: "UTC"
+            ),
+            PhotoSignalInfo(
+                dayKey: DayKey.make(from: end, timeZone: calendar.timeZone),
+                countryCode: "ES",
+                countryName: spainName,
+                timeZoneId: "UTC"
+            )
+        ]
+
+        let results = PresenceInferenceEngine.compute(
+            dayKeys: dayKeys,
+            stays: [],
+            overrides: [],
+            locations: [],
+            photos: photos,
+            calendarSignals: [],
+            rangeEnd: end,
+            calendar: calendar
+        )
+
+        let unresolvedKeys = (2...9).map { day in
+            DayKey.make(from: self.day(2026, 2, day), timeZone: calendar.timeZone)
+        }
+
+        for key in unresolvedKeys {
+            let result = results.first { $0.dayKey == key }
+            XCTAssertNil(result?.countryCode)
+        }
     }
 }
 #endif
