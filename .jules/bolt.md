@@ -63,3 +63,7 @@
 ## 2026-03-19 - Optimize Unicode scalar preprocessing in flight parsing
 **Learning:** Chaining `.unicodeScalars.filter`, `String(UnicodeScalarView(...))`, and `replacingOccurrences` in Swift causes multiple O(N) heap allocations and passes over the string.
 **Action:** Use `raw.unicodeScalars.lazy.compactMap { ... }` and a `switch` statement on `scalar.value` to combine filtering and mapping into a single lazy pass, then initialize the result string directly with `String(scalars)`.
+
+## 2026-03-22 - Fast-Path Normalized Strings in High-Frequency Loops
+**Learning:** O(N) string operations like `trimmingCharacters(in:)` and `.uppercased()` generate significant heap memory allocation overhead when called repetitively inside high-frequency `for` loops (e.g., iterating over hundreds of `PresenceDay` models during SwiftUI view evaluation in `DashboardView` and `CountryDetailView`).
+**Action:** Always add `O(1)` early-exit fast paths (like examining `code.utf8` sequences) to return the original unmodified string immediately if it already conforms to the required normalization standard. This avoids the hidden performance penalty of unnecessary heap reallocations.
