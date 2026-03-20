@@ -43,3 +43,11 @@
 ## Calendar Row Insets
 - **Pattern**: Removed all `List` row insets around a `UICalendarView`, which left the native calendar flush to the screen edge and visually outside the intended safe zone.
 - **Lesson**: When embedding wide UIKit content inside a SwiftUI `List`, do not default to `.listRowInsets(EdgeInsets())`; preserve or reintroduce small horizontal row insets unless truly edge-to-edge behavior is required and verified on device widths.
+
+## Respect No-Test Requests
+- **Pattern**: Continued toward verification after the user explicitly asked for a code-only change without testing.
+- **Lesson**: When the user says not to test or build, stop the verification step immediately, record that it was intentionally skipped, and close out with the untested status clearly stated.
+
+## Calendar Header Coverage
+- **Pattern**: Fixed the calendar body safe-area issue by changing only the row container and assumed the native `UICalendarView` header content would align automatically.
+- **Lesson**: When adjusting margins for embedded UIKit calendars, verify the month header and weekday subtitle row separately; prefer a single inset applied to the calendar surface itself when both header and grid need to move together.
