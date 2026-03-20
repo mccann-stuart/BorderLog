@@ -35,3 +35,7 @@
 ## Native UI Quality Bar
 - **Pattern**: Delivered a new tab with working data behavior but a visual design that did not meet the expected native iOS quality bar.
 - **Lesson**: For new top-level SwiftUI surfaces, design the visual hierarchy intentionally from the start: prefer system materials, restrained gradients, strong spacing, native controls, and section/card structures that feel like first-party iOS instead of shipping a functional but rough layout and iterating only after user pushback.
+
+## Responsive Calendar Grid
+- **Pattern**: Styled a seven-column calendar with fixed-size day content, which caused the month grid to push outside the safe area on smaller screens.
+- **Lesson**: For dense calendar layouts, size day cells from the available container width instead of assuming fixed dimensions; add safe-area-aware outer padding only after the internal grid is responsive.

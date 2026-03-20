@@ -1,3 +1,21 @@
+# Task Plan: Fix Git Sync
+
+- [ ] Sync local main branch with remote origin/main.
+
+---
+
+# Task Plan (Calendar Safe Area Margins)
+
+- [ ] Make the Calendar month grid responsive so seven columns fit on compact screens.
+- [ ] Add small safe-area-aware horizontal margins to keep the Calendar content on screen.
+- [ ] Run an app build and record the verification result.
+
+## Review (Calendar Safe Area Margins)
+
+- Pending implementation.
+
+---
+
 # Rebuild Calendar Tab
 
 - [x] Create PR branch (`feature/rebuild-calendar-tab`).
