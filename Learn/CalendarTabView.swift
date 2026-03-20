@@ -57,7 +57,6 @@ struct CalendarTabView: View {
                     }
                 )
                 .frame(minHeight: 450)
-                .padding(.horizontal, 12)
                 .listRowInsets(EdgeInsets())
                 .listRowBackground(Color.clear)
             }
@@ -188,9 +187,12 @@ struct NativeCalendarView: UIViewRepresentable {
 
     func makeUIView(context: Context) -> UICalendarView {
         let calendarView = UICalendarView()
+        let horizontalInset: CGFloat = 12
         calendarView.calendar = Calendar.current
         calendarView.locale = Locale.current
         calendarView.fontDesign = .rounded
+        calendarView.layoutMargins = UIEdgeInsets(top: 0, left: horizontalInset, bottom: 0, right: horizontalInset)
+        calendarView.directionalLayoutMargins = NSDirectionalEdgeInsets(top: 0, leading: horizontalInset, bottom: 0, trailing: horizontalInset)
         calendarView.delegate = context.coordinator
         
         let selection = UICalendarSelectionSingleDate(delegate: context.coordinator)

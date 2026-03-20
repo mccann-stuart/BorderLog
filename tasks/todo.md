@@ -43,7 +43,7 @@
 
 ## Review (Calendar Header Safe Area Margins)
 
-- Fix applied: moved the 12-point horizontal margin onto the `NativeCalendarView` itself with `.padding(.horizontal, 12)` while keeping `.listRowInsets(EdgeInsets())`, so the month header and weekday subtitle row inherit the same inset as the calendar body.
+- Fix applied: set `UICalendarView` `layoutMargins` and `directionalLayoutMargins` to a 12-point horizontal inset in `makeUIView`, so `March 2026`, the chevrons, and the weekday subtitle row share the same safe-area spacing as the calendar body.
 - Verification: not run, per user instruction to avoid testing.
 
 ---
