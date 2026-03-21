@@ -17,15 +17,32 @@ final class CalendarFlightParsingTests: XCTestCase {
     }
 
     func testShouldIngestRejectsFriendTaggedEvents() {
+        XCTAssertEqual(CalendarFlightParsing.classify(event: snapshot(title: "Flight to Paris", notes: "Friend: Alice")), .none)
         XCTAssertFalse(CalendarFlightParsing.shouldIngest(event: snapshot(title: "Flight to Paris", notes: "Friend: Alice")))
     }
 
     func testShouldIngestAcceptsFlightKeywordsOrEmoji() {
         let keywordSnapshot = snapshot(title: "Flight to Paris")
+        XCTAssertEqual(CalendarFlightParsing.classify(event: keywordSnapshot), .flight)
         XCTAssertTrue(CalendarFlightParsing.shouldIngest(event: keywordSnapshot))
+        XCTAssertTrue(CalendarFlightParsing.shouldDecorateAsFlight(event: keywordSnapshot))
 
         let emojiSnapshot = snapshot(title: "LHR ✈ JFK")
+        XCTAssertEqual(CalendarFlightParsing.classify(event: emojiSnapshot), .flight)
         XCTAssertTrue(CalendarFlightParsing.shouldIngest(event: emojiSnapshot))
+        XCTAssertTrue(CalendarFlightParsing.shouldDecorateAsFlight(event: emojiSnapshot))
+    }
+
+    func testShouldIngestAcceptsNonFlightTravelWithoutFlightDecoration() {
+        let trainSnapshot = snapshot(title: "Train to Paris")
+        XCTAssertEqual(CalendarFlightParsing.classify(event: trainSnapshot), .otherTravelOrLodging)
+        XCTAssertTrue(CalendarFlightParsing.shouldIngest(event: trainSnapshot))
+        XCTAssertFalse(CalendarFlightParsing.shouldDecorateAsFlight(event: trainSnapshot))
+
+        let hotelSnapshot = snapshot(title: "Hotel in Berlin")
+        XCTAssertEqual(CalendarFlightParsing.classify(event: hotelSnapshot), .otherTravelOrLodging)
+        XCTAssertTrue(CalendarFlightParsing.shouldIngest(event: hotelSnapshot))
+        XCTAssertFalse(CalendarFlightParsing.shouldDecorateAsFlight(event: hotelSnapshot))
     }
 
     func testParseFlightInfoFromAirportCodes() {

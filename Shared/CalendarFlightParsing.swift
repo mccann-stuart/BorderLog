@@ -14,8 +14,22 @@ struct CalendarEventTextSnapshot: Sendable {
     let notes: String?
 }
 
+enum CalendarEventIngestability: Sendable {
+    case flight
+    case otherTravelOrLodging
+    case none
+
+    var shouldIngest: Bool {
+        self != .none
+    }
+
+    var shouldDecorateAsFlight: Bool {
+        self == .flight
+    }
+}
+
 enum CalendarFlightParsing {
-    static func shouldIngest(event: CalendarEventTextSnapshot) -> Bool {
+    static func classify(event: CalendarEventTextSnapshot) -> CalendarEventIngestability {
         let candidates = [
             event.title,
             event.location,
@@ -24,14 +38,26 @@ enum CalendarFlightParsing {
         ].compactMap { $0 }
 
         for text in candidates where text.localizedCaseInsensitiveContains("Friend:") {
-            return false
+            return .none
         }
 
-        for text in candidates where text.contains("✈") || text.contains("🚆") || text.contains("🚄") || text.contains("⛴") || text.contains("🏨") || text.localizedCaseInsensitiveContains("Flight") || text.localizedCaseInsensitiveContains("Train") || text.localizedCaseInsensitiveContains("Ferry") || text.localizedCaseInsensitiveContains("Bus") || text.localizedCaseInsensitiveContains("Hotel") {
-            return true
+        for text in candidates where isFlightText(text) {
+            return .flight
         }
 
-        return false
+        for text in candidates where isOtherTravelOrLodgingText(text) {
+            return .otherTravelOrLodging
+        }
+
+        return .none
+    }
+
+    static func shouldIngest(event: CalendarEventTextSnapshot) -> Bool {
+        classify(event: event).shouldIngest
+    }
+
+    static func shouldDecorateAsFlight(event: CalendarEventTextSnapshot) -> Bool {
+        classify(event: event).shouldDecorateAsFlight
     }
 
     static func parseFlightInfo(event: CalendarEventTextSnapshot) -> (from: String?, to: String?) {
@@ -133,6 +159,21 @@ enum CalendarFlightParsing {
         }
 
         return (bestFrom, bestTo)
+    }
+
+    private static func isFlightText(_ text: String) -> Bool {
+        text.contains("✈") || text.localizedCaseInsensitiveContains("Flight")
+    }
+
+    private static func isOtherTravelOrLodgingText(_ text: String) -> Bool {
+        text.contains("🚆")
+        || text.contains("🚄")
+        || text.contains("⛴")
+        || text.contains("🏨")
+        || text.localizedCaseInsensitiveContains("Train")
+        || text.localizedCaseInsensitiveContains("Ferry")
+        || text.localizedCaseInsensitiveContains("Bus")
+        || text.localizedCaseInsensitiveContains("Hotel")
     }
 
     private static func preprocessCandidateText(_ raw: String) -> String {

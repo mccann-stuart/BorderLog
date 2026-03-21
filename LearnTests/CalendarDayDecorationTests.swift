@@ -96,5 +96,27 @@ final class CalendarDayDecorationTests: XCTestCase {
 
         XCTAssertEqual(tokens, ["🇬🇧", "✈️", "🇺🇸", "🇨🇦", "🇲🇽"])
     }
+
+    func testCalendarDayDecorationTokensDoNotRenderPlaneForNonFlightDays() {
+        let tokens = calendarDayDecorationTokens(
+            for: summary(
+                countries: [country("DE"), country("FR")],
+                hasFlight: false
+            )
+        )
+
+        XCTAssertEqual(tokens, ["🇩🇪", "🇫🇷"])
+    }
+
+    func testCalendarDayDecorationTokensRenderSuggestionOnlyDaysAsPlainFlags() {
+        let tokens = calendarDayDecorationTokens(
+            for: summary(
+                countries: [country("GB"), country("US")],
+                hasFlight: false
+            )
+        )
+
+        XCTAssertEqual(tokens, ["🇬🇧", "🇺🇸"])
+    }
 }
 #endif

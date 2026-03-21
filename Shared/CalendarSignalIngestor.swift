@@ -13,6 +13,7 @@ import MapKit
 @ModelActor
 actor CalendarSignalIngestor {
     private static let primarySignalSource = "Calendar"
+    private static let flightPrimarySignalSource = "CalendarFlight"
     private static let flightOriginSignalSource = "CalendarFlightOrigin"
     private static let originSignalSuffix = "#origin"
     private static let legacyEndSignalSuffix = "#end"
@@ -138,8 +139,9 @@ actor CalendarSignalIngestor {
             let endId = id + Self.legacyEndSignalSuffix
             var eventMutations = 0
             let snapshot = eventSnapshot(for: event)
+            let ingestability = classify(snapshot)
 
-            guard shouldIngest(snapshot) else {
+            guard ingestability.shouldIngest else {
                 eventMutations += deleteSignalIfExists(
                     identifier: id,
                     existingSignalByIdentifier: &existingSignalByIdentifier,
@@ -189,7 +191,8 @@ actor CalendarSignalIngestor {
             )
 
             let originResolved: ResolvedCalendarSignal?
-            if primarySelection.usesDestinationRule,
+            if ingestability.shouldDecorateAsFlight,
+               primarySelection.usesDestinationRule,
                let originLocation = nonEmptyLocation(parsedFrom) {
                 originResolved = await resolveSignal(
                     locationString: originLocation,
@@ -208,7 +211,7 @@ actor CalendarSignalIngestor {
                     identifier: id,
                     resolved: startResolved,
                     title: event.title,
-                    source: Self.primarySignalSource,
+                    source: ingestability.shouldDecorateAsFlight ? Self.flightPrimarySignalSource : Self.primarySignalSource,
                     existingSignalByIdentifier: &existingSignalByIdentifier,
                     touchedDayKeys: &touchedDayKeys
                 ) {
@@ -290,8 +293,8 @@ actor CalendarSignalIngestor {
         )
     }
 
-    private func shouldIngest(_ snapshot: CalendarEventTextSnapshot) -> Bool {
-        CalendarFlightParsing.shouldIngest(event: snapshot)
+    private func classify(_ snapshot: CalendarEventTextSnapshot) -> CalendarEventIngestability {
+        CalendarFlightParsing.classify(event: snapshot)
     }
 
     private func parseFlightInfo(_ snapshot: CalendarEventTextSnapshot) -> (from: String?, to: String?) {

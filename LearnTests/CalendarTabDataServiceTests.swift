@@ -49,10 +49,15 @@ final class CalendarTabDataServiceTests: XCTestCase {
         confidence: Double,
         confidenceLabel: ConfidenceLabel,
         sources: SignalSourceMask,
+        isOverride: Bool = false,
         stayCount: Int,
         photoCount: Int,
         locationCount: Int,
-        calendarCount: Int
+        calendarCount: Int,
+        suggestedCountryCode1: String? = nil,
+        suggestedCountryName1: String? = nil,
+        suggestedCountryCode2: String? = nil,
+        suggestedCountryName2: String? = nil
     ) -> PresenceDay {
         let contributedCountries: [ContributedCountry]
         if let countryName {
@@ -73,11 +78,15 @@ final class CalendarTabDataServiceTests: XCTestCase {
             confidence: confidence,
             confidenceLabel: confidenceLabel,
             sources: sources,
-            isOverride: false,
+            isOverride: isOverride,
             stayCount: stayCount,
             photoCount: photoCount,
             locationCount: locationCount,
-            calendarCount: calendarCount
+            calendarCount: calendarCount,
+            suggestedCountryCode1: suggestedCountryCode1,
+            suggestedCountryName1: suggestedCountryName1,
+            suggestedCountryCode2: suggestedCountryCode2,
+            suggestedCountryName2: suggestedCountryName2
         )
     }
 
@@ -124,7 +133,7 @@ final class CalendarTabDataServiceTests: XCTestCase {
                 bucketingTimeZoneId: timeZoneID,
                 eventIdentifier: "flight-1",
                 title: "Flight to London",
-                source: "Calendar"
+                source: "CalendarFlight"
             )
         )
         context.insert(CountryConfig(countryCode: "GB", maxAllowedDays: 180))
@@ -482,7 +491,7 @@ final class CalendarTabDataServiceTests: XCTestCase {
                 bucketingTimeZoneId: "America/New_York",
                 eventIdentifier: "flight-1",
                 title: "LHR to JFK",
-                source: "Calendar"
+                source: "CalendarFlight"
             )
         )
         try context.save()
@@ -551,7 +560,7 @@ final class CalendarTabDataServiceTests: XCTestCase {
                 bucketingTimeZoneId: "Europe/Paris",
                 eventIdentifier: "flight-2",
                 title: "LHR to CDG",
-                source: "Calendar"
+                source: "CalendarFlight"
             )
         )
         try context.save()
@@ -601,7 +610,7 @@ final class CalendarTabDataServiceTests: XCTestCase {
                 bucketingTimeZoneId: "Europe/Berlin",
                 eventIdentifier: "flight-a",
                 title: "LHR to FRA",
-                source: "Calendar"
+                source: "CalendarFlight"
             )
         )
         context.insert(
@@ -631,7 +640,7 @@ final class CalendarTabDataServiceTests: XCTestCase {
                 bucketingTimeZoneId: "America/New_York",
                 eventIdentifier: "flight-b",
                 title: "CDG to JFK",
-                source: "Calendar"
+                source: "CalendarFlight"
             )
         )
         try context.save()
@@ -647,5 +656,166 @@ final class CalendarTabDataServiceTests: XCTestCase {
         XCTAssertEqual(march18.flightOriginCountry?.id, "GB")
         XCTAssertEqual(march18.flightDestinationCountry?.id, "US")
         XCTAssertEqual(march18.countries.map(\.id), ["GB", "US", "DE", "FR"])
+    }
+
+    func testSnapshotKeepsNonFlightCalendarEvidenceWithoutPlaneDecoration() async throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let dayKey = "2026-03-12"
+
+        context.insert(
+            CalendarSignal(
+                timestamp: makeDate(2026, 3, 12, hour: 9),
+                dayKey: dayKey,
+                latitude: 48.8566,
+                longitude: 2.3522,
+                countryCode: "FR",
+                countryName: localizedCountryName("FR"),
+                timeZoneId: "Europe/Paris",
+                bucketingTimeZoneId: "Europe/Paris",
+                eventIdentifier: "train-1",
+                title: "Train to Paris",
+                source: "Calendar"
+            )
+        )
+        try context.save()
+
+        let service = CalendarTabDataService(modelContainer: container)
+        let snapshot = try await service.snapshot(
+            visibleMonthStart: makeDate(2026, 3, 1),
+            summaryRange: .visibleMonth,
+            now: makeDate(2026, 3, 19)
+        )
+
+        let march12 = try XCTUnwrap(snapshot.daySummaries.first { $0.dayKey == dayKey })
+        XCTAssertFalse(march12.hasFlight)
+        XCTAssertNil(march12.flightOriginCountry)
+        XCTAssertNil(march12.flightDestinationCountry)
+        XCTAssertEqual(march12.countries.map(\.id), ["FR"])
+    }
+
+    func testSnapshotPrefersResolvedCountryWhenFlightOriginsShareTimestamp() async throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let dayKey = "2026-03-10"
+        let timeZoneID = TimeZone.current.identifier
+
+        context.insert(
+            makePresenceDay(
+                dayKey: dayKey,
+                date: normalizedDate(for: dayKey),
+                timeZoneId: timeZoneID,
+                countryCode: "GB",
+                countryName: localizedCountryName("GB"),
+                confidence: 0.6,
+                confidenceLabel: .medium,
+                sources: .calendar,
+                isOverride: false,
+                stayCount: 0,
+                photoCount: 0,
+                locationCount: 0,
+                calendarCount: 3
+            )
+        )
+        context.insert(
+            CalendarSignal(
+                timestamp: makeDate(2026, 3, 10, hour: 8),
+                dayKey: dayKey,
+                latitude: 40.6413,
+                longitude: -73.7781,
+                countryCode: "US",
+                countryName: localizedCountryName("US"),
+                timeZoneId: "America/New_York",
+                bucketingTimeZoneId: "America/New_York",
+                eventIdentifier: "flight-a#origin",
+                title: "JFK to LHR",
+                source: "CalendarFlightOrigin"
+            )
+        )
+        context.insert(
+            CalendarSignal(
+                timestamp: makeDate(2026, 3, 10, hour: 8),
+                dayKey: dayKey,
+                latitude: 51.4700,
+                longitude: -0.4543,
+                countryCode: "GB",
+                countryName: localizedCountryName("GB"),
+                timeZoneId: "Europe/London",
+                bucketingTimeZoneId: "Europe/London",
+                eventIdentifier: "flight-b#origin",
+                title: "LHR to FRA",
+                source: "CalendarFlightOrigin"
+            )
+        )
+        context.insert(
+            CalendarSignal(
+                timestamp: makeDate(2026, 3, 10, hour: 14),
+                dayKey: dayKey,
+                latitude: 50.0379,
+                longitude: 8.5622,
+                countryCode: "DE",
+                countryName: localizedCountryName("DE"),
+                timeZoneId: "Europe/Berlin",
+                bucketingTimeZoneId: "Europe/Berlin",
+                eventIdentifier: "flight-b",
+                title: "LHR to FRA",
+                source: "CalendarFlight"
+            )
+        )
+        try context.save()
+
+        let service = CalendarTabDataService(modelContainer: container)
+        let snapshot = try await service.snapshot(
+            visibleMonthStart: makeDate(2026, 3, 1),
+            summaryRange: .visibleMonth,
+            now: makeDate(2026, 3, 19)
+        )
+
+        let march10 = try XCTUnwrap(snapshot.daySummaries.first { $0.dayKey == dayKey })
+        XCTAssertTrue(march10.hasFlight)
+        XCTAssertEqual(march10.flightOriginCountry?.id, "GB")
+        XCTAssertEqual(march10.flightDestinationCountry?.id, "DE")
+        XCTAssertEqual(march10.countries.map(\.id), ["GB", "DE", "US"])
+    }
+
+    func testSnapshotFallsBackToSuggestionsWhenResolvedAndRawCountriesAreMissing() async throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let dayKey = "2026-03-07"
+
+        context.insert(
+            makePresenceDay(
+                dayKey: dayKey,
+                date: normalizedDate(for: dayKey),
+                timeZoneId: TimeZone.current.identifier,
+                countryCode: nil,
+                countryName: nil,
+                confidence: 0.0,
+                confidenceLabel: .low,
+                sources: .none,
+                isOverride: false,
+                stayCount: 0,
+                photoCount: 0,
+                locationCount: 0,
+                calendarCount: 0,
+                suggestedCountryCode1: "GB",
+                suggestedCountryName1: localizedCountryName("GB"),
+                suggestedCountryCode2: "DE",
+                suggestedCountryName2: localizedCountryName("DE")
+            )
+        )
+        try context.save()
+
+        let service = CalendarTabDataService(modelContainer: container)
+        let snapshot = try await service.snapshot(
+            visibleMonthStart: makeDate(2026, 3, 1),
+            summaryRange: .visibleMonth,
+            now: makeDate(2026, 3, 19)
+        )
+
+        let march7 = try XCTUnwrap(snapshot.daySummaries.first { $0.dayKey == dayKey })
+        XCTAssertFalse(march7.hasFlight)
+        XCTAssertEqual(march7.countries.map(\.id), ["GB", "DE"])
+        XCTAssertTrue(snapshot.countrySummaries.isEmpty)
     }
 }

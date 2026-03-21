@@ -272,11 +272,27 @@ struct DebugExportDaySourceCounts: Codable, Sendable {
     let calendarSignals: Int
 }
 
+struct DebugExportPresenceSummary: Codable, Sendable {
+    let countryCode: String?
+    let countryName: String?
+    let suggestedCountryCode1: String?
+    let suggestedCountryName1: String?
+    let suggestedCountryCode2: String?
+    let suggestedCountryName2: String?
+    let contributedCountries: [ContributedCountry]
+    let sourceLabels: [String]
+    let confidence: Double
+    let confidenceLabelRaw: String
+    let isDisputed: Bool
+    let isManuallyModified: Bool
+}
+
 struct DebugExportDaySnapshot: Codable, Sendable {
     let dayKey: String
     let date: Date
     let timeZoneId: String?
     let presence: DebugExportPresenceDayRecord?
+    let presenceSummary: DebugExportPresenceSummary?
     let dayOverride: DebugExportDayOverrideRecord?
     let staysCoveringDay: [DebugExportStayRecord]
     let locations: [DebugExportLocationSampleRecord]
@@ -290,6 +306,7 @@ struct DebugExportDaySnapshot: Codable, Sendable {
         case date
         case timeZoneId
         case presence
+        case presenceSummary
         case dayOverride = "override"
         case staysCoveringDay
         case locations
@@ -640,6 +657,7 @@ actor DebugDataStoreExportService {
                     date: normalizedDate,
                     timeZoneId: timeZoneId,
                     presence: presence,
+                    presenceSummary: presence.map(makePresenceSummary),
                     dayOverride: dayOverride,
                     staysCoveringDay: stays,
                     locations: locations,
@@ -661,6 +679,23 @@ actor DebugDataStoreExportService {
                 }
                 return $0.date < $1.date
             }
+    }
+
+    private static func makePresenceSummary(_ presence: DebugExportPresenceDayRecord) -> DebugExportPresenceSummary {
+        DebugExportPresenceSummary(
+            countryCode: presence.countryCode,
+            countryName: presence.countryName,
+            suggestedCountryCode1: presence.suggestedCountryCode1,
+            suggestedCountryName1: presence.suggestedCountryName1,
+            suggestedCountryCode2: presence.suggestedCountryCode2,
+            suggestedCountryName2: presence.suggestedCountryName2,
+            contributedCountries: presence.contributedCountries,
+            sourceLabels: presence.sourceLabels,
+            confidence: presence.confidence,
+            confidenceLabelRaw: presence.confidenceLabelRaw,
+            isDisputed: presence.isDisputed,
+            isManuallyModified: presence.isManuallyModified
+        )
     }
 
     private static func expandedDayKeys(

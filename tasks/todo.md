@@ -84,3 +84,18 @@
 - [x] Adjacent travel promotions now set calendar source/count and add explicit before/after evidence markers
 - [x] Transition-gap infill now promotes disputed two-country results while preserving suggestions
 - [ ] `swiftc -parse` passed for updated inference and test files; `xcodebuild test` is still blocked by older test fixtures using the obsolete `PresenceDay` initializer, and `xcodebuild build` is still blocked in this environment by SwiftData macro/plugin failures
+
+## Task: Calendar travel decorations, suggestion fallback, and export day summary
+- [x] Inspect current calendar parsing, ingestion, day aggregation, view decoration, and export behavior
+- [x] Split calendar event classification into flight vs non-flight travel/lodging vs none
+- [x] Restrict flight decorations to actual flight signals while preserving non-flight evidence
+- [x] Make same-day flight endpoint selection deterministic with ordered candidate tie-breaking
+- [x] Render suggestion-only days as plain fallback flags without affecting summaries
+- [x] Add flat `presenceSummary` to debug export day snapshots
+- [x] Add and update focused regression tests for parsing, day summaries, decorations, and export shape
+- [x] Run targeted verification and document results
+
+## Review
+- [x] `swiftc -parse` passed for all edited production and test files
+- [x] Targeted `xcodebuild test` could not start because this environment cannot discover or boot iOS Simulator runtimes (`simdiskimaged` / destination resolution failure)
+- [x] Generic `xcodebuild build` is still blocked in this environment by SwiftData macro/plugin failures unrelated to these edits

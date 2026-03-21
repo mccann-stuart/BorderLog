@@ -138,13 +138,14 @@ actor CalendarTabDataService {
     fileprivate struct FlightCountryCandidate {
         let country: CalendarDayCountry
         let timestamp: Date
+        let eventIdentifier: String
     }
 
     fileprivate struct DayAccumulator {
         var countriesByID: [String: CalendarDayCountry] = [:]
         var hasFlight = false
-        var earliestFlightOrigin: FlightCountryCandidate?
-        var latestFlightDestination: FlightCountryCandidate?
+        var flightOriginCandidates: [FlightCountryCandidate] = []
+        var flightDestinationCandidates: [FlightCountryCandidate] = []
     }
 
     fileprivate struct DayKeyRange {
@@ -435,30 +436,25 @@ actor CalendarTabDataService {
         to accumulators: inout [String: DayAccumulator]
     ) {
         guard var accumulator = accumulators[signal.dayKey] else { return }
-        accumulator.hasFlight = true
 
         if let country = Self.normalizedCountry(
             countryCode: signal.countryCode,
             countryName: signal.countryName
         ) {
             accumulator.countriesByID[country.id] = country
-            let candidate = FlightCountryCandidate(country: country, timestamp: signal.timestamp)
 
-            if signal.source == "CalendarFlightOrigin" {
-                if let existing = accumulator.earliestFlightOrigin {
-                    if candidate.timestamp < existing.timestamp {
-                        accumulator.earliestFlightOrigin = candidate
-                    }
+            if Self.isFlightSignalSource(signal.source) {
+                accumulator.hasFlight = true
+                let candidate = FlightCountryCandidate(
+                    country: country,
+                    timestamp: signal.timestamp,
+                    eventIdentifier: signal.eventIdentifier
+                )
+
+                if Self.isFlightOriginSignalSource(signal.source) {
+                    accumulator.flightOriginCandidates.append(candidate)
                 } else {
-                    accumulator.earliestFlightOrigin = candidate
-                }
-            } else {
-                if let existing = accumulator.latestFlightDestination {
-                    if candidate.timestamp > existing.timestamp {
-                        accumulator.latestFlightDestination = candidate
-                    }
-                } else {
-                    accumulator.latestFlightDestination = candidate
+                    accumulator.flightDestinationCandidates.append(candidate)
                 }
             }
         }
@@ -653,25 +649,42 @@ actor CalendarTabDataService {
         return monthRange.dayKeys.compactMap { dayKey in
             guard let date = DayKey.date(for: dayKey, timeZone: calendar.timeZone) else { return nil }
             let accumulator = accumulators[dayKey]
-            let resolvedCountry = resolvedDayMap[dayKey].flatMap {
+            let resolvedDay = resolvedDayMap[dayKey]
+            let resolvedCountry = resolvedDay.flatMap {
                 Self.normalizedCountry(
                     countryCode: $0.countryCode,
                     countryName: $0.countryName
                 )
             }
-            let flightOriginCountry = accumulator?.earliestFlightOrigin?.country
-            let flightDestinationCountry = accumulator?.latestFlightDestination?.country
+            let flightOriginCountry = accumulator.flatMap {
+                preferredFlightCountry(
+                    from: $0.flightOriginCandidates,
+                    resolvedCountry: resolvedCountry,
+                    preferLatest: false
+                )
+            }
+            let flightDestinationCountry = accumulator.flatMap {
+                preferredFlightCountry(
+                    from: $0.flightDestinationCandidates,
+                    resolvedCountry: resolvedCountry,
+                    preferLatest: true
+                )
+            }
             let countries: [CalendarDayCountry]
 
             if let accumulator, accumulator.hasFlight {
                 countries = makeFlightDecorationCountries(
                     accumulator: accumulator,
-                    resolvedCountry: resolvedCountry
+                    resolvedCountry: resolvedCountry,
+                    flightOriginCountry: flightOriginCountry,
+                    flightDestinationCountry: flightDestinationCountry
                 )
             } else if let resolvedCountry {
                 countries = [resolvedCountry]
+            } else if let accumulator, !accumulator.countriesByID.isEmpty {
+                countries = sortedCountries(accumulator.countriesByID.values)
             } else {
-                countries = accumulator.map { sortedCountries($0.countriesByID.values) } ?? []
+                countries = suggestionCountries(from: resolvedDay)
             }
 
             return CalendarDaySummary(
@@ -690,7 +703,9 @@ actor CalendarTabDataService {
 
     nonisolated fileprivate static func makeFlightDecorationCountries(
         accumulator: DayAccumulator,
-        resolvedCountry: CalendarDayCountry?
+        resolvedCountry: CalendarDayCountry?,
+        flightOriginCountry: CalendarDayCountry?,
+        flightDestinationCountry: CalendarDayCountry?
     ) -> [CalendarDayCountry] {
         var countries: [CalendarDayCountry] = []
         var seenIDs = Set<String>()
@@ -700,8 +715,8 @@ actor CalendarTabDataService {
             countries.append(country)
         }
 
-        append(accumulator.earliestFlightOrigin?.country)
-        append(accumulator.latestFlightDestination?.country)
+        append(flightOriginCountry)
+        append(flightDestinationCountry)
         append(resolvedCountry)
 
         for country in sortedCountries(accumulator.countriesByID.values) {
@@ -717,5 +732,76 @@ actor CalendarTabDataService {
         Array(countries).sorted { lhs, rhs in
             lhs.countryName.localizedCaseInsensitiveCompare(rhs.countryName) == .orderedAscending
         }
+    }
+
+    private nonisolated static func isFlightSignalSource(_ source: String?) -> Bool {
+        guard let source else { return false }
+        return source.hasPrefix("CalendarFlight")
+    }
+
+    private nonisolated static func isFlightOriginSignalSource(_ source: String?) -> Bool {
+        source == "CalendarFlightOrigin"
+    }
+
+    private nonisolated static func preferredFlightCountry(
+        from candidates: [FlightCountryCandidate],
+        resolvedCountry: CalendarDayCountry?,
+        preferLatest: Bool
+    ) -> CalendarDayCountry? {
+        candidates.sorted {
+            compareFlightCandidates(
+                lhs: $0,
+                rhs: $1,
+                resolvedCountry: resolvedCountry,
+                preferLatest: preferLatest
+            )
+        }.first?.country
+    }
+
+    private nonisolated static func compareFlightCandidates(
+        lhs: FlightCountryCandidate,
+        rhs: FlightCountryCandidate,
+        resolvedCountry: CalendarDayCountry?,
+        preferLatest: Bool
+    ) -> Bool {
+        if lhs.timestamp != rhs.timestamp {
+            return preferLatest ? lhs.timestamp > rhs.timestamp : lhs.timestamp < rhs.timestamp
+        }
+
+        let resolvedID = resolvedCountry?.id
+        let lhsMatchesResolved = lhs.country.id == resolvedID
+        let rhsMatchesResolved = rhs.country.id == resolvedID
+        if lhsMatchesResolved != rhsMatchesResolved {
+            return lhsMatchesResolved
+        }
+
+        let lhsHasCode = lhs.country.countryCode != nil
+        let rhsHasCode = rhs.country.countryCode != nil
+        if lhsHasCode != rhsHasCode {
+            return lhsHasCode
+        }
+
+        if lhs.eventIdentifier != rhs.eventIdentifier {
+            return lhs.eventIdentifier.localizedCaseInsensitiveCompare(rhs.eventIdentifier) == .orderedAscending
+        }
+
+        return lhs.country.id.localizedCaseInsensitiveCompare(rhs.country.id) == .orderedAscending
+    }
+
+    private nonisolated static func suggestionCountries(from presenceDay: PresenceDay?) -> [CalendarDayCountry] {
+        guard let presenceDay else { return [] }
+
+        var countries: [CalendarDayCountry] = []
+        var seenIDs = Set<String>()
+
+        func append(countryCode: String?, countryName: String?) {
+            guard let country = normalizedCountry(countryCode: countryCode, countryName: countryName),
+                  seenIDs.insert(country.id).inserted else { return }
+            countries.append(country)
+        }
+
+        append(countryCode: presenceDay.suggestedCountryCode1, countryName: presenceDay.suggestedCountryName1)
+        append(countryCode: presenceDay.suggestedCountryCode2, countryName: presenceDay.suggestedCountryName2)
+        return countries
     }
 }

@@ -313,6 +313,15 @@ final class DebugDataStoreExportServiceTests: XCTestCase {
         XCTAssertEqual(march1.presence?.sourceLabels, ["stay", "photo"])
         XCTAssertEqual(march1.presence?.suggestedCountryCode1, "ES")
         XCTAssertEqual(march1.presence?.suggestedCountryCode2, "BE")
+        XCTAssertEqual(march1.presenceSummary?.countryCode, "FR")
+        XCTAssertEqual(march1.presenceSummary?.countryName, "France")
+        XCTAssertEqual(march1.presenceSummary?.suggestedCountryCode1, "ES")
+        XCTAssertEqual(march1.presenceSummary?.suggestedCountryCode2, "BE")
+        XCTAssertEqual(march1.presenceSummary?.sourceLabels, ["stay", "photo"])
+        XCTAssertEqual(march1.presenceSummary?.confidence, 0.91, accuracy: 0.0001)
+        XCTAssertEqual(march1.presenceSummary?.confidenceLabelRaw, "high")
+        XCTAssertEqual(march1.presenceSummary?.isDisputed, true)
+        XCTAssertEqual(march1.presenceSummary?.isManuallyModified, true)
         XCTAssertEqual(march1.staysCoveringDay.count, 1)
         XCTAssertTrue(march1.hasAnyRawEvidence)
 
@@ -323,6 +332,7 @@ final class DebugDataStoreExportServiceTests: XCTestCase {
 
         let march3 = try XCTUnwrap(payload.days.first { $0.dayKey == "2026-03-03" })
         XCTAssertNil(march3.presence)
+        XCTAssertNil(march3.presenceSummary)
         XCTAssertNil(march3.dayOverride)
         XCTAssertEqual(march3.staysCoveringDay.count, 1)
         XCTAssertEqual(march3.sourceCounts.stays, 1)
@@ -373,5 +383,14 @@ final class DebugDataStoreExportServiceTests: XCTestCase {
         XCTAssertEqual(userData["passportNationality"] as? String, "GB")
         XCTAssertTrue(userData.keys.contains("appleUserId"))
         XCTAssertTrue(userData["appleUserId"] is NSNull)
+
+        let days = try XCTUnwrap(jsonObject["days"] as? [[String: Any]])
+        let march1 = try XCTUnwrap(days.first { ($0["dayKey"] as? String) == "2026-03-01" })
+        let presenceSummary = try XCTUnwrap(march1["presenceSummary"] as? [String: Any])
+        XCTAssertEqual(presenceSummary["countryCode"] as? String, "FR")
+        XCTAssertEqual(presenceSummary["countryName"] as? String, "France")
+        XCTAssertEqual(presenceSummary["suggestedCountryCode1"] as? String, "ES")
+        XCTAssertEqual(presenceSummary["suggestedCountryCode2"] as? String, "BE")
+        XCTAssertEqual(presenceSummary["confidenceLabelRaw"] as? String, "high")
     }
 }
