@@ -795,15 +795,15 @@ struct SettingsView: View {
     }
 
     private func locationPermissionStatus(for status: CLAuthorizationStatus) -> DebugExportPermissionStatus {
-        DebugExportPermissionStatus(rawValue: status.rawValue, label: locationStatusLabel(for: status))
+        DebugExportPermissionStatus(rawValue: Int(status.rawValue), label: locationStatusLabel(for: status))
     }
 
     private func photoPermissionStatus(for status: PHAuthorizationStatus) -> DebugExportPermissionStatus {
-        DebugExportPermissionStatus(rawValue: status.rawValue, label: photoStatusLabel(for: status))
+        DebugExportPermissionStatus(rawValue: Int(status.rawValue), label: photoStatusLabel(for: status))
     }
 
     private func calendarPermissionStatus(for status: EKAuthorizationStatus) -> DebugExportPermissionStatus {
-        DebugExportPermissionStatus(rawValue: status.rawValue, label: calendarStatusLabel(for: status))
+        DebugExportPermissionStatus(rawValue: Int(status.rawValue), label: calendarStatusLabel(for: status))
     }
 
     private var deviceModelCategory: String {

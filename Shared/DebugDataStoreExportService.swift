@@ -58,6 +58,21 @@ struct DebugExportUserData: Codable, Sendable {
     let homeCountry: String?
     let appleUserId: String?
     let appleSignInEnabled: Bool
+
+    enum CodingKeys: String, CodingKey {
+        case passportNationality
+        case homeCountry
+        case appleUserId
+        case appleSignInEnabled
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(passportNationality, forKey: .passportNationality)
+        try container.encode(homeCountry, forKey: .homeCountry)
+        try container.encode(appleUserId, forKey: .appleUserId)
+        try container.encode(appleSignInEnabled, forKey: .appleSignInEnabled)
+    }
 }
 
 struct DebugExportDateRange: Codable, Sendable {
@@ -476,10 +491,17 @@ actor DebugDataStoreExportService {
             pendingLocationSnapshots: pendingLocationSnapshots
         )
 
+        let schengenSummary = SchengenLedgerCalculator.summary(for: presenceDays, asOf: exportedAt)
         let summary = Self.makeSummary(
-            exportedAt: exportedAt,
             records: records,
-            presenceDays: presenceDays
+            schengenLedgerSummary: DebugExportSchengenLedgerSummary(
+                usedDays: schengenSummary.usedDays,
+                remainingDays: schengenSummary.remainingDays,
+                overstayDays: schengenSummary.overstayDays,
+                unknownDays: schengenSummary.unknownDays,
+                windowStart: schengenSummary.windowStart,
+                windowEnd: schengenSummary.windowEnd
+            )
         )
         let days = Self.makeDaySnapshots(records: records, exportedAt: exportedAt)
 
@@ -505,9 +527,8 @@ actor DebugDataStoreExportService {
     }
 
     private static func makeSummary(
-        exportedAt: Date,
         records: DebugExportRecords,
-        presenceDays: [PresenceDay]
+        schengenLedgerSummary: DebugExportSchengenLedgerSummary
     ) -> DebugExportSummary {
         let recordCounts = DebugExportRecordCounts(
             stays: records.stays.count,
@@ -552,16 +573,6 @@ actor DebugDataStoreExportService {
             presenceDaysWithPhotoSource: records.presenceDays.filter { $0.sourceLabels.contains("photo") }.count,
             presenceDaysWithLocationSource: records.presenceDays.filter { $0.sourceLabels.contains("location") }.count,
             presenceDaysWithCalendarSource: records.presenceDays.filter { $0.sourceLabels.contains("calendar") }.count
-        )
-
-        let schengenSummary = SchengenLedgerCalculator.summary(for: presenceDays, asOf: exportedAt)
-        let schengenLedgerSummary = DebugExportSchengenLedgerSummary(
-            usedDays: schengenSummary.usedDays,
-            remainingDays: schengenSummary.remainingDays,
-            overstayDays: schengenSummary.overstayDays,
-            unknownDays: schengenSummary.unknownDays,
-            windowStart: schengenSummary.windowStart,
-            windowEnd: schengenSummary.windowEnd
         )
 
         return DebugExportSummary(

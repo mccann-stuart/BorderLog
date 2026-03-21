@@ -54,10 +54,21 @@
 - [x] XcodeRefreshCodeIssuesInFile: PresenceDayDetailView.swift
 
 ## Task: Debug Data Store Export In Settings
-- [ ] Add a background debug export service with codable payload, summaries, and day-level diagnostics
-- [ ] Add an iPhone Settings export flow with file export UI, progress, and error handling
-- [ ] Add focused unit tests for payload generation, summaries, and day union coverage
+- [x] Add a background debug export service with codable payload, summaries, and day-level diagnostics
+- [x] Add an iPhone Settings export flow with file export UI, progress, and error handling
+- [x] Add focused unit tests for payload generation, summaries, and day union coverage
 - [ ] Run targeted verification for the new export feature and document results
 
 ## Review
-- [ ] Pending
+- [x] Added a full-fidelity JSON export payload with records, summaries, and day-level diagnostics
+- [x] Added a Settings export button, progress state, file exporter, and export failure handling
+- [x] Added targeted exporter tests covering payload shape, summary values, and day union logic
+- [ ] `swiftc -parse` passed for the new files, but Xcode verification is blocked by local simulator/runtime and SwiftData macro failures
+
+## Task: Fix SettingsView Debug Export Permission Raw Value Type
+- [x] Inspect SettingsView permission status helpers and DebugExportPermissionStatus
+- [x] Update rawValue conversion to Int for permission statuses
+- [x] Verify diagnostics in SettingsView.swift
+
+## Review
+- [x] XcodeRefreshCodeIssuesInFile: SettingsView.swift

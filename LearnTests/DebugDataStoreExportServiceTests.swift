@@ -364,11 +364,14 @@ final class DebugDataStoreExportServiceTests: XCTestCase {
         XCTAssertEqual(photoSignals.first?["assetIdHash"] as? String, "asset-raw-1")
 
         let locationSamples = try XCTUnwrap(records["locationSamples"] as? [[String: Any]])
-        XCTAssertEqual(locationSamples.first?["latitude"] as? Double, 51.5074, accuracy: 0.0001)
-        XCTAssertEqual(locationSamples.first?["longitude"] as? Double, -0.1278, accuracy: 0.0001)
+        let latitude = try XCTUnwrap(locationSamples.first?["latitude"] as? Double)
+        let longitude = try XCTUnwrap(locationSamples.first?["longitude"] as? Double)
+        XCTAssertEqual(latitude, 51.5074, accuracy: 0.0001)
+        XCTAssertEqual(longitude, -0.1278, accuracy: 0.0001)
 
         let userData = try XCTUnwrap(jsonObject["userData"] as? [String: Any])
         XCTAssertEqual(userData["passportNationality"] as? String, "GB")
         XCTAssertTrue(userData.keys.contains("appleUserId"))
+        XCTAssertTrue(userData["appleUserId"] is NSNull)
     }
 }
