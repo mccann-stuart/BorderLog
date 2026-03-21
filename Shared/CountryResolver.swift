@@ -91,7 +91,7 @@ actor GeocodeCoordinator {
                 let mapItem = mapItems.first
                 let addressRepresentations = mapItem?.addressRepresentations
                 let resolution = CountryResolution.normalized(
-                    countryCode: addressRepresentations?.regionCode,
+                    countryCode: addressRepresentations?.region?.identifier,
                     countryName: addressRepresentations?.regionName,
                     timeZone: mapItem?.timeZone
                 )

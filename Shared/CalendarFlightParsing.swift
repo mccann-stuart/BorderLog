@@ -20,11 +20,21 @@ enum CalendarEventIngestability: Sendable {
     case none
 
     nonisolated var shouldIngest: Bool {
-        self != .none
+        switch self {
+        case .none:
+            return false
+        case .flight, .otherTravelOrLodging:
+            return true
+        }
     }
 
     nonisolated var shouldDecorateAsFlight: Bool {
-        self == .flight
+        switch self {
+        case .flight:
+            return true
+        case .otherTravelOrLodging, .none:
+            return false
+        }
     }
 }
 
