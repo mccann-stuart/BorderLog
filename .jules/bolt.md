@@ -1,0 +1,3 @@
+## 2026-03-22 - O(N) Array Scan in UIKit View Rendering Loops
+**Learning:** `UICalendarView` delegate methods like `calendarView(_:decorationFor:)` are called repeatedly for every single rendered day. Using a linear `first(where:)` array scan on the underlying data set inside this loop causes O(N) performance degradation per rendered day, leading to noticeable UI lag as the data set grows.
+**Action:** When bridging state into UIKit views that have repeated delegate callbacks, pre-compute an O(1) dictionary lookup for the data (e.g., in `didSet` of the data binding or snapshot) and use the dictionary to resolve data instantly inside the render cycle.

@@ -314,9 +314,25 @@ struct NativeCalendarView: UIViewRepresentable {
 
     class Coordinator: NSObject, UICalendarViewDelegate, UICalendarSelectionSingleDateDelegate {
         var parent: NativeCalendarView
-        var snapshot: CalendarTabSnapshot?
+        var snapshot: CalendarTabSnapshot? {
+            didSet {
+                // ⚡ Bolt: Pre-compute dictionary for O(1) lookups during calendar decoration rendering.
+                // Replaces the O(N) array scan `snapshot?.daySummaries.first(where:)` which is called
+                // repeatedly for each day rendered by the `UICalendarView`.
+                if let newSnapshot = snapshot {
+                    summariesByKey = Dictionary(
+                        newSnapshot.daySummaries.map { ($0.dayKey, $0) },
+                        uniquingKeysWith: { first, _ in first }
+                    )
+                } else {
+                    summariesByKey = [:]
+                }
+            }
+        }
         var visibleMonthStart: Binding<Date>
         var onDateSelected: (String) -> Void
+
+        private var summariesByKey: [String: CalendarDaySummary] = [:]
 
         init(_ parent: NativeCalendarView, visibleMonthStart: Binding<Date>, onDateSelected: @escaping (String) -> Void) {
             self.parent = parent
@@ -327,7 +343,7 @@ struct NativeCalendarView: UIViewRepresentable {
         func calendarView(_ calendarView: UICalendarView, decorationFor dateComponents: DateComponents) -> UICalendarView.Decoration? {
             guard let date = Calendar.current.date(from: dateComponents) else { return nil }
             let dayKey = DayKey.make(from: date, timeZone: Calendar.current.timeZone)
-            guard let summary = snapshot?.daySummaries.first(where: { $0.dayKey == dayKey }) else { return nil }
+            guard let summary = summariesByKey[dayKey] else { return nil }
 
             guard let emojiString = calendarDayDecorationString(for: summary) else { return nil }
             
