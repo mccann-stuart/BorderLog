@@ -1,3 +1,21 @@
+# Task Plan (Presence Inference PRD)
+
+- Spec: produce a standalone markdown PRD that documents the implemented presence-inference system driven by stays, calendar events, photos, and location samples.
+- Spec: capture the full end-to-end sequencing, including ingestion triggers, day-key/time-zone normalization, impacted-range recompute behavior, scoring order, post-processing passes, and persisted outputs.
+- Spec: document exact confidence semantics, dispute rules, gap-bridging behavior, flight-origin promotion behavior, explainability fields, and known non-goals so the PRD is implementation-accurate rather than aspirational.
+- [x] Review the current inference engine, ingestion services, normalization helpers, and regression tests to extract the real behavior.
+- [x] Write the standalone presence-inference PRD markdown file.
+- [x] Verify the new markdown and record the review result.
+
+## Review (Presence Inference PRD)
+
+- Deliverable: added `PRESENCE_INFERENCE_PRD.md` as a standalone implementation-accurate specification for the daily presence inference system.
+- Coverage: the PRD documents source ingestion behavior for stays, overrides, location samples, photo signals, and calendar flight signals; the impacted-scope recompute pipeline; canonical day/country/timezone normalization; exact scoring weights and thresholds; dispute rules; gap bridging; origin-flight promotion; unresolved-day suggestions; and the persisted `PresenceDay` output contract.
+- Source-of-truth basis: content was derived from the current implementation in `PresenceInferenceEngine`, `LedgerRecomputeService`, `CalendarSignalIngestor`, `PhotoSignalIngestor`, `LocationSampleService`, and the regression tests in `InferenceEngineTests` plus related ingestor tests.
+- Verification: `git diff --check -- PRESENCE_INFERENCE_PRD.md tasks/todo.md` passed on March 21, 2026.
+
+---
+
 # Task Plan (Calendar Flight Emoji Pair)
 
 - Spec: flight days in the Calendar tab should render origin and destination country emojis in the day cell instead of collapsing to only the resolved day country.
