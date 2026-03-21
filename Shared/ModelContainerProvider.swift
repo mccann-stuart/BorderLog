@@ -320,6 +320,20 @@ enum BorderLogSchemaV6: VersionedSchema {
     ]
 }
 
+enum BorderLogSchemaV7: VersionedSchema {
+    static var versionIdentifier: Schema.Version = .init(7, 0, 0)
+    static var models: [any PersistentModel.Type] = [
+        Stay.self,
+        DayOverride.self,
+        LocationSample.self,
+        PhotoSignal.self,
+        PresenceDay.self,
+        PhotoIngestState.self,
+        CountryConfig.self,
+        CalendarSignal.self
+    ]
+}
+
 enum BorderLogMigrationPlan: SchemaMigrationPlan {
     static var schemas: [any VersionedSchema.Type] = [
         BorderLogSchemaV1.self,
@@ -327,28 +341,30 @@ enum BorderLogMigrationPlan: SchemaMigrationPlan {
         BorderLogSchemaV3.self,
         BorderLogSchemaV4.self,
         BorderLogSchemaV5.self,
-        BorderLogSchemaV6.self
+        BorderLogSchemaV6.self,
+        BorderLogSchemaV7.self
     ]
     static var stages: [MigrationStage] = [
         .lightweight(fromVersion: BorderLogSchemaV1.self, toVersion: BorderLogSchemaV2.self),
         .lightweight(fromVersion: BorderLogSchemaV2.self, toVersion: BorderLogSchemaV3.self),
         .lightweight(fromVersion: BorderLogSchemaV3.self, toVersion: BorderLogSchemaV4.self),
         .lightweight(fromVersion: BorderLogSchemaV4.self, toVersion: BorderLogSchemaV5.self),
-        .lightweight(fromVersion: BorderLogSchemaV5.self, toVersion: BorderLogSchemaV6.self)
+        .lightweight(fromVersion: BorderLogSchemaV5.self, toVersion: BorderLogSchemaV6.self),
+        .lightweight(fromVersion: BorderLogSchemaV6.self, toVersion: BorderLogSchemaV7.self)
     ]
 }
 
 enum ModelContainerProvider {
     private static let logger = Logger(subsystem: "com.MCCANN.Border", category: "Persistence")
     private static let storeEpochDefaultsKey = "storeEpochV2"
-    private static let currentStoreEpoch = 7
+    private static let currentStoreEpoch = 8
 
     internal static var storeEpochKeyForTests: String { storeEpochDefaultsKey }
     internal static var currentStoreEpochForTests: Int { currentStoreEpoch }
 
     static func makeContainer() -> ModelContainer {
         _ = enforceStoreEpoch()
-        let schema = Schema(versionedSchema: BorderLogSchemaV6.self)
+        let schema = Schema(versionedSchema: BorderLogSchemaV7.self)
         let cloudKitDatabase: ModelConfiguration.CloudKitDatabase =
             (AppConfig.isCloudKitFeatureEnabled && AppConfig.isCloudKitSyncEnabled)
                 ? .private(AppConfig.cloudKitContainerId)
