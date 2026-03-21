@@ -197,6 +197,49 @@ struct CalendarTabView: View {
     }
 }
 
+func calendarDayDecorationTokens(for summary: CalendarDaySummary) -> [String] {
+    func emoji(for country: CalendarDayCountry) -> String {
+        guard let code = country.countryCode else { return "🌍" }
+        return countryCodeToEmoji(code)
+    }
+
+    let flightOriginID = summary.flightOriginCountry?.id
+    let flightDestinationID = summary.flightDestinationCountry?.id
+    let extraCountries = summary.countries.filter { country in
+        country.id != flightOriginID && country.id != flightDestinationID
+    }
+
+    if summary.flightOriginCountry != nil || summary.flightDestinationCountry != nil {
+        var tokens: [String] = []
+
+        if let origin = summary.flightOriginCountry {
+            tokens.append(emoji(for: origin))
+        }
+
+        tokens.append("✈️")
+
+        if let destination = summary.flightDestinationCountry,
+           destination.id != flightOriginID {
+            tokens.append(emoji(for: destination))
+        }
+
+        tokens.append(contentsOf: extraCountries.map { emoji(for: $0) })
+        return tokens
+    }
+
+    var tokens = summary.countries.map { emoji(for: $0) }
+    if summary.hasFlight {
+        tokens.append("✈️")
+    }
+    return tokens
+}
+
+func calendarDayDecorationString(for summary: CalendarDaySummary) -> String? {
+    let tokens = calendarDayDecorationTokens(for: summary)
+    guard !tokens.isEmpty else { return nil }
+    return tokens.joined(separator: " ")
+}
+
 // MARK: - Native Calendar Wrapper
 
 struct NativeCalendarView: UIViewRepresentable {
@@ -285,18 +328,8 @@ struct NativeCalendarView: UIViewRepresentable {
             guard let date = Calendar.current.date(from: dateComponents) else { return nil }
             let dayKey = DayKey.make(from: date, timeZone: Calendar.current.timeZone)
             guard let summary = snapshot?.daySummaries.first(where: { $0.dayKey == dayKey }) else { return nil }
-            
-            let flags = summary.countries.map { country in
-                guard let code = country.countryCode else { return "🌍" }
-                return countryCodeToEmoji(code)
-            }
-            var emojis = flags
-            if summary.hasFlight {
-                emojis.append("✈️")
-            }
-            
-            let emojiString = emojis.joined(separator: " ")
-            if emojiString.isEmpty { return nil }
+
+            guard let emojiString = calendarDayDecorationString(for: summary) else { return nil }
             
             return .customView {
                 let label = UILabel()

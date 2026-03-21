@@ -1,3 +1,22 @@
+# Task Plan (Calendar Flight Emoji Pair)
+
+- Spec: flight days in the Calendar tab should render origin and destination country emojis in the day cell instead of collapsing to only the resolved day country.
+- Spec: the emoji order should be `origin ✈️ destination`, with origin-only and destination-only fallbacks, and with any extra unique countries appended after the flight pair.
+- Spec: multi-flight days should compress to the first origin and the last destination while preserving the existing non-flight cell behavior.
+- [x] Extend the calendar day summary model to carry explicit flight origin/destination countries alongside the decoration-country list.
+- [x] Update Calendar tab summary assembly and decoration rendering to produce the approved flight emoji sequence without duplicate country emojis.
+- [x] Add focused regression tests for flight-day summary output, multi-flight compression, and the pure emoji builder, then record verification results or blockers.
+
+## Review (Calendar Flight Emoji Pair)
+
+- Root cause: `CalendarTabDataService` collapsed flight days to the resolved `PresenceDay` country whenever one existed, and `CalendarTabView` only rendered `summary.countries` plus a trailing plane marker, so the month cell could not preserve both flight origin and destination countries.
+- Fix applied: `CalendarDaySummary` now carries explicit `flightOriginCountry` and `flightDestinationCountry`; the day-summary builder keeps the first origin and last destination for flight days, merges in extra unique countries afterward, and `CalendarTabView` now uses a pure decoration helper to render `origin ✈️ destination` with origin-only, destination-only, and generic-flight fallbacks.
+- Regression coverage: expanded `CalendarTabDataServiceTests` for destination-only flight ordering, resolved-country deduping against origin/destination, and multi-flight compression; added `CalendarDayDecorationTests` for the pure emoji-sequence helper.
+- Verification: `git diff --check -- Learn/CalendarTabView.swift Shared/CalendarTabDataService.swift LearnTests/CalendarTabDataServiceTests.swift LearnTests/CalendarDayDecorationTests.swift tasks/todo.md` passed on March 21, 2026.
+- Verification blocker: `xcodebuild build-for-testing -scheme Learn -destination 'generic/platform=iOS Simulator' -derivedDataPath /tmp/BorderLogDerivedData -only-testing:LearnTests/CalendarTabDataServiceTests -only-testing:LearnTests/CalendarDayDecorationTests` still fails in this environment before test execution because CoreSimulator cannot discover usable runtimes and SwiftData macro expansion is already failing in `Shared/Stay.swift` (`SwiftDataMacros.PersistentModelMacro ... produced malformed response`).
+
+---
+
 # Task Plan (Adjacent Flight Event Evidence)
 
 - Spec: when a day is inferred from a flight on the immediately next or previous day, the inferred day should still show that flight in the Calendar Events evidence section instead of appearing to have no calendar evidence.
