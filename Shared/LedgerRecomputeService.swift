@@ -203,7 +203,7 @@ public actor LedgerRecomputeService {
 
         do {
             try self.upsertPresenceDays(finalResults, originalKeys: finalScopeKeys)
-            try dataFetcher.save()
+            try await dataFetcher.save()
         } catch {
             Self.logger.error("LedgerRecomputeService save error: \(error, privacy: .private)")
             onRecomputeError?(error)

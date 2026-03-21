@@ -508,8 +508,14 @@ private struct EvidenceSection: View {
         dayKey: "2026-02-15",
         date: Date(),
         timeZoneId: TimeZone.current.identifier,
-        countryCode: "ES",
-        countryName: "Spain",
+        contributedCountries: [
+            ContributedCountry(countryCode: "ES", countryName: "Spain", probability: 0.7)
+        ],
+        zoneOverlays: ["Europe/Madrid"],
+        evidence: [
+            SignalImpact(source: "photo", countryCode: "ES", countryName: "Spain", scoreDelta: 0.4),
+            SignalImpact(source: "location", countryCode: "ES", countryName: "Spain", scoreDelta: 0.3)
+        ],
         confidence: 0.7,
         confidenceLabel: .medium,
         sources: [.photo, .location],

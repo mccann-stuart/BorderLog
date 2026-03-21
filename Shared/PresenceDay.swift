@@ -82,6 +82,14 @@ final class PresenceDay {
         set { sourcesRaw = newValue.rawValue }
     }
 
+    var countryCode: String? {
+        contributedCountries.first?.countryCode
+    }
+
+    var countryName: String? {
+        contributedCountries.first?.countryName
+    }
+
     var isManuallyModified: Bool {
         isOverride || stayCount > 0
     }

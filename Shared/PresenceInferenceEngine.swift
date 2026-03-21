@@ -294,7 +294,7 @@ struct ResultCompiler {
             }
             
             var totalScore: Double = 0
-            var rankedCountries = bucket.countryScores.compactMap { key, score -> (ResolvedCountry, Double)? in
+            let rankedCountries = bucket.countryScores.compactMap { key, score -> (ResolvedCountry, Double)? in
                 guard let c = bucket.countries[key] else { return nil }
                 totalScore += score
                 return (c, score)

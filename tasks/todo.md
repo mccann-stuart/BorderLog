@@ -27,3 +27,28 @@
 - [x] Run full test suite and fix issues
 - [x] Validate manual stays, overrides, calendar (flights/trains), photos, and location edge cases
 - [x] Write Walkthrough of changes
+
+## Widget Fix: PresenceDay fields
+- [x] Inspect PresenceDay model and BorderLogWidget usage around the error lines
+- [x] Update BorderLogWidget to use correct PresenceDay fields/accessors
+- [x] Verify diagnostics/build and document results
+
+## Review
+- [x] XcodeRefreshCodeIssuesInFile: no issues in BorderLogWidget.swift
+
+## Task: Fix PresenceDay country access in CalendarTabDataService
+- [x] Inspect PresenceDay model usage and missing members
+- [x] Implement PresenceDay computed accessors for primary country
+- [x] Verify diagnostics in CalendarTabDataService.swift
+
+## Review
+- [x] XcodeRefreshCodeIssuesInFile: CalendarTabDataService.swift (warnings only)
+- [ ] BuildProject: failed - PresenceDayDetailView preview uses outdated PresenceDay initializer
+
+## Task: Fix PresenceDayDetailView preview initializer
+- [x] Inspect PresenceDayDetailView preview call and PresenceDay initializer
+- [x] Update preview to include contributedCountries, zoneOverlays, evidence
+- [x] Verify diagnostics/build
+
+## Review
+- [x] XcodeRefreshCodeIssuesInFile: PresenceDayDetailView.swift
