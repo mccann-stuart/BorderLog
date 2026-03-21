@@ -40,6 +40,47 @@ final class CalendarTabDataServiceTests: XCTestCase {
         Locale.autoupdatingCurrent.localizedString(forRegionCode: code) ?? code
     }
 
+    private func makePresenceDay(
+        dayKey: String,
+        date: Date,
+        timeZoneId: String,
+        countryCode: String?,
+        countryName: String?,
+        confidence: Double,
+        confidenceLabel: ConfidenceLabel,
+        sources: SignalSourceMask,
+        stayCount: Int,
+        photoCount: Int,
+        locationCount: Int,
+        calendarCount: Int
+    ) -> PresenceDay {
+        let contributedCountries: [ContributedCountry]
+        if let countryName {
+            contributedCountries = [
+                ContributedCountry(countryCode: countryCode, countryName: countryName, probability: 1.0)
+            ]
+        } else {
+            contributedCountries = []
+        }
+
+        return PresenceDay(
+            dayKey: dayKey,
+            date: date,
+            timeZoneId: timeZoneId,
+            contributedCountries: contributedCountries,
+            zoneOverlays: [],
+            evidence: [],
+            confidence: confidence,
+            confidenceLabel: confidenceLabel,
+            sources: sources,
+            isOverride: false,
+            stayCount: stayCount,
+            photoCount: photoCount,
+            locationCount: locationCount,
+            calendarCount: calendarCount
+        )
+    }
+
     func testSnapshotDedupesCountriesPerDayAndMarksFlights() async throws {
         let container = try makeContainer()
         let context = container.mainContext
@@ -247,7 +288,7 @@ final class CalendarTabDataServiceTests: XCTestCase {
         let spainName = localizedCountryName("ES")
 
         context.insert(
-            PresenceDay(
+            makePresenceDay(
                 dayKey: bridgeDayKey,
                 date: bridgeDate,
                 timeZoneId: TimeZone.current.identifier,
@@ -288,7 +329,7 @@ final class CalendarTabDataServiceTests: XCTestCase {
         let spainName = localizedCountryName("ES")
 
         context.insert(
-            PresenceDay(
+            makePresenceDay(
                 dayKey: "2026-03-15",
                 date: normalizedDate(for: "2026-03-15"),
                 timeZoneId: TimeZone.current.identifier,
@@ -305,7 +346,7 @@ final class CalendarTabDataServiceTests: XCTestCase {
             )
         )
         context.insert(
-            PresenceDay(
+            makePresenceDay(
                 dayKey: "2026-03-16",
                 date: normalizedDate(for: "2026-03-16"),
                 timeZoneId: TimeZone.current.identifier,
@@ -344,7 +385,7 @@ final class CalendarTabDataServiceTests: XCTestCase {
         let context = container.mainContext
 
         context.insert(
-            PresenceDay(
+            makePresenceDay(
                 dayKey: "2025-10-01",
                 date: normalizedDate(for: "2025-10-01"),
                 timeZoneId: TimeZone.current.identifier,
@@ -361,7 +402,7 @@ final class CalendarTabDataServiceTests: XCTestCase {
             )
         )
         context.insert(
-            PresenceDay(
+            makePresenceDay(
                 dayKey: "2026-03-15",
                 date: normalizedDate(for: "2026-03-15"),
                 timeZoneId: TimeZone.current.identifier,
@@ -398,7 +439,7 @@ final class CalendarTabDataServiceTests: XCTestCase {
         let timeZoneID = TimeZone.current.identifier
 
         context.insert(
-            PresenceDay(
+            makePresenceDay(
                 dayKey: dayKey,
                 date: normalizedDate(for: dayKey),
                 timeZoneId: timeZoneID,
@@ -467,7 +508,7 @@ final class CalendarTabDataServiceTests: XCTestCase {
         let timeZoneID = TimeZone.current.identifier
 
         context.insert(
-            PresenceDay(
+            makePresenceDay(
                 dayKey: dayKey,
                 date: normalizedDate(for: dayKey),
                 timeZoneId: timeZoneID,

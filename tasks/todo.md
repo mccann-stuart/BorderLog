@@ -72,3 +72,15 @@
 
 ## Review
 - [x] XcodeRefreshCodeIssuesInFile: SettingsView.swift
+
+## Task: Travel-Backed Transition Inference
+- [x] Inspect existing travel promotion and gap-bridging behavior in `PresenceInferenceEngine.swift`
+- [x] Implement grouped travel-event indexing and adjacent before/after travel promotions
+- [x] Implement travel-backed different-country transition infill while preserving suggestions/disputed state
+- [x] Add regression and guardrail tests in `InferenceEngineTests.swift`
+- [ ] Run targeted verification for inference changes and document results
+
+## Review
+- [x] Adjacent travel promotions now set calendar source/count and add explicit before/after evidence markers
+- [x] Transition-gap infill now promotes disputed two-country results while preserving suggestions
+- [ ] `swiftc -parse` passed for updated inference and test files; `xcodebuild test` is still blocked by older test fixtures using the obsolete `PresenceDay` initializer, and `xcodebuild build` is still blocked in this environment by SwiftData macro/plugin failures

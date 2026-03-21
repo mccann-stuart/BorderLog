@@ -4,6 +4,48 @@ import SwiftData
 
 @MainActor
 final class RealLedgerDataFetcherTests: XCTestCase {
+    private func makePresenceDay(
+        dayKey: String,
+        date: Date,
+        timeZoneId: String,
+        countryCode: String?,
+        countryName: String?,
+        confidence: Double,
+        confidenceLabel: ConfidenceLabel,
+        sources: SignalSourceMask,
+        isOverride: Bool,
+        stayCount: Int,
+        photoCount: Int,
+        locationCount: Int,
+        calendarCount: Int
+    ) -> PresenceDay {
+        let contributedCountries: [ContributedCountry]
+        if let countryName {
+            contributedCountries = [
+                ContributedCountry(countryCode: countryCode, countryName: countryName, probability: 1.0)
+            ]
+        } else {
+            contributedCountries = []
+        }
+
+        return PresenceDay(
+            dayKey: dayKey,
+            date: date,
+            timeZoneId: timeZoneId,
+            contributedCountries: contributedCountries,
+            zoneOverlays: [],
+            evidence: [],
+            confidence: confidence,
+            confidenceLabel: confidenceLabel,
+            sources: sources,
+            isOverride: isOverride,
+            stayCount: stayCount,
+            photoCount: photoCount,
+            locationCount: locationCount,
+            calendarCount: calendarCount
+        )
+    }
+
     private func makeContainer() throws -> ModelContainer {
         let config = ModelConfiguration(isStoredInMemoryOnly: true)
         return try ModelContainer(
@@ -101,9 +143,9 @@ final class RealLedgerDataFetcherTests: XCTestCase {
         let d3 = calendar.date(from: DateComponents(year: 2026, month: 2, day: 3))!
         let d4 = calendar.date(from: DateComponents(year: 2026, month: 2, day: 4))!
 
-        context.insert(PresenceDay(dayKey: "2026-02-01", date: d1, timeZoneId: "UTC", countryCode: "ES", countryName: "Spain", confidence: 1, confidenceLabel: .high, sources: .stay, isOverride: false, stayCount: 1, photoCount: 0, locationCount: 0, calendarCount: 0))
-        context.insert(PresenceDay(dayKey: "2026-02-02", date: d2, timeZoneId: "UTC", countryCode: nil, countryName: nil, confidence: 0, confidenceLabel: .low, sources: .none, isOverride: false, stayCount: 0, photoCount: 0, locationCount: 0, calendarCount: 0))
-        context.insert(PresenceDay(dayKey: "2026-02-03", date: d3, timeZoneId: "UTC", countryCode: "FR", countryName: "France", confidence: 1, confidenceLabel: .high, sources: .stay, isOverride: false, stayCount: 1, photoCount: 0, locationCount: 0, calendarCount: 0))
+        context.insert(makePresenceDay(dayKey: "2026-02-01", date: d1, timeZoneId: "UTC", countryCode: "ES", countryName: "Spain", confidence: 1, confidenceLabel: .high, sources: .stay, isOverride: false, stayCount: 1, photoCount: 0, locationCount: 0, calendarCount: 0))
+        context.insert(makePresenceDay(dayKey: "2026-02-02", date: d2, timeZoneId: "UTC", countryCode: nil, countryName: nil, confidence: 0, confidenceLabel: .low, sources: .none, isOverride: false, stayCount: 0, photoCount: 0, locationCount: 0, calendarCount: 0))
+        context.insert(makePresenceDay(dayKey: "2026-02-03", date: d3, timeZoneId: "UTC", countryCode: "FR", countryName: "France", confidence: 1, confidenceLabel: .high, sources: .stay, isOverride: false, stayCount: 1, photoCount: 0, locationCount: 0, calendarCount: 0))
         try context.save()
 
         let keys = try fetcher.fetchPresenceDayKeys(from: d1, to: d3)
@@ -128,7 +170,7 @@ final class RealLedgerDataFetcherTests: XCTestCase {
         let driftedDate = calendar.date(from: DateComponents(year: 2026, month: 2, day: 27))!
 
         context.insert(
-            PresenceDay(
+            makePresenceDay(
                 dayKey: "2026-03-01",
                 date: driftedDate,
                 timeZoneId: "UTC",

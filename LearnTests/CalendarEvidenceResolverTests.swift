@@ -3,8 +3,46 @@ import XCTest
 @testable import Learn
 
 final class CalendarEvidenceResolverTests: XCTestCase {
+    private func makePresenceDay(
+        dayKey: String,
+        date: Date,
+        timeZoneId: String,
+        countryCode: String?,
+        countryName: String?,
+        confidence: Double,
+        confidenceLabel: ConfidenceLabel,
+        sources: SignalSourceMask,
+        calendarCount: Int
+    ) -> PresenceDay {
+        let contributedCountries: [ContributedCountry]
+        if let countryName {
+            contributedCountries = [
+                ContributedCountry(countryCode: countryCode, countryName: countryName, probability: 1.0)
+            ]
+        } else {
+            contributedCountries = []
+        }
+
+        return PresenceDay(
+            dayKey: dayKey,
+            date: date,
+            timeZoneId: timeZoneId,
+            contributedCountries: contributedCountries,
+            zoneOverlays: [],
+            evidence: [],
+            confidence: confidence,
+            confidenceLabel: confidenceLabel,
+            sources: sources,
+            isOverride: false,
+            stayCount: 0,
+            photoCount: 0,
+            locationCount: 0,
+            calendarCount: calendarCount
+        )
+    }
+
     func testResolveUsesAdjacentOriginFlightForCalendarInferredDayWithoutSameDaySignals() {
-        let day = PresenceDay(
+        let day = makePresenceDay(
             dayKey: "2026-03-14",
             date: Date(timeIntervalSince1970: 1_000),
             timeZoneId: "Europe/London",
@@ -60,7 +98,7 @@ final class CalendarEvidenceResolverTests: XCTestCase {
     }
 
     func testResolveFallsBackToAdjacentOriginFlightWhenDayIsStillUnknown() {
-        let day = PresenceDay(
+        let day = makePresenceDay(
             dayKey: "2026-03-14",
             date: Date(timeIntervalSince1970: 1_000),
             timeZoneId: "Europe/London",
@@ -104,7 +142,7 @@ final class CalendarEvidenceResolverTests: XCTestCase {
     }
 
     func testResolveKeepsSameDayCalendarSignalsWithoutPullingAdjacentOriginSignals() {
-        let day = PresenceDay(
+        let day = makePresenceDay(
             dayKey: "2026-03-15",
             date: Date(timeIntervalSince1970: 1_000),
             timeZoneId: "Europe/London",
@@ -163,7 +201,7 @@ final class CalendarEvidenceResolverTests: XCTestCase {
     }
 
     func testResolveFallsBackToAdjacentRegularCalendarSignalsWhenOriginSignalIsUnavailable() {
-        let day = PresenceDay(
+        let day = makePresenceDay(
             dayKey: "2026-03-16",
             date: Date(timeIntervalSince1970: 1_000),
             timeZoneId: "America/Los_Angeles",

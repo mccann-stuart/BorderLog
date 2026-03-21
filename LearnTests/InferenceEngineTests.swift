@@ -20,6 +20,24 @@ final class InferenceEngineTests: XCTestCase {
         Locale.autoupdatingCurrent.localizedString(forRegionCode: code) ?? code
     }
 
+    private func travelSignal(
+        dayKey: String,
+        countryCode: String,
+        timeZoneId: String,
+        eventIdentifier: String,
+        source: String
+    ) -> CalendarSignalInfo {
+        CalendarSignalInfo(
+            dayKey: dayKey,
+            countryCode: countryCode,
+            countryName: localizedCountryName(countryCode),
+            timeZoneId: timeZoneId,
+            bucketingTimeZoneId: timeZoneId,
+            eventIdentifier: eventIdentifier,
+            source: source
+        )
+    }
+
     func testOverrideWinsOverSignals() {
         let date = day(2026, 2, 15)
         let dayKey = DayKey.make(from: date, timeZone: calendar.timeZone)
@@ -340,6 +358,238 @@ final class InferenceEngineTests: XCTestCase {
         XCTAssertEqual(flightDay?.contributedCountries.first?.countryCode, "GB")
         XCTAssertEqual(flightDay?.confidenceLabel, .medium)
         XCTAssertEqual(flightDay?.timeZoneId, "Europe/London")
+    }
+
+    func testTravelEventPromotesDayBeforeDepartureAndDayAfterArrival() {
+        let dayBeforeDeparture = day(2026, 3, 9)
+        let departureDay = day(2026, 3, 10)
+        let arrivalDay = day(2026, 3, 11)
+        let dayAfterArrival = day(2026, 3, 12)
+
+        let dayBeforeDepartureKey = DayKey.make(from: dayBeforeDeparture, timeZone: calendar.timeZone)
+        let departureDayKey = DayKey.make(from: departureDay, timeZone: calendar.timeZone)
+        let arrivalDayKey = DayKey.make(from: arrivalDay, timeZone: calendar.timeZone)
+        let dayAfterArrivalKey = DayKey.make(from: dayAfterArrival, timeZone: calendar.timeZone)
+
+        let results = PresenceInferenceEngine.compute(
+            dayKeys: [dayBeforeDepartureKey, departureDayKey, arrivalDayKey, dayAfterArrivalKey],
+            stays: [],
+            overrides: [],
+            locations: [],
+            photos: [],
+            calendarSignals: [
+                travelSignal(
+                    dayKey: departureDayKey,
+                    countryCode: "GB",
+                    timeZoneId: "Europe/London",
+                    eventIdentifier: "trip-1#origin",
+                    source: "CalendarFlightOrigin"
+                ),
+                travelSignal(
+                    dayKey: arrivalDayKey,
+                    countryCode: "DE",
+                    timeZoneId: "Europe/Berlin",
+                    eventIdentifier: "trip-1",
+                    source: "Calendar"
+                )
+            ],
+            rangeEnd: dayAfterArrival,
+            calendar: calendar
+        )
+
+        let before = results.first { $0.dayKey == dayBeforeDepartureKey }
+        XCTAssertEqual(before?.contributedCountries.first?.countryCode, "GB")
+        XCTAssertEqual(before?.confidence, 0.85, accuracy: 0.001)
+        XCTAssertEqual(before?.confidenceLabel, .high)
+        XCTAssertTrue(before?.sources.contains(.calendar) == true)
+        XCTAssertEqual(before?.calendarCount, 1)
+        XCTAssertTrue(before?.evidence.contains(where: { $0.source == "CalendarTravelBeforePromotion" }) == true)
+
+        let after = results.first { $0.dayKey == dayAfterArrivalKey }
+        XCTAssertEqual(after?.contributedCountries.first?.countryCode, "DE")
+        XCTAssertEqual(after?.confidence, 0.85, accuracy: 0.001)
+        XCTAssertEqual(after?.confidenceLabel, .high)
+        XCTAssertTrue(after?.sources.contains(.calendar) == true)
+        XCTAssertEqual(after?.calendarCount, 1)
+        XCTAssertTrue(after?.evidence.contains(where: { $0.source == "CalendarTravelAfterPromotion" }) == true)
+    }
+
+    func testTravelEventDoesNotReplaceOverrideOrResolvedNonCalendarDay() {
+        let dayBeforeDeparture = day(2026, 3, 9)
+        let departureDay = day(2026, 3, 10)
+        let arrivalDay = day(2026, 3, 11)
+        let dayAfterArrival = day(2026, 3, 12)
+
+        let dayBeforeDepartureKey = DayKey.make(from: dayBeforeDeparture, timeZone: calendar.timeZone)
+        let departureDayKey = DayKey.make(from: departureDay, timeZone: calendar.timeZone)
+        let arrivalDayKey = DayKey.make(from: arrivalDay, timeZone: calendar.timeZone)
+        let dayAfterArrivalKey = DayKey.make(from: dayAfterArrival, timeZone: calendar.timeZone)
+
+        let results = PresenceInferenceEngine.compute(
+            dayKeys: [dayBeforeDepartureKey, departureDayKey, arrivalDayKey, dayAfterArrivalKey],
+            stays: [],
+            overrides: [
+                OverridePresenceInfo(
+                    dayKey: dayBeforeDepartureKey,
+                    dayTimeZoneId: calendar.timeZone.identifier,
+                    countryCode: "FR",
+                    countryName: localizedCountryName("FR")
+                )
+            ],
+            locations: [
+                LocationSignalInfo(
+                    dayKey: dayAfterArrivalKey,
+                    countryCode: "US",
+                    countryName: localizedCountryName("US"),
+                    accuracyMeters: 10,
+                    timeZoneId: "America/New_York"
+                )
+            ],
+            photos: [],
+            calendarSignals: [
+                travelSignal(
+                    dayKey: departureDayKey,
+                    countryCode: "GB",
+                    timeZoneId: "Europe/London",
+                    eventIdentifier: "trip-2#origin",
+                    source: "CalendarFlightOrigin"
+                ),
+                travelSignal(
+                    dayKey: arrivalDayKey,
+                    countryCode: "DE",
+                    timeZoneId: "Europe/Berlin",
+                    eventIdentifier: "trip-2",
+                    source: "Calendar"
+                )
+            ],
+            rangeEnd: dayAfterArrival,
+            calendar: calendar
+        )
+
+        let before = results.first { $0.dayKey == dayBeforeDepartureKey }
+        XCTAssertEqual(before?.contributedCountries.first?.countryCode, "FR")
+        XCTAssertTrue(before?.isOverride == true)
+        XCTAssertFalse(before?.evidence.contains(where: { $0.source == "CalendarTravelBeforePromotion" }) == true)
+
+        let after = results.first { $0.dayKey == dayAfterArrivalKey }
+        XCTAssertEqual(after?.contributedCountries.first?.countryCode, "US")
+        XCTAssertFalse(after?.evidence.contains(where: { $0.source == "CalendarTravelAfterPromotion" }) == true)
+    }
+
+    func testTravelBackedTransitionInfillPromotesMarch2026GapsAndKeepsSuggestions() {
+        let dayKeys = Set((6...15).map { day in
+            DayKey.make(from: self.day(2026, 3, day), timeZone: calendar.timeZone)
+        })
+
+        let results = PresenceInferenceEngine.compute(
+            dayKeys: dayKeys,
+            stays: [],
+            overrides: [],
+            locations: [],
+            photos: [],
+            calendarSignals: [
+                travelSignal(
+                    dayKey: DayKey.make(from: day(2026, 3, 6), timeZone: calendar.timeZone),
+                    countryCode: "GB",
+                    timeZoneId: "Europe/London",
+                    eventIdentifier: "trip-a#origin",
+                    source: "CalendarFlightOrigin"
+                ),
+                travelSignal(
+                    dayKey: DayKey.make(from: day(2026, 3, 10), timeZone: calendar.timeZone),
+                    countryCode: "DE",
+                    timeZoneId: "Europe/Berlin",
+                    eventIdentifier: "trip-a",
+                    source: "Calendar"
+                ),
+                travelSignal(
+                    dayKey: DayKey.make(from: day(2026, 3, 12), timeZone: calendar.timeZone),
+                    countryCode: "GB",
+                    timeZoneId: "Europe/London",
+                    eventIdentifier: "trip-b#origin",
+                    source: "CalendarFlightOrigin"
+                ),
+                travelSignal(
+                    dayKey: DayKey.make(from: day(2026, 3, 15), timeZone: calendar.timeZone),
+                    countryCode: "US",
+                    timeZoneId: "America/New_York",
+                    eventIdentifier: "trip-b",
+                    source: "Calendar"
+                )
+            ],
+            rangeEnd: day(2026, 3, 15),
+            calendar: calendar
+        )
+
+        for travelGapDay in [7, 8, 9] {
+            let result = results.first {
+                $0.dayKey == DayKey.make(from: self.day(2026, 3, travelGapDay), timeZone: self.calendar.timeZone)
+            }
+            XCTAssertEqual(result?.contributedCountries.map { $0.countryCode ?? "" }, ["GB", "DE"])
+            XCTAssertEqual(result?.contributedCountries.first?.probability, 0.51, accuracy: 0.001)
+            XCTAssertEqual(result?.contributedCountries.dropFirst().first?.probability, 0.49, accuracy: 0.001)
+            XCTAssertEqual(result?.suggestedCountryCode1, "GB")
+            XCTAssertEqual(result?.suggestedCountryCode2, "DE")
+            XCTAssertTrue(result?.isDisputed == true)
+            XCTAssertEqual(result?.confidence, 0.51, accuracy: 0.001)
+            XCTAssertEqual(result?.confidenceLabel, .medium)
+            XCTAssertNotEqual(result?.confidenceLabel, .high)
+            XCTAssertTrue(result?.evidence.contains(where: { $0.source == "CalendarTransitionInfill" }) == true)
+        }
+
+        for travelGapDay in [13, 14] {
+            let result = results.first {
+                $0.dayKey == DayKey.make(from: self.day(2026, 3, travelGapDay), timeZone: self.calendar.timeZone)
+            }
+            XCTAssertEqual(result?.contributedCountries.map { $0.countryCode ?? "" }, ["GB", "US"])
+            XCTAssertEqual(result?.suggestedCountryCode1, "GB")
+            XCTAssertEqual(result?.suggestedCountryCode2, "US")
+            XCTAssertTrue(result?.isDisputed == true)
+            XCTAssertEqual(result?.confidenceLabel, .medium)
+            XCTAssertTrue(result?.evidence.contains(where: { $0.source == "CalendarTransitionInfill" }) == true)
+        }
+    }
+
+    func testDifferentCountryGapWithoutTravelEvidenceRemainsSuggestionOnly() {
+        let dayKeys = Set((6...10).map { day in
+            DayKey.make(from: self.day(2026, 3, day), timeZone: calendar.timeZone)
+        })
+
+        let results = PresenceInferenceEngine.compute(
+            dayKeys: dayKeys,
+            stays: [],
+            overrides: [],
+            locations: [],
+            photos: [],
+            calendarSignals: [
+                travelSignal(
+                    dayKey: DayKey.make(from: day(2026, 3, 6), timeZone: calendar.timeZone),
+                    countryCode: "GB",
+                    timeZoneId: "Europe/London",
+                    eventIdentifier: "trip-c",
+                    source: "Calendar"
+                ),
+                travelSignal(
+                    dayKey: DayKey.make(from: day(2026, 3, 10), timeZone: calendar.timeZone),
+                    countryCode: "DE",
+                    timeZoneId: "Europe/Berlin",
+                    eventIdentifier: "trip-d",
+                    source: "Calendar"
+                )
+            ],
+            rangeEnd: day(2026, 3, 10),
+            calendar: calendar
+        )
+
+        for gapDay in [7, 8, 9] {
+            let result = results.first {
+                $0.dayKey == DayKey.make(from: self.day(2026, 3, gapDay), timeZone: self.calendar.timeZone)
+            }
+            XCTAssertTrue(result?.contributedCountries.isEmpty == true)
+            XCTAssertEqual(result?.suggestedCountryCode1, "GB")
+            XCTAssertEqual(result?.suggestedCountryCode2, "DE")
+            XCTAssertFalse(result?.evidence.contains(where: { $0.source == "CalendarTransitionInfill" }) == true)
+        }
     }
 }
 #endif

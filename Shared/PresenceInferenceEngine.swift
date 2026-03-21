@@ -232,6 +232,18 @@ struct OverrideMiddleware: InferenceMiddleware {
 
 struct ResultCompiler {
     let context: InferenceContext
+
+    private struct TravelEventEndpoint {
+        let dayKey: String
+        let country: ResolvedCountry
+        let timeZoneId: String?
+    }
+
+    private struct TravelEventContext {
+        let baseEventIdentifier: String
+        let origin: TravelEventEndpoint
+        let destination: TravelEventEndpoint
+    }
     
     private func selectedDayTimeZoneId(for bucket: DayBucket, preferredTimeZoneId: String?, fallback: String) -> String {
         if let preferredTimeZoneId, TimeZone(identifier: preferredTimeZoneId) != nil {
@@ -372,6 +384,7 @@ struct ResultCompiler {
         }
         
         var sortedResults = results.sorted { $0.date < $1.date }
+        let travelEvents = buildTravelEventContexts()
         
         // 2. Contextual Influence and Gap Bridging (Day-before / Day-after Smoothing)
         var i = 0
@@ -419,7 +432,10 @@ struct ResultCompiler {
             }
         }
         
-        // 3. Origin-flight promotion (Contextual Promotion)
+        // 3. Travel-backed adjacent day promotions
+        applyAdjacentTravelPromotions(results: &sortedResults, travelEvents: travelEvents)
+
+        // 4. Origin-flight promotion (Contextual Promotion)
         for index in 0..<sortedResults.count {
             let currentDayKey = sortedResults[index].dayKey
             guard let bucket = buckets[currentDayKey] else { continue }
@@ -450,8 +466,11 @@ struct ResultCompiler {
             }
         }
         
-        // 4. Fill backward and forward suggestions
+        // 5. Fill backward and forward suggestions
         fillSuggestions(results: &sortedResults)
+
+        // 6. Travel-backed transition gap infill
+        applyTravelBackedTransitionInfill(results: &sortedResults, travelEvents: travelEvents)
         
         return sortedResults
     }
@@ -488,6 +507,90 @@ struct ResultCompiler {
             photoCount: result.photoCount,
             locationCount: result.locationCount,
             calendarCount: max(result.calendarCount, originFlight.count),
+            suggestedCountryCode1: result.suggestedCountryCode1,
+            suggestedCountryName1: result.suggestedCountryName1,
+            suggestedCountryCode2: result.suggestedCountryCode2,
+            suggestedCountryName2: result.suggestedCountryName2
+        )
+    }
+
+    private func promoteByAdjacentTravelContext(
+        result: PresenceDayResult,
+        country: ResolvedCountry,
+        timeZoneId: String?,
+        evidenceSource: String
+    ) -> PresenceDayResult {
+        var sources = result.sources
+        sources.formUnion(.calendar)
+
+        var newEvidence = result.evidence
+        newEvidence.append(SignalImpact(
+            source: evidenceSource,
+            countryCode: country.code,
+            countryName: country.name,
+            scoreDelta: 1.0
+        ))
+
+        return PresenceDayResult(
+            dayKey: result.dayKey,
+            date: result.date,
+            timeZoneId: timeZoneId ?? result.timeZoneId,
+            contributedCountries: [
+                ContributedCountry(countryCode: country.code, countryName: country.name, probability: 1.0)
+            ],
+            zoneOverlays: result.zoneOverlays,
+            evidence: newEvidence,
+            confidence: 0.85,
+            confidenceLabel: .high,
+            sources: sources,
+            isOverride: false,
+            isDisputed: false,
+            stayCount: result.stayCount,
+            photoCount: result.photoCount,
+            locationCount: result.locationCount,
+            calendarCount: max(result.calendarCount, 1),
+            suggestedCountryCode1: result.suggestedCountryCode1,
+            suggestedCountryName1: result.suggestedCountryName1,
+            suggestedCountryCode2: result.suggestedCountryCode2,
+            suggestedCountryName2: result.suggestedCountryName2
+        )
+    }
+
+    private func promoteByTravelTransitionInfill(
+        result: PresenceDayResult,
+        primary: ResolvedCountry,
+        secondary: ResolvedCountry
+    ) -> PresenceDayResult {
+        var sources = result.sources
+        sources.formUnion(.calendar)
+
+        var newEvidence = result.evidence
+        newEvidence.append(SignalImpact(
+            source: "CalendarTransitionInfill",
+            countryCode: primary.code,
+            countryName: primary.name,
+            scoreDelta: 0.51
+        ))
+
+        return PresenceDayResult(
+            dayKey: result.dayKey,
+            date: result.date,
+            timeZoneId: result.timeZoneId,
+            contributedCountries: [
+                ContributedCountry(countryCode: primary.code, countryName: primary.name, probability: 0.51),
+                ContributedCountry(countryCode: secondary.code, countryName: secondary.name, probability: 0.49)
+            ],
+            zoneOverlays: result.zoneOverlays,
+            evidence: newEvidence,
+            confidence: 0.51,
+            confidenceLabel: .medium,
+            sources: sources,
+            isOverride: false,
+            isDisputed: true,
+            stayCount: result.stayCount,
+            photoCount: result.photoCount,
+            locationCount: result.locationCount,
+            calendarCount: max(result.calendarCount, 1),
             suggestedCountryCode1: result.suggestedCountryCode1,
             suggestedCountryName1: result.suggestedCountryName1,
             suggestedCountryCode2: result.suggestedCountryCode2,
@@ -531,6 +634,228 @@ struct ResultCompiler {
                 }
             }
         }
+    }
+
+    private func buildTravelEventContexts() -> [TravelEventContext] {
+        struct TravelAccumulator {
+            var origin: TravelEventEndpoint?
+            var destination: TravelEventEndpoint?
+        }
+
+        var grouped: [String: TravelAccumulator] = [:]
+
+        for signal in context.calendarSignals {
+            guard let baseEventIdentifier = baseTravelEventIdentifier(for: signal.eventIdentifier),
+                  let country = resolveCountry(countryCode: signal.countryCode, countryName: signal.countryName) else {
+                continue
+            }
+
+            let endpoint = TravelEventEndpoint(
+                dayKey: signal.dayKey,
+                country: country,
+                timeZoneId: signal.bucketingTimeZoneId ?? signal.timeZoneId
+            )
+
+            var accumulator = grouped[baseEventIdentifier] ?? TravelAccumulator()
+            if isOriginFlightSignal(signal) {
+                if preferredTravelEndpoint(endpoint, over: accumulator.origin) {
+                    accumulator.origin = endpoint
+                }
+            } else if signal.source == "Calendar" {
+                if preferredTravelEndpoint(endpoint, over: accumulator.destination) {
+                    accumulator.destination = endpoint
+                }
+            }
+            grouped[baseEventIdentifier] = accumulator
+        }
+
+        return grouped.compactMap { baseEventIdentifier, accumulator in
+            guard let origin = accumulator.origin, let destination = accumulator.destination else {
+                return nil
+            }
+            return TravelEventContext(
+                baseEventIdentifier: baseEventIdentifier,
+                origin: origin,
+                destination: destination
+            )
+        }
+        .sorted { lhs, rhs in
+            (lhs.origin.dayKey, lhs.destination.dayKey, lhs.baseEventIdentifier) <
+            (rhs.origin.dayKey, rhs.destination.dayKey, rhs.baseEventIdentifier)
+        }
+    }
+
+    private func applyAdjacentTravelPromotions(
+        results: inout [PresenceDayResult],
+        travelEvents: [TravelEventContext]
+    ) {
+        let indexByDayKey = Dictionary(uniqueKeysWithValues: results.enumerated().map { ($0.element.dayKey, $0.offset) })
+
+        for travelEvent in travelEvents {
+            if let previousDayKey = adjacentDayKey(
+                from: travelEvent.origin.dayKey,
+                timeZoneId: travelEvent.origin.timeZoneId,
+                deltaDays: -1
+            ), let index = indexByDayKey[previousDayKey],
+               isEligibleForAdjacentTravelPromotion(results[index]) {
+                results[index] = promoteByAdjacentTravelContext(
+                    result: results[index],
+                    country: travelEvent.origin.country,
+                    timeZoneId: travelEvent.origin.timeZoneId,
+                    evidenceSource: "CalendarTravelBeforePromotion"
+                )
+            }
+
+            if let nextDayKey = adjacentDayKey(
+                from: travelEvent.destination.dayKey,
+                timeZoneId: travelEvent.destination.timeZoneId,
+                deltaDays: 1
+            ), let index = indexByDayKey[nextDayKey],
+               isEligibleForAdjacentTravelPromotion(results[index]) {
+                results[index] = promoteByAdjacentTravelContext(
+                    result: results[index],
+                    country: travelEvent.destination.country,
+                    timeZoneId: travelEvent.destination.timeZoneId,
+                    evidenceSource: "CalendarTravelAfterPromotion"
+                )
+            }
+        }
+    }
+
+    private func applyTravelBackedTransitionInfill(
+        results: inout [PresenceDayResult],
+        travelEvents: [TravelEventContext]
+    ) {
+        var i = 0
+        while i < results.count {
+            if results[i].contributedCountries.isEmpty {
+                var j = i
+                while j < results.count, results[j].contributedCountries.isEmpty {
+                    j += 1
+                }
+
+                let gapLength = j - i
+                if gapLength <= 7, i > 0, j < results.count,
+                   let previous = results[i - 1].contributedCountries.first,
+                   let next = results[j].contributedCountries.first,
+                   !countriesMatch(previous, next),
+                   hasTransitionSuggestions(in: results[i..<j]),
+                   hasAnchoredTravelEvent(
+                    travelEvents: travelEvents,
+                    previousDay: results[i - 1],
+                    nextDay: results[j],
+                    previousCountry: previous,
+                    nextCountry: next
+                   ) {
+                    for k in i..<j {
+                        guard let primary = resolveCountry(
+                            countryCode: results[k].suggestedCountryCode1,
+                            countryName: results[k].suggestedCountryName1
+                        ), let secondary = resolveCountry(
+                            countryCode: results[k].suggestedCountryCode2,
+                            countryName: results[k].suggestedCountryName2
+                        ) else {
+                            continue
+                        }
+
+                        results[k] = promoteByTravelTransitionInfill(
+                            result: results[k],
+                            primary: primary,
+                            secondary: secondary
+                        )
+                    }
+                }
+                i = j
+            } else {
+                i += 1
+            }
+        }
+    }
+
+    private func hasTransitionSuggestions(in slice: ArraySlice<PresenceDayResult>) -> Bool {
+        slice.allSatisfy {
+            $0.suggestedCountryCode1 != nil &&
+            $0.suggestedCountryName1 != nil &&
+            $0.suggestedCountryCode2 != nil &&
+            $0.suggestedCountryName2 != nil
+        }
+    }
+
+    private func hasAnchoredTravelEvent(
+        travelEvents: [TravelEventContext],
+        previousDay: PresenceDayResult,
+        nextDay: PresenceDayResult,
+        previousCountry: ContributedCountry,
+        nextCountry: ContributedCountry
+    ) -> Bool {
+        travelEvents.contains { travelEvent in
+            travelEvent.origin.dayKey == previousDay.dayKey &&
+            travelEvent.destination.dayKey == nextDay.dayKey &&
+            countriesMatch(previousCountry, travelEvent.origin.country) &&
+            countriesMatch(nextCountry, travelEvent.destination.country)
+        }
+    }
+
+    private func countriesMatch(_ lhs: ContributedCountry, _ rhs: ContributedCountry) -> Bool {
+        if let lhsCode = lhs.countryCode, let rhsCode = rhs.countryCode {
+            return lhsCode == rhsCode
+        }
+        return lhs.countryName.caseInsensitiveCompare(rhs.countryName) == .orderedSame
+    }
+
+    private func countriesMatch(_ lhs: ContributedCountry, _ rhs: ResolvedCountry) -> Bool {
+        if let lhsCode = lhs.countryCode, let rhsCode = rhs.code {
+            return lhsCode == rhsCode
+        }
+        return lhs.countryName.caseInsensitiveCompare(rhs.name) == .orderedSame
+    }
+
+    private func preferredTravelEndpoint(
+        _ candidate: TravelEventEndpoint,
+        over existing: TravelEventEndpoint?
+    ) -> Bool {
+        guard let existing else { return true }
+        return (candidate.dayKey, candidate.country.id, candidate.timeZoneId ?? "") <
+        (existing.dayKey, existing.country.id, existing.timeZoneId ?? "")
+    }
+
+    private func isOriginFlightSignal(_ signal: CalendarSignalInfo) -> Bool {
+        if signal.source == "CalendarFlightOrigin" { return true }
+        return signal.eventIdentifier?.hasSuffix("#origin") == true
+    }
+
+    private func baseTravelEventIdentifier(for eventIdentifier: String?) -> String? {
+        guard let eventIdentifier, !eventIdentifier.isEmpty else { return nil }
+        if eventIdentifier.hasSuffix("#origin") {
+            return String(eventIdentifier.dropLast("#origin".count))
+        }
+        return eventIdentifier
+    }
+
+    private func adjacentDayKey(
+        from dayKey: String,
+        timeZoneId: String?,
+        deltaDays: Int
+    ) -> String? {
+        let timeZone = DayIdentity.canonicalTimeZone(preferredTimeZoneId: timeZoneId, fallback: context.calendar.timeZone)
+        guard let date = DayKey.date(for: dayKey, timeZone: timeZone) else { return nil }
+
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = timeZone
+
+        guard let adjacent = calendar.date(byAdding: .day, value: deltaDays, to: date) else {
+            return nil
+        }
+        return DayKey.make(from: adjacent, timeZone: timeZone)
+    }
+
+    private func isEligibleForAdjacentTravelPromotion(_ result: PresenceDayResult) -> Bool {
+        guard !result.isOverride else { return false }
+        guard result.contributedCountries.isEmpty else { return false }
+        guard result.stayCount == 0 else { return false }
+        guard result.photoCount == 0 else { return false }
+        guard result.locationCount == 0 else { return false }
+        return true
     }
 }
 
