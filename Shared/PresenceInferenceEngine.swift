@@ -67,20 +67,20 @@ struct InferencePipelineConfig: Sendable {
     }
 }
 
-private struct InferenceSourceCounts: Sendable {
+struct InferenceSourceCounts: Sendable {
     var stayCount = 0
     var photoCount = 0
     var locationCount = 0
     var calendarCount = 0
 }
 
-private struct FlightOriginCandidate: Sendable {
+struct FlightOriginCandidate: Sendable {
     let country: ResolvedCountry
     var count: Int
     let timeZoneId: String?
 }
 
-private struct DayInferenceState: Sendable {
+struct DayInferenceState: Sendable {
     var countryScores: [String: Double] = [:]
     var countries: [String: ResolvedCountry] = [:]
     var timeZoneScores: [String: Double] = [:]

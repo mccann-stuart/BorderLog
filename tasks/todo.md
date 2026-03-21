@@ -114,3 +114,11 @@
 - [x] Updated `PresenceDay` persistence, ledger writes, and day detail UI to surface normalized allocations and the inference audit trail
 - [x] Added regression coverage for calibration metadata and winning-vs-losing evidence flags; repaired stale test fixture helpers
 - [ ] `swiftc -parse` passed for all edited production and test files, but `xcodebuild test` remains blocked in this environment by simulator runtime failures (`simdiskimaged` / runtime discovery)
+
+## Task: Fix PresenceInferenceEngine Access Control Errors
+- [x] Inspect access control for pipeline state types around the reported errors
+- [x] Update access levels to satisfy private type visibility rules
+- [x] Verify diagnostics for PresenceInferenceEngine.swift
+
+## Review
+- [x] XcodeRefreshCodeIssuesInFile: PresenceInferenceEngine.swift
