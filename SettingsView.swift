@@ -31,8 +31,16 @@ struct SettingsView: View {
     @State private var ingestionError: String?
     @State private var locationService = LocationSampleService()
     @State private var widgetLastWriteDate: Date?
+    @State private var isPreparingDebugExport = false
+    @State private var isPresentingDebugExport = false
+    @State private var debugExportError: String?
+    @State private var debugExportDocument = DebugDataStoreExportDocument(data: Data())
+    @State private var debugExportDefaultFilename = "borderlog-debug-export"
     @AppStorage("didBootstrapInference") private var didBootstrapInference = false
     @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
+    @AppStorage("hasPromptedLocation") private var hasPromptedLocation = false
+    @AppStorage("hasPromptedPhotos") private var hasPromptedPhotos = false
+    @AppStorage("hasPromptedCalendar") private var hasPromptedCalendar = false
     @AppStorage("usePolygonMapView") private var usePolygonMapView = true
     @AppStorage("showSchengenDashboardSection") private var showSchengenDashboardSection = true
     @AppStorage("cloudKitSyncEnabled", store: AppConfig.sharedDefaults) private var cloudKitSyncEnabled = false
@@ -250,6 +258,28 @@ struct SettingsView: View {
                     Text("Permanently deletes all stays, day overrides, and location samples stored on this device.")
                 }
 
+                Section {
+                    Button {
+                        exportDebugDataStore()
+                    } label: {
+                        HStack {
+                            Label(
+                                isPreparingDebugExport ? "Preparing Export…" : "Export Debug Data Store",
+                                systemImage: isPreparingDebugExport ? "arrow.triangle.2.circlepath" : "square.and.arrow.up"
+                            )
+                            if isPreparingDebugExport {
+                                Spacer()
+                                ProgressView()
+                            }
+                        }
+                    }
+                    .disabled(isPreparingDebugExport)
+                } header: {
+                    Text("Debug Export")
+                } footer: {
+                    Text("Exports a full-fidelity JSON snapshot for internal debugging, including raw coordinates, event identifiers, titles, asset hashes, and local user identifiers.")
+                }
+
                 // MARK: – App Info
                 Section {
                     HStack {
@@ -330,6 +360,22 @@ struct SettingsView: View {
                 Button("OK", role: .cancel) {}
             } message: {
                 Text(ingestionError ?? "Unknown error.")
+            }
+            .alert("Unable to export debug data", isPresented: debugExportErrorPresented) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text(debugExportError ?? "Unknown error.")
+            }
+            .fileExporter(
+                isPresented: $isPresentingDebugExport,
+                document: debugExportDocument,
+                contentTypes: DebugDataStoreExportDocument.readableContentTypes,
+                defaultFilename: debugExportDefaultFilename
+            ) { result in
+                if case .failure(let error) = result {
+                    Self.logger.error("Debug export file handoff failed: \(error, privacy: .private)")
+                    debugExportError = "Failed to hand off the debug export file. Please try again."
+                }
             }
             .onAppear {
                 refreshPermissions()
@@ -419,13 +465,17 @@ struct SettingsView: View {
     // MARK: – Helpers
 
     private func refreshWidgetLastWriteDate() {
+        widgetLastWriteDate = latestWidgetWriteDate()
+    }
+
+    private func latestWidgetWriteDate() -> Date? {
         let widgetSourceRaw = LocationSampleSource.widget.rawValue
         var descriptor = FetchDescriptor<LocationSample>(sortBy: [SortDescriptor(\LocationSample.timestamp, order: .reverse)])
         descriptor.fetchLimit = 1
         descriptor.predicate = #Predicate<LocationSample> { sample in
             sample.sourceRaw == widgetSourceRaw
         }
-        widgetLastWriteDate = (try? modelContext.fetch(descriptor))?.first?.timestamp
+        return (try? modelContext.fetch(descriptor))?.first?.timestamp
     }
 
     private func resetAllData() {
@@ -507,6 +557,34 @@ struct SettingsView: View {
         }
     }
 
+    private func exportDebugDataStore() {
+        isPreparingDebugExport = true
+        debugExportError = nil
+
+        let exportedAt = Date()
+        let runtimeContext = makeDebugExportContext(exportedAt: exportedAt)
+        let container = modelContext.container
+
+        Task {
+            do {
+                let service = DebugDataStoreExportService(modelContainer: container)
+                let data = try await service.exportJSON(context: runtimeContext)
+                await MainActor.run {
+                    debugExportDocument = DebugDataStoreExportDocument(data: data)
+                    debugExportDefaultFilename = Self.debugExportFilename(for: exportedAt)
+                    isPresentingDebugExport = true
+                    isPreparingDebugExport = false
+                }
+            } catch {
+                Self.logger.error("Failed to export debug data store: \(error, privacy: .private)")
+                await MainActor.run {
+                    isPreparingDebugExport = false
+                    debugExportError = "Failed to export debug data. Please try again."
+                }
+            }
+        }
+    }
+
     private func openAppSettings() {
         if let url = URL(string: UIApplication.openSettingsURLString) {
             UIApplication.shared.open(url)
@@ -518,9 +596,15 @@ struct SettingsView: View {
     }
 
     private var appVersionString: String {
-        let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"
-        let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "1"
-        return "\(version) (\(build))"
+        "\(appVersion) (\(appBuild))"
+    }
+
+    private var appVersion: String {
+        Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"
+    }
+
+    private var appBuild: String {
+        Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "1"
     }
 
     private var dataStoreLabel: String {
@@ -531,6 +615,17 @@ struct SettingsView: View {
             return "Local App storage"
         case .temporary:
             return "Not saving (Error)"
+        }
+    }
+
+    private var dataStoreModeCode: String {
+        switch dataStoreStatus {
+        case .cloudKit:
+            return "cloudKit"
+        case .local:
+            return "local"
+        case .temporary:
+            return "temporary"
         }
     }
 
@@ -616,6 +711,131 @@ struct SettingsView: View {
         }
     }
 
+    private func makeDebugExportContext(exportedAt: Date) -> DebugExportRuntimeContext {
+        let currentLocationStatus = CLLocationManager().authorizationStatus
+        let currentPhotoStatus = PHPhotoLibrary.authorizationStatus(for: .readWrite)
+        let currentCalendarStatus = EKEventStore.authorizationStatus(for: .event)
+        let pendingSnapshots = PendingLocationSnapshot.dequeueAll(from: AppConfig.sharedDefaults, clearAfter: false)
+            .map {
+                DebugExportPendingLocationSnapshot(
+                    timestamp: $0.timestamp,
+                    latitude: $0.latitude,
+                    longitude: $0.longitude,
+                    accuracyMeters: $0.accuracyMeters,
+                    sourceRaw: $0.sourceRaw,
+                    timeZoneId: $0.timeZoneId,
+                    dayKey: $0.dayKey,
+                    countryCode: $0.countryCode,
+                    countryName: $0.countryName
+                )
+            }
+        let latestWidgetWriteDate = latestWidgetWriteDate()
+        widgetLastWriteDate = latestWidgetWriteDate
+
+        let metadata = DebugExportMetadata(
+            exportedAt: exportedAt,
+            appVersion: appVersion,
+            appBuild: appBuild,
+            bundleIdentifier: Bundle.main.bundleIdentifier,
+            deviceModelCategory: deviceModelCategory,
+            operatingSystemVersion: ProcessInfo.processInfo.operatingSystemVersionString,
+            localeIdentifier: Locale.autoupdatingCurrent.identifier,
+            currentTimeZoneId: TimeZone.current.identifier,
+            appVariantFlags: DebugExportAppVariantFlags(
+                cloudKitFeatureEnabled: AppConfig.isCloudKitFeatureEnabled,
+                appleSignInEnabled: AuthenticationManager.isAppleSignInEnabled,
+                appGroupAvailable: AppConfig.isAppGroupAvailable
+            )
+        )
+
+        let appState = DebugExportAppState(
+            hasCompletedOnboarding: hasCompletedOnboarding,
+            didBootstrapInference: didBootstrapInference,
+            hasPromptedLocation: hasPromptedLocation,
+            hasPromptedPhotos: hasPromptedPhotos,
+            hasPromptedCalendar: hasPromptedCalendar,
+            usePolygonMapView: usePolygonMapView,
+            showSchengenDashboardSection: showSchengenDashboardSection,
+            cloudKitSyncEnabled: cloudKitSyncEnabled,
+            requireBiometrics: requireBiometrics,
+            locationPermission: locationPermissionStatus(for: currentLocationStatus),
+            photoPermission: photoPermissionStatus(for: currentPhotoStatus),
+            calendarPermission: calendarPermissionStatus(for: currentCalendarStatus),
+            dataStoreMode: dataStoreModeCode,
+            appGroupAvailable: AppConfig.isAppGroupAvailable,
+            cloudKitFeatureEnabled: AppConfig.isCloudKitFeatureEnabled,
+            currentStoreEpoch: ModelContainerProvider.currentStoreEpochForTests,
+            storedStoreEpoch: AppConfig.sharedDefaults.integer(forKey: ModelContainerProvider.storeEpochKeyForTests),
+            widgetLastWriteDate: latestWidgetWriteDate,
+            pendingWidgetSnapshotCount: pendingSnapshots.count
+        )
+
+        let userData = DebugExportUserData(
+            passportNationality: readKeychainString(account: "userPassportNationality"),
+            homeCountry: readKeychainString(account: "userHomeCountry"),
+            appleUserId: readKeychainString(account: "appleUserId"),
+            appleSignInEnabled: AuthenticationManager.isAppleSignInEnabled
+        )
+
+        return DebugExportRuntimeContext(
+            metadata: metadata,
+            appState: appState,
+            userData: userData,
+            pendingLocationSnapshots: pendingSnapshots
+        )
+    }
+
+    private func readKeychainString(account: String) -> String? {
+        guard let data = KeychainHelper.standard.read(service: "com.MCCANN.Border", account: account),
+              let value = String(data: data, encoding: .utf8) else {
+            return nil
+        }
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : trimmed
+    }
+
+    private func locationPermissionStatus(for status: CLAuthorizationStatus) -> DebugExportPermissionStatus {
+        DebugExportPermissionStatus(rawValue: status.rawValue, label: locationStatusLabel(for: status))
+    }
+
+    private func photoPermissionStatus(for status: PHAuthorizationStatus) -> DebugExportPermissionStatus {
+        DebugExportPermissionStatus(rawValue: status.rawValue, label: photoStatusLabel(for: status))
+    }
+
+    private func calendarPermissionStatus(for status: EKAuthorizationStatus) -> DebugExportPermissionStatus {
+        DebugExportPermissionStatus(rawValue: status.rawValue, label: calendarStatusLabel(for: status))
+    }
+
+    private var deviceModelCategory: String {
+        switch UIDevice.current.userInterfaceIdiom {
+        case .phone:
+            return "phone"
+        case .pad:
+            return "pad"
+        case .mac:
+            return "mac"
+        case .tv:
+            return "tv"
+        case .vision:
+            return "vision"
+        case .carPlay:
+            return "carPlay"
+        case .unspecified:
+            return "unspecified"
+        @unknown default:
+            return "unknown"
+        }
+    }
+
+    private static func debugExportFilename(for date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.calendar = Calendar(identifier: .gregorian)
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = TimeZone.current
+        formatter.dateFormat = "yyyy-MM-dd-HHmmss"
+        return "borderlog-debug-export-\(formatter.string(from: date))"
+    }
+
     private var cloudKitDeleteErrorPresented: Binding<Bool> {
         Binding(
             get: { cloudKitDeleteError != nil },
@@ -628,6 +848,46 @@ struct SettingsView: View {
             get: { ingestionError != nil },
             set: { if !$0 { ingestionError = nil } }
         )
+    }
+
+    private var debugExportErrorPresented: Binding<Bool> {
+        Binding(
+            get: { debugExportError != nil },
+            set: { if !$0 { debugExportError = nil } }
+        )
+    }
+
+    private func locationStatusLabel(for status: CLAuthorizationStatus) -> String {
+        switch status {
+        case .authorizedAlways:    return "Always On"
+        case .authorizedWhenInUse: return "When In Use"
+        case .denied:              return "Denied"
+        case .restricted:          return "Restricted"
+        case .notDetermined:       return "Not Set"
+        @unknown default:          return "Unknown"
+        }
+    }
+
+    private func photoStatusLabel(for status: PHAuthorizationStatus) -> String {
+        switch status {
+        case .authorized:    return "Geo Location Access"
+        case .limited:       return "Limited photos"
+        case .denied:        return "Denied"
+        case .restricted:    return "Restricted"
+        case .notDetermined: return "Not Set"
+        @unknown default:    return "Unknown"
+        }
+    }
+
+    private func calendarStatusLabel(for status: EKAuthorizationStatus) -> String {
+        switch status {
+        case .fullAccess:    return "Read Access"
+        case .writeOnly:     return "Write Only"
+        case .denied:        return "Denied"
+        case .restricted:    return "Restricted"
+        case .notDetermined: return "Not Set"
+        @unknown default:    return "Unknown"
+        }
     }
 }
 
@@ -743,5 +1003,5 @@ struct ProfileEditView: View {
 
 #Preview {
     SettingsView()
-        .modelContainer(for: [Stay.self, DayOverride.self, LocationSample.self, PhotoSignal.self, PresenceDay.self, PhotoIngestState.self, CalendarSignal.self], inMemory: true)
+        .modelContainer(for: [Stay.self, DayOverride.self, LocationSample.self, PhotoSignal.self, PresenceDay.self, PhotoIngestState.self, CountryConfig.self, CalendarSignal.self], inMemory: true)
 }

@@ -52,3 +52,12 @@
 
 ## Review
 - [x] XcodeRefreshCodeIssuesInFile: PresenceDayDetailView.swift
+
+## Task: Debug Data Store Export In Settings
+- [ ] Add a background debug export service with codable payload, summaries, and day-level diagnostics
+- [ ] Add an iPhone Settings export flow with file export UI, progress, and error handling
+- [ ] Add focused unit tests for payload generation, summaries, and day union coverage
+- [ ] Run targeted verification for the new export feature and document results
+
+## Review
+- [ ] Pending
