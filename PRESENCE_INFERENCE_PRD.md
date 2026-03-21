@@ -456,10 +456,20 @@ For adjacent-day flight inference specifically:
 - Burst location capture reuses one resolved country/timezone for the selected burst sample set.
 - Calendar ingestion is intentionally flight-focused today; non-flight travel signals are not part of this PRD.
 
-## 15. Future Extensions
+## 15. Future Extensions and Improvements
 
-- more nuanced transit-day modeling
-- non-flight calendar travel events
-- richer confidence calibration
-- separate explanation of losing evidence vs. winning evidence
-- zone-specific confidence overlays on top of country inference
+The current iteration of the inference engine is functional, local-first, and deterministic. However, as the app scales and ingests more varied signal types, the following areas represent key opportunities for structural rewrites, logic improvements, and algorithmic efficiency.
+
+### 15.1 Architectural Restructuring and Flow Improvements
+- **Decoupled Scoring Pipeline:** Rewrite the current sequential bucket construction into a functional, middleware-style pipeline. This allows individual signal processors (e.g., photo signals, calendar signals) to independently emit standardized score mutations, making it easier to test individual domains, add new source types, and dynamically toggle modifiers.
+- **Incremental Ledger Updates:** Currently, small data entry modifications expand the recompute scope to an 8-day surrounding window. A more efficient method involves maintaining a persistent, versioned dependency graph of `DayKey` mutations. The system should identify localized state changes and only propagate recalculations through days mathematically capable of changing (e.g., boundary edge days for gap bridging) without touching stable adjacent records.
+- **Asynchronous Ingestion Queues:** Move signal normalization, hashing, and initial timezone resolution into an offline background queue (using Core Data background contexts or Swift Concurrency actors). The main inference engine would only merge pre-computed daily aggregates rather than iterating raw source models on the fly, drastically improving flow efficiency.
+
+### 15.2 Inference Logic and Methodological Enhancements
+- **Nuanced Transit-Day Modeling:** Instead of forcing a single terminal winner, transit days involving multiple countries (e.g., layovers) should persist as a structured multi-country representation. The engine could calculate percentage-time weights rather than relying entirely on discrete location sample counts, enabling better compliance reporting where fractional days matter.
+- **Dynamic Confidence Calibration:** While the rule is deterministic today, confidence scoring can be evolved from hardcoded weights (`+3.0`, `+2.0`) to a parameterized decay model. Signals from high-accuracy GPS samples should have stronger temporal authority over immediately adjacent hours than a single timestamped photo, allowing time-distance bounding boxes to shape confidence dynamically.
+- **Non-Flight Context Parsing:** Expand the calendar signal ingestor beyond destination-first flight resolution. Introduce a generalized rules-based parser for trains, ferries, hotel check-ins, and cross-border events to provide the same targeted promotion capabilities currently restricted to flights.
+
+### 15.3 Explainability and Data Representation
+- **Transparent Losing vs. Winning Evidence:** The current `sources` mask explicitly hides non-winning evidence. The `PresenceDay` persistence model should be refactored to store an array of contributing factors, tracking exact numerical impacts of all sources—both winning and losing. This dramatically improves the UX for users conducting manual audits of disputed days.
+- **Zone-Specific Overlays:** Shift inference away from checking just country-level overlap and extend it into geo-fence bounding structures (e.g., Schengen Zone, US States). This allows the engine to output simultaneous conclusions (e.g., "User is in France AND user is counting towards Schengen limits"), creating more robust, queryable abstractions downstream.
