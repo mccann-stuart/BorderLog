@@ -6,7 +6,7 @@
 //
 
 import Foundation
-import SwiftData
+@preconcurrency import SwiftData
 
 struct DebugExportAppVariantFlags: Codable, Sendable {
     let cloudKitFeatureEnabled: Bool

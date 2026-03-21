@@ -117,7 +117,7 @@ struct PresenceConfidenceBreakdown: Codable, Sendable, Equatable {
     let label: ConfidenceLabel
     let calibrationSummary: String
 
-    init(
+    nonisolated init(
         score: Double,
         runnerUpScore: Double,
         margin: Double,
@@ -137,16 +137,16 @@ struct PresenceConfidenceBreakdown: Codable, Sendable, Equatable {
 struct SignalSourceMask: OptionSet, Codable, Sendable {
     let rawValue: Int
 
-    static let override = SignalSourceMask(rawValue: 1 << 0)
-    static let stay = SignalSourceMask(rawValue: 1 << 1)
-    static let photo = SignalSourceMask(rawValue: 1 << 2)
-    static let location = SignalSourceMask(rawValue: 1 << 3)
-    static let calendar = SignalSourceMask(rawValue: 1 << 4)
+    nonisolated static let override = SignalSourceMask(rawValue: 1 << 0)
+    nonisolated static let stay = SignalSourceMask(rawValue: 1 << 1)
+    nonisolated static let photo = SignalSourceMask(rawValue: 1 << 2)
+    nonisolated static let location = SignalSourceMask(rawValue: 1 << 3)
+    nonisolated static let calendar = SignalSourceMask(rawValue: 1 << 4)
 
-    static let none: SignalSourceMask = []
-    static let all: SignalSourceMask = [.`override`, .stay, .photo, .location, .calendar]
+    nonisolated static let none: SignalSourceMask = []
+    nonisolated static let all: SignalSourceMask = [.`override`, .stay, .photo, .location, .calendar]
 
-    static func from(processorIDs: some Sequence<String>) -> SignalSourceMask {
+    nonisolated static func from(processorIDs: some Sequence<String>) -> SignalSourceMask {
         processorIDs.reduce(into: .none) { partialResult, processorID in
             let normalized = processorID.lowercased()
             if normalized.contains("override") {
@@ -173,7 +173,7 @@ struct CalendarSignalInfo: Sendable {
     let eventIdentifier: String?
     let source: String?
 
-    init(
+    nonisolated init(
         dayKey: String,
         countryCode: String?,
         countryName: String,

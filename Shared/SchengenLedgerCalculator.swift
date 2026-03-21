@@ -17,10 +17,10 @@ struct SchengenLedgerSummary: Sendable {
 }
 
 enum SchengenLedgerCalculator {
-    private static let windowSize = 180
-    private static let maxAllowedDays = 90
+    private nonisolated static let windowSize = 180
+    private nonisolated static let maxAllowedDays = 90
 
-    static func summary(
+    nonisolated static func summary(
         for days: [PresenceDay],
         asOf referenceDate: Date = Date(),
         calendar: Calendar = .current,

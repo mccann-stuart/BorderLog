@@ -19,17 +19,17 @@ enum CalendarEventIngestability: Sendable {
     case otherTravelOrLodging
     case none
 
-    var shouldIngest: Bool {
+    nonisolated var shouldIngest: Bool {
         self != .none
     }
 
-    var shouldDecorateAsFlight: Bool {
+    nonisolated var shouldDecorateAsFlight: Bool {
         self == .flight
     }
 }
 
 enum CalendarFlightParsing {
-    static func classify(event: CalendarEventTextSnapshot) -> CalendarEventIngestability {
+    nonisolated static func classify(event: CalendarEventTextSnapshot) -> CalendarEventIngestability {
         let candidates = [
             event.title,
             event.location,
@@ -52,15 +52,15 @@ enum CalendarFlightParsing {
         return .none
     }
 
-    static func shouldIngest(event: CalendarEventTextSnapshot) -> Bool {
+    nonisolated static func shouldIngest(event: CalendarEventTextSnapshot) -> Bool {
         classify(event: event).shouldIngest
     }
 
-    static func shouldDecorateAsFlight(event: CalendarEventTextSnapshot) -> Bool {
+    nonisolated static func shouldDecorateAsFlight(event: CalendarEventTextSnapshot) -> Bool {
         classify(event: event).shouldDecorateAsFlight
     }
 
-    static func parseFlightInfo(event: CalendarEventTextSnapshot) -> (from: String?, to: String?) {
+    nonisolated static func parseFlightInfo(event: CalendarEventTextSnapshot) -> (from: String?, to: String?) {
         let candidates = [
             event.title ?? "",
             event.location ?? "",
@@ -161,11 +161,11 @@ enum CalendarFlightParsing {
         return (bestFrom, bestTo)
     }
 
-    private static func isFlightText(_ text: String) -> Bool {
+    private nonisolated static func isFlightText(_ text: String) -> Bool {
         text.contains("✈") || text.localizedCaseInsensitiveContains("Flight")
     }
 
-    private static func isOtherTravelOrLodgingText(_ text: String) -> Bool {
+    private nonisolated static func isOtherTravelOrLodgingText(_ text: String) -> Bool {
         text.contains("🚆")
         || text.contains("🚄")
         || text.contains("⛴")
@@ -176,7 +176,7 @@ enum CalendarFlightParsing {
         || text.localizedCaseInsensitiveContains("Hotel")
     }
 
-    private static func preprocessCandidateText(_ raw: String) -> String {
+    private nonisolated static func preprocessCandidateText(_ raw: String) -> String {
         guard !raw.isEmpty else { return "" }
 
         let scalars = raw.unicodeScalars.lazy.compactMap { scalar -> UnicodeScalar? in
@@ -192,13 +192,13 @@ enum CalendarFlightParsing {
         return String(scalars.map { Character($0) })
     }
 
-    private static func collapseWhitespace(_ raw: String) -> String {
+    private nonisolated static func collapseWhitespace(_ raw: String) -> String {
         raw
             .replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
             .trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
-    private static func normalizeLocationToken(_ raw: String) -> String? {
+    private nonisolated static func normalizeLocationToken(_ raw: String) -> String? {
         var value = raw.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !value.isEmpty else { return nil }
 

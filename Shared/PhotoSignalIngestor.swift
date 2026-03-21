@@ -121,7 +121,7 @@ actor PhotoSignalIngestor {
                 }
                 let resolution = await activeResolver.resolveCountry(for: location)
                 let timeZone = resolution?.timeZone ?? TimeZone.current
-                let dayKey = await DayKey.make(from: creationDate, timeZone: timeZone)
+                let dayKey = DayKey.make(from: creationDate, timeZone: timeZone)
 
                 let signal = PhotoSignal(
                     timestamp: creationDate,

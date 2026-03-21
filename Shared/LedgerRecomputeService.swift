@@ -6,7 +6,7 @@
 //
 
 import Foundation
-import SwiftData
+@preconcurrency import SwiftData
 import os
 
 @ModelActor
@@ -147,7 +147,7 @@ public actor LedgerRecomputeService {
                 didBeginInference = true
             }
 
-            let results = await PresenceInferenceEngine.compute(
+            let results = PresenceInferenceEngine.compute(
                 dayKeys: dayKeySet,
                 stays: stayInfos,
                 overrides: overrideInfos,
@@ -203,7 +203,7 @@ public actor LedgerRecomputeService {
 
         do {
             try self.upsertPresenceDays(finalResults, originalKeys: finalScopeKeys)
-            try await dataFetcher.save()
+            try dataFetcher.save()
         } catch {
             Self.logger.error("LedgerRecomputeService save error: \(error, privacy: .private)")
             onRecomputeError?(error)

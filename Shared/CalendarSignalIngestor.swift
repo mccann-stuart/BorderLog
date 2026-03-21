@@ -392,13 +392,12 @@ actor CalendarSignalIngestor {
 
                 if let response = try? await search.start(),
                    let item = response.mapItems.first {
-                    let placemark = item.placemark
                     let location = item.location
                     latitude = location.coordinate.latitude
                     longitude = location.coordinate.longitude
-                    countryCode = placemark.countryCode ?? item.addressRepresentations?.region?.identifier
-                    countryName = placemark.country ?? item.addressRepresentations?.regionName
-                    resolvedTimeZoneId = item.timeZone?.identifier ?? placemark.timeZone?.identifier
+                    countryCode = item.addressRepresentations?.regionCode
+                    countryName = item.addressRepresentations?.regionName
+                    resolvedTimeZoneId = item.timeZone?.identifier
                 }
             }
         }

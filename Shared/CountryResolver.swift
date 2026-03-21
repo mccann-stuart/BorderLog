@@ -14,7 +14,7 @@ struct CountryResolution: Sendable {
     let countryName: String?
     let timeZone: TimeZone?
 
-    static func normalized(
+    nonisolated static func normalized(
         countryCode: String?,
         countryName: String?,
         timeZone: TimeZone?
@@ -78,7 +78,7 @@ actor GeocodeCoordinator {
 
         let task: Task<CountryResolution?, Never> = Task { [self] in
             defer {
-                Task { await self.clearInFlight(for: key) }
+                Task { self.clearInFlight(for: key) }
             }
 
             await self.waitForPermit()
@@ -89,15 +89,14 @@ actor GeocodeCoordinator {
                 }
                 let mapItems = try await request.mapItems
                 let mapItem = mapItems.first
-                let placemark = mapItem?.placemark
                 let addressRepresentations = mapItem?.addressRepresentations
                 let resolution = CountryResolution.normalized(
-                    countryCode: placemark?.countryCode ?? addressRepresentations?.region?.identifier,
-                    countryName: placemark?.country ?? addressRepresentations?.regionName,
-                    timeZone: mapItem?.timeZone ?? placemark?.timeZone
+                    countryCode: addressRepresentations?.regionCode,
+                    countryName: addressRepresentations?.regionName,
+                    timeZone: mapItem?.timeZone
                 )
                 if let resolution {
-                    await self.store(resolution, for: key)
+                    self.store(resolution, for: key)
                 }
                 return resolution
             } catch {

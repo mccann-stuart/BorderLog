@@ -6,7 +6,7 @@
 //
 
 import Foundation
-import SwiftData
+@preconcurrency import SwiftData
 
 enum CalendarCountrySummaryRange: String, CaseIterable, Identifiable {
     case visibleMonth = "Visible Month"
