@@ -27,7 +27,7 @@ enum CalendarFlightParsing {
             return false
         }
 
-        for text in candidates where text.contains("✈") || text.localizedCaseInsensitiveContains("Flight") {
+        for text in candidates where text.contains("✈") || text.contains("🚆") || text.contains("🚄") || text.contains("⛴") || text.contains("🏨") || text.localizedCaseInsensitiveContains("Flight") || text.localizedCaseInsensitiveContains("Train") || text.localizedCaseInsensitiveContains("Ferry") || text.localizedCaseInsensitiveContains("Bus") || text.localizedCaseInsensitiveContains("Hotel") {
             return true
         }
 
@@ -42,8 +42,9 @@ enum CalendarFlightParsing {
             event.notes ?? ""
         ]
 
-        let patternFromTo = try? NSRegularExpression(pattern: "from\\s+(.+?)\\s+to\\s+(.+)", options: [.caseInsensitive])
-        let patternTo = try? NSRegularExpression(pattern: "flight\\s+to\\s+(.+)", options: [.caseInsensitive])
+        let patternFromTo = try? NSRegularExpression(pattern: "(?:from\\s+(.+?)\\s+to\\s+(.+))", options: [.caseInsensitive])
+        let patternTo = try? NSRegularExpression(pattern: "(?:flight|train|ferry|bus)\\s+to\\s+(.+)", options: [.caseInsensitive])
+        let patternHotel = try? NSRegularExpression(pattern: "hotel\\s+(?:in|at)\\s+(.+)", options: [.caseInsensitive])
         let patternFlightNumberRoute = try? NSRegularExpression(
             pattern: "flight\\s*[:\\-]?\\s*[A-Z]{1,3}\\s*\\d{1,4}\\s+(.+?)\\s+to\\s+(.+)",
             options: [.caseInsensitive]
@@ -118,6 +119,13 @@ enum CalendarFlightParsing {
 
             if bestTo == nil,
                let p = patternTo,
+               let match = p.firstMatch(in: text, options: [], range: range),
+               match.numberOfRanges >= 2 {
+                bestTo = normalizeLocationToken(nsString.substring(with: match.range(at: 1)))
+            }
+
+            if bestTo == nil,
+               let p = patternHotel,
                let match = p.firstMatch(in: text, options: [], range: range),
                match.numberOfRanges >= 2 {
                 bestTo = normalizeLocationToken(nsString.substring(with: match.range(at: 1)))

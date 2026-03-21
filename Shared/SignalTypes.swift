@@ -13,6 +13,19 @@ enum ConfidenceLabel: String, CaseIterable, Codable {
     case low
 }
 
+struct ContributedCountry: Codable, Sendable, Equatable {
+    let countryCode: String?
+    let countryName: String
+    let probability: Double
+}
+
+struct SignalImpact: Codable, Sendable, Equatable {
+    let source: String
+    let countryCode: String?
+    let countryName: String
+    let scoreDelta: Double
+}
+
 struct SignalSourceMask: OptionSet, Codable, Sendable {
     let rawValue: Int
 
@@ -88,8 +101,9 @@ struct PresenceDayResult: Sendable {
     let dayKey: String
     let date: Date
     let timeZoneId: String?
-    let countryCode: String?
-    let countryName: String?
+    let contributedCountries: [ContributedCountry]
+    let zoneOverlays: [String]
+    let evidence: [SignalImpact]
     let confidence: Double
     let confidenceLabel: ConfidenceLabel
     let sources: SignalSourceMask

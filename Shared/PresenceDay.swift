@@ -13,8 +13,9 @@ final class PresenceDay {
     @Attribute(.unique) var dayKey: String
     var date: Date
     var timeZoneId: String?
-    var countryCode: String?
-    var countryName: String?
+    var contributedCountries: [ContributedCountry] = []
+    var zoneOverlays: [String] = []
+    var evidence: [SignalImpact] = []
     var confidence: Double
     var confidenceLabelRaw: String
     var sourcesRaw: Int
@@ -33,8 +34,9 @@ final class PresenceDay {
         dayKey: String,
         date: Date,
         timeZoneId: String?,
-        countryCode: String?,
-        countryName: String?,
+        contributedCountries: [ContributedCountry],
+        zoneOverlays: [String],
+        evidence: [SignalImpact],
         confidence: Double,
         confidenceLabel: ConfidenceLabel,
         sources: SignalSourceMask,
@@ -52,8 +54,9 @@ final class PresenceDay {
         self.dayKey = dayKey
         self.date = date
         self.timeZoneId = timeZoneId
-        self.countryCode = countryCode
-        self.countryName = countryName
+        self.contributedCountries = contributedCountries
+        self.zoneOverlays = zoneOverlays
+        self.evidence = evidence
         self.confidence = confidence
         self.confidenceLabelRaw = confidenceLabel.rawValue
         self.sourcesRaw = sources.rawValue

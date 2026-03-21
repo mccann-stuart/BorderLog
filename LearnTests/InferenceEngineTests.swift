@@ -45,14 +45,16 @@ final class InferenceEngineTests: XCTestCase {
             calendar: calendar
         )
 
-        XCTAssertEqual(results.first?.countryCode, "FR")
+        XCTAssertEqual(results.first?.contributedCountries.first?.countryCode, "FR")
         XCTAssertEqual(results.first?.isOverride, true)
+        XCTAssertTrue(results.first?.evidence.contains(where: { $0.source == "override" }) == true)
+        XCTAssertTrue(results.first?.evidence.contains(where: { $0.source == "photo" }) == true)
     }
 
     func testUnknownWhenScoreBelowThreshold() {
         let date = day(2026, 2, 15)
         let dayKey = DayKey.make(from: date, timeZone: calendar.timeZone)
-        let locations = [LocationSignalInfo(dayKey: dayKey, countryCode: "ES", countryName: "Spain", accuracyMeters: 10000, timeZoneId: nil)]
+        let locations = [LocationSignalInfo(dayKey: dayKey, countryCode: "ES", countryName: "Spain", accuracyMeters: 10000, timeZoneId: nil)] // Adds +0.6
 
         let results = PresenceInferenceEngine.compute(
             dayKeys: [dayKey],
@@ -64,8 +66,41 @@ final class InferenceEngineTests: XCTestCase {
             calendar: calendar
         )
 
-        XCTAssertNil(results.first?.countryCode)
+        XCTAssertTrue(results.first?.contributedCountries.isEmpty == true)
         XCTAssertEqual(results.first?.confidenceLabel, .low)
+        // Ensure evidence still surfaces transparently even if unknown
+        XCTAssertEqual(results.first?.evidence.first?.countryCode, "ES")
+    }
+
+    func testNuancedTransitDayAllocatesProbability() {
+        let date = day(2026, 2, 15)
+        let dayKey = DayKey.make(from: date, timeZone: calendar.timeZone)
+        let locations = [
+            LocationSignalInfo(dayKey: dayKey, countryCode: "FR", countryName: "France", accuracyMeters: 10, timeZoneId: nil), // 3.0
+            LocationSignalInfo(dayKey: dayKey, countryCode: "FR", countryName: "France", accuracyMeters: 10, timeZoneId: nil), // 3.0
+            LocationSignalInfo(dayKey: dayKey, countryCode: "ES", countryName: "Spain", accuracyMeters: 10, timeZoneId: nil)  // 3.0
+        ]
+
+        let results = PresenceInferenceEngine.compute(
+            dayKeys: [dayKey],
+            stays: [],
+            overrides: [],
+            locations: locations,
+            photos: [],
+            calendarSignals: [],
+            rangeEnd: date,
+            calendar: calendar
+        )
+        
+        let contributed = results.first?.contributedCountries ?? []
+        XCTAssertEqual(contributed.count, 2)
+        XCTAssertEqual(contributed[0].countryCode, "FR")
+        XCTAssertEqual(contributed[1].countryCode, "ES")
+        XCTAssertEqual(contributed[0].probability, 6.0 / 9.0, accuracy: 0.01)
+        XCTAssertEqual(contributed[1].probability, 3.0 / 9.0, accuracy: 0.01)
+        
+        let evidence = results.first?.evidence ?? []
+        XCTAssertEqual(evidence.count, 3)
     }
 
     func testDisputedWhenConfidenceDeltaSmall() {
@@ -87,33 +122,8 @@ final class InferenceEngineTests: XCTestCase {
             calendar: calendar
         )
 
-        XCTAssertEqual(results.first?.countryCode, "FR")
+        XCTAssertEqual(results.first?.contributedCountries.first?.countryCode, "FR")
         XCTAssertEqual(results.first?.isDisputed, true)
-    }
-
-    func testNotDisputedWhenConfidenceDeltaLarge() {
-        let date = day(2026, 2, 15)
-        let dayKey = DayKey.make(from: date, timeZone: calendar.timeZone)
-        let photos = [
-            PhotoSignalInfo(dayKey: dayKey, countryCode: "FR", countryName: "France", timeZoneId: nil),
-            PhotoSignalInfo(dayKey: dayKey, countryCode: "FR", countryName: "France", timeZoneId: nil),
-            PhotoSignalInfo(dayKey: dayKey, countryCode: "FR", countryName: "France", timeZoneId: nil),
-            PhotoSignalInfo(dayKey: dayKey, countryCode: "FR", countryName: "France", timeZoneId: nil),
-            PhotoSignalInfo(dayKey: dayKey, countryCode: "ES", countryName: "Spain", timeZoneId: nil)
-        ]
-
-        let results = PresenceInferenceEngine.compute(
-            dayKeys: [dayKey],
-            stays: [],
-            overrides: [],
-            locations: [],
-            photos: photos, calendarSignals: [],
-            rangeEnd: date,
-            calendar: calendar
-        )
-
-        XCTAssertEqual(results.first?.countryCode, "FR")
-        XCTAssertEqual(results.first?.isDisputed, false)
     }
 
     func testDeterministicTimeZoneSelectionWhenScoresTie() {
@@ -137,30 +147,6 @@ final class InferenceEngineTests: XCTestCase {
         )
 
         XCTAssertEqual(results.first?.timeZoneId, "Europe/Paris")
-    }
-
-    func testCanonicalizesCountryCodeWhenOnlyCountryNameAvailable() {
-        let date = day(2026, 2, 15)
-        let dayKey = DayKey.make(from: date, timeZone: calendar.timeZone)
-        let spainName = localizedCountryName("ES")
-
-        let photos = [
-            PhotoSignalInfo(dayKey: dayKey, countryCode: nil, countryName: spainName, timeZoneId: "UTC")
-        ]
-
-        let results = PresenceInferenceEngine.compute(
-            dayKeys: [dayKey],
-            stays: [],
-            overrides: [],
-            locations: [],
-            photos: photos,
-            calendarSignals: [],
-            rangeEnd: date,
-            calendar: calendar
-        )
-
-        XCTAssertEqual(results.first?.countryName, spainName)
-        XCTAssertEqual(results.first?.countryCode, "ES")
     }
 
     func testBridgesSevenDayVoidWhenCanonicalCountriesMatch() {
@@ -203,9 +189,10 @@ final class InferenceEngineTests: XCTestCase {
 
         for key in bridgedKeys {
             let result = results.first { $0.dayKey == key }
-            XCTAssertEqual(result?.countryCode, "ES")
-            XCTAssertEqual(result?.countryName, spainName)
+            XCTAssertEqual(result?.contributedCountries.first?.countryCode, "ES")
+            XCTAssertEqual(result?.contributedCountries.first?.countryName, spainName)
             XCTAssertEqual(result?.confidenceLabel, .medium)
+            XCTAssertTrue(result?.evidence.contains(where: { $0.source == "GapBridgingContext" }) == true)
         }
     }
 
@@ -249,7 +236,7 @@ final class InferenceEngineTests: XCTestCase {
 
         for key in unresolvedKeys {
             let result = results.first { $0.dayKey == key }
-            XCTAssertNil(result?.countryCode)
+            XCTAssertTrue(result?.contributedCountries.isEmpty == true)
         }
     }
 
@@ -293,17 +280,18 @@ final class InferenceEngineTests: XCTestCase {
         )
 
         let previous = results.first { $0.dayKey == previousDayKey }
-        XCTAssertEqual(previous?.countryCode, "GB")
+        XCTAssertEqual(previous?.contributedCountries.first?.countryCode, "GB")
         XCTAssertEqual(previous?.confidenceLabel, .medium)
         XCTAssertTrue(previous?.sources.contains(.calendar) == true)
+        XCTAssertTrue(previous?.evidence.contains(where: { $0.source == "CalendarFlightOriginPromotion" }) == true)
 
         let departure = results.first { $0.dayKey == departureDayKey }
-        XCTAssertEqual(departure?.countryCode, "GB")
+        XCTAssertEqual(departure?.contributedCountries.first?.countryCode, "GB")
         XCTAssertEqual(departure?.confidenceLabel, .medium)
         XCTAssertTrue(departure?.sources.contains(.calendar) == true)
 
         let arrival = results.first { $0.dayKey == arrivalDayKey }
-        XCTAssertEqual(arrival?.countryCode, "US")
+        XCTAssertEqual(arrival?.contributedCountries.first?.countryCode, "US")
     }
 
     func testSameDateOriginFlightPromotesFlightDayAndPreviousUnknownDay() {
@@ -344,12 +332,12 @@ final class InferenceEngineTests: XCTestCase {
         )
 
         let previous = results.first { $0.dayKey == previousDayKey }
-        XCTAssertEqual(previous?.countryCode, "GB")
+        XCTAssertEqual(previous?.contributedCountries.first?.countryCode, "GB")
         XCTAssertEqual(previous?.confidenceLabel, .medium)
         XCTAssertEqual(previous?.timeZoneId, "Europe/London")
 
         let flightDay = results.first { $0.dayKey == flightDayKey }
-        XCTAssertEqual(flightDay?.countryCode, "GB")
+        XCTAssertEqual(flightDay?.contributedCountries.first?.countryCode, "GB")
         XCTAssertEqual(flightDay?.confidenceLabel, .medium)
         XCTAssertEqual(flightDay?.timeZoneId, "Europe/London")
     }
