@@ -12,6 +12,10 @@ final class CalendarEvidenceResolverTests: XCTestCase {
         confidence: Double,
         confidenceLabel: ConfidenceLabel,
         sources: SignalSourceMask,
+        isOverride: Bool = false,
+        stayCount: Int = 0,
+        photoCount: Int = 0,
+        locationCount: Int = 0,
         calendarCount: Int
     ) -> PresenceDay {
         let contributedCountries: [ContributedCountry]
@@ -33,10 +37,10 @@ final class CalendarEvidenceResolverTests: XCTestCase {
             confidence: confidence,
             confidenceLabel: confidenceLabel,
             sources: sources,
-            isOverride: false,
-            stayCount: 0,
-            photoCount: 0,
-            locationCount: 0,
+            isOverride: isOverride,
+            stayCount: stayCount,
+            photoCount: photoCount,
+            locationCount: locationCount,
             calendarCount: calendarCount
         )
     }

@@ -90,6 +90,28 @@ final class InferenceEngineTests: XCTestCase {
         XCTAssertEqual(results.first?.evidence.first?.countryCode, "ES")
     }
 
+    func testLocationEvidenceTracksRawAndCalibratedWeights() {
+        let date = day(2026, 2, 15)
+        let dayKey = DayKey.make(from: date, timeZone: calendar.timeZone)
+        let results = PresenceInferenceEngine.compute(
+            dayKeys: [dayKey],
+            stays: [],
+            overrides: [],
+            locations: [LocationSignalInfo(dayKey: dayKey, countryCode: "ES", countryName: "Spain", accuracyMeters: 10_000, timeZoneId: "UTC")],
+            photos: [],
+            calendarSignals: [],
+            rangeEnd: date,
+            calendar: calendar
+        )
+
+        let evidence = try XCTUnwrap(results.first?.evidence.first)
+        XCTAssertEqual(evidence.source, "location")
+        XCTAssertEqual(evidence.phase, .base)
+        XCTAssertEqual(evidence.rawWeight, 3.0, accuracy: 0.001)
+        XCTAssertEqual(evidence.calibratedWeight, 0.6, accuracy: 0.001)
+        XCTAssertFalse(evidence.contributedToFinalResult)
+    }
+
     func testNuancedTransitDayAllocatesProbability() {
         let date = day(2026, 2, 15)
         let dayKey = DayKey.make(from: date, timeZone: calendar.timeZone)
@@ -119,6 +141,30 @@ final class InferenceEngineTests: XCTestCase {
         
         let evidence = results.first?.evidence ?? []
         XCTAssertEqual(evidence.count, 3)
+    }
+
+    func testResolvedDayMarksWinningAndLosingEvidenceSeparately() {
+        let date = day(2026, 2, 15)
+        let dayKey = DayKey.make(from: date, timeZone: calendar.timeZone)
+        let results = PresenceInferenceEngine.compute(
+            dayKeys: [dayKey],
+            stays: [],
+            overrides: [],
+            locations: [],
+            photos: [
+                PhotoSignalInfo(dayKey: dayKey, countryCode: "FR", countryName: "France", timeZoneId: nil),
+                PhotoSignalInfo(dayKey: dayKey, countryCode: "FR", countryName: "France", timeZoneId: nil),
+                PhotoSignalInfo(dayKey: dayKey, countryCode: "ES", countryName: "Spain", timeZoneId: nil)
+            ],
+            calendarSignals: [],
+            rangeEnd: date,
+            calendar: calendar
+        )
+
+        let evidence = results.first?.evidence ?? []
+        XCTAssertEqual(evidence.count, 3)
+        XCTAssertEqual(evidence.filter { $0.countryCode == "FR" && $0.contributedToFinalResult }.count, 2)
+        XCTAssertTrue(evidence.contains(where: { $0.countryCode == "ES" && !$0.contributedToFinalResult }))
     }
 
     func testDisputedWhenConfidenceDeltaSmall() {

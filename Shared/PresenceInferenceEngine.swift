@@ -7,7 +7,7 @@
 
 import Foundation
 
-struct ResolvedCountry: Hashable {
+struct ResolvedCountry: Hashable, Sendable {
     let id: String
     let code: String?
     let name: String
@@ -25,44 +25,194 @@ struct InferenceContext {
     let progress: ((Int, Int) -> Void)?
 }
 
-struct DayBucket {
-    var countryScores: [String: Double] = [:]
-    var countries: [String: ResolvedCountry] = [:]
-    var stayCount: Int = 0
-    var photoCount: Int = 0
-    var locationCount: Int = 0
-    var calendarCount: Int = 0
-    var evidence: [SignalImpact] = []
-    var timeZoneScores: [String: Double] = [:]
-    var overrideInfo: OverridePresenceInfo? = nil
-    
-    // For origin flight promotions
-    var flightOriginCandidates: [String: (country: ResolvedCountry, count: Int, timeZoneId: String?)] = [:]
-    
-    var totalScore: Double {
-        countryScores.values.reduce(0, +)
+struct InferencePipelineConfig: Sendable {
+    let stayBaseWeight: Double = 5.0
+    let photoBaseWeight: Double = 2.0
+    let locationBaseWeight: Double = 3.0
+    let calendarBaseWeight: Double = 1.0
+    let overrideWeight: Double = 1_000.0
+    let resolutionThreshold: Double = 1.0
+    let allocationFloor: Double = 0.05
+    let disputeShareMarginThreshold: Double = 0.35
+    let gapBridgeMaxDays: Int = 7
+    let highConfidenceScore: Double = 5.0
+    let mediumConfidenceScore: Double = 2.0
+    let adjacentTravelWinningShare: Double = 0.85
+    let originPromotionWinningShare: Double = 0.55
+    let transitionPrimaryShare: Double = 0.51
+    let transitionSecondaryShare: Double = 0.49
+    let gapBridgeShare: Double = 0.5
+    let locationAccuracyReference: Double = 100.0
+    let locationMinDecayFactor: Double = 0.2
+    let locationMaxDecayFactor: Double = 1.0
+    let contextualDecayFactor: Double = 0.5
+
+    func calibratedLocationWeight(for accuracyMeters: Double) -> Double {
+        let accuracy = max(accuracyMeters, 1)
+        let factor = min(
+            locationMaxDecayFactor,
+            max(locationMinDecayFactor, locationAccuracyReference / accuracy)
+        )
+        return locationBaseWeight * factor
+    }
+
+    func confidenceLabel(for winningScore: Double, winningShare: Double) -> ConfidenceLabel {
+        if winningScore >= highConfidenceScore || winningShare >= 0.85 {
+            return .high
+        }
+        if winningScore >= mediumConfidenceScore || winningShare >= 0.5 {
+            return .medium
+        }
+        return .low
     }
 }
 
-protocol InferenceMiddleware {
-    func process(buckets: inout [String: DayBucket], context: InferenceContext)
+private struct InferenceSourceCounts: Sendable {
+    var stayCount = 0
+    var photoCount = 0
+    var locationCount = 0
+    var calendarCount = 0
 }
 
-struct PresenceInferencePipeline {
-    let middlewares: [InferenceMiddleware]
-    
+private struct FlightOriginCandidate: Sendable {
+    let country: ResolvedCountry
+    var count: Int
+    let timeZoneId: String?
+}
+
+private struct DayInferenceState: Sendable {
+    var countryScores: [String: Double] = [:]
+    var countries: [String: ResolvedCountry] = [:]
+    var timeZoneScores: [String: Double] = [:]
+    var counts = InferenceSourceCounts()
+    var evidenceEntries: [PresenceEvidenceEntry] = []
+    var overrideInfo: OverridePresenceInfo?
+    var flightOriginCandidates: [String: FlightOriginCandidate] = [:]
+}
+
+struct InferencePipelineState: Sendable {
+    var days: [String: DayInferenceState]
+
+    init(dayKeys: Set<String>) {
+        self.days = Dictionary(uniqueKeysWithValues: dayKeys.map { ($0, DayInferenceState()) })
+    }
+
+    subscript(dayKey: String) -> DayInferenceState {
+        get { days[dayKey] ?? DayInferenceState() }
+        set { days[dayKey] = newValue }
+    }
+
+    mutating func recordMutation(
+        dayKey: String,
+        processorID: String,
+        country: ResolvedCountry,
+        rawWeight: Double,
+        calibratedWeight: Double,
+        phase: PresenceEvidencePhase,
+        reason: String,
+        timeZoneId: String?,
+        contributesToScore: Bool = true
+    ) {
+        var dayState = self[dayKey]
+        dayState.countries[country.id] = country
+        if contributesToScore {
+            dayState.countryScores[country.id, default: 0] += calibratedWeight
+            if let timeZoneId, TimeZone(identifier: timeZoneId) != nil {
+                dayState.timeZoneScores[timeZoneId, default: 0] += calibratedWeight
+            }
+            incrementCount(for: processorID, counts: &dayState.counts)
+        }
+        dayState.evidenceEntries.append(
+            PresenceEvidenceEntry(
+                dayKey: dayKey,
+                processorID: processorID,
+                countryCode: country.code,
+                countryName: country.name,
+                rawWeight: rawWeight,
+                calibratedWeight: calibratedWeight,
+                phase: phase,
+                reason: reason,
+                contributedToFinalResult: false,
+                timeZoneId: timeZoneId
+            )
+        )
+        self[dayKey] = dayState
+    }
+
+    mutating func recordOverride(dayKey: String, overrideInfo: OverridePresenceInfo, country: ResolvedCountry, weight: Double) {
+        var dayState = self[dayKey]
+        dayState.overrideInfo = overrideInfo
+        if TimeZone(identifier: overrideInfo.dayTimeZoneId) != nil {
+            dayState.timeZoneScores[overrideInfo.dayTimeZoneId, default: 0] += weight
+        }
+        dayState.evidenceEntries.append(
+            PresenceEvidenceEntry(
+                dayKey: dayKey,
+                processorID: "override",
+                countryCode: country.code,
+                countryName: country.name,
+                rawWeight: weight,
+                calibratedWeight: weight,
+                phase: .override,
+                reason: "manual-override",
+                contributedToFinalResult: true,
+                timeZoneId: overrideInfo.dayTimeZoneId
+            )
+        )
+        self[dayKey] = dayState
+    }
+
+    mutating func recordFlightOriginCandidate(dayKey: String, country: ResolvedCountry, timeZoneId: String?, reason: String) {
+        var dayState = self[dayKey]
+        var candidate = dayState.flightOriginCandidates[country.id] ?? FlightOriginCandidate(country: country, count: 0, timeZoneId: timeZoneId)
+        candidate.count += 1
+        dayState.flightOriginCandidates[country.id] = candidate
+        dayState.evidenceEntries.append(
+            PresenceEvidenceEntry(
+                dayKey: dayKey,
+                processorID: "calendar.origin",
+                countryCode: country.code,
+                countryName: country.name,
+                rawWeight: 0,
+                calibratedWeight: 0,
+                phase: .contextual,
+                reason: reason,
+                contributedToFinalResult: false,
+                timeZoneId: timeZoneId
+            )
+        )
+        self[dayKey] = dayState
+    }
+
+    private mutating func incrementCount(for processorID: String, counts: inout InferenceSourceCounts) {
+        let normalized = processorID.lowercased()
+        if normalized.contains("stay") {
+            counts.stayCount += 1
+        } else if normalized.contains("photo") {
+            counts.photoCount += 1
+        } else if normalized.contains("location") {
+            counts.locationCount += 1
+        } else if normalized.contains("calendar") {
+            counts.calendarCount += 1
+        }
+    }
+}
+
+protocol SignalProcessor {
+    var id: String { get }
+    func process(state: inout InferencePipelineState, context: InferenceContext, config: InferencePipelineConfig)
+}
+
+struct InferencePipeline {
+    let config: InferencePipelineConfig
+    let processors: [SignalProcessor]
+
     func execute(context: InferenceContext) -> [PresenceDayResult] {
-        var buckets: [String: DayBucket] = [:]
-        for dayKey in context.dayKeys {
-            buckets[dayKey] = DayBucket()
+        var state = InferencePipelineState(dayKeys: context.dayKeys)
+        for processor in processors {
+            processor.process(state: &state, context: context, config: config)
         }
-        
-        for middleware in middlewares {
-            middleware.process(buckets: &buckets, context: context)
-        }
-        
-        let compiler = ResultCompiler(context: context)
-        return compiler.compile(buckets: buckets)
+        return PresenceResultCompiler(context: context, config: config).compile(state: state)
     }
 }
 
@@ -91,147 +241,160 @@ fileprivate func resolveCountry(countryCode: String?, countryName: String?) -> R
     return ResolvedCountry(id: identity, code: canonicalCode, name: resolvedName)
 }
 
-fileprivate func addScore(
-    to bucket: inout DayBucket,
-    countryCode: String?,
-    countryName: String,
-    weight: Double,
-    source: String,
-    timeZoneId: String?
-) {
-    guard let country = resolveCountry(countryCode: countryCode, countryName: countryName) else { return }
-    let priorScore = bucket.countryScores[country.id] ?? 0
-    bucket.countryScores[country.id] = priorScore + weight
-    
-    if bucket.countries[country.id]?.code == nil && country.code != nil {
-        bucket.countries[country.id] = country
-    } else if bucket.countries[country.id] == nil {
-        bucket.countries[country.id] = country
+fileprivate func countryMatches(_ lhs: PresenceCountryAllocation, _ rhs: PresenceCountryAllocation) -> Bool {
+    if let lhsCode = lhs.countryCode, let rhsCode = rhs.countryCode {
+        return lhsCode == rhsCode
     }
-    
-    bucket.evidence.append(SignalImpact(
-        source: source,
-        countryCode: country.code,
-        countryName: country.name,
-        scoreDelta: weight
-    ))
-    
-    if let timeZoneId, TimeZone(identifier: timeZoneId) != nil {
-        bucket.timeZoneScores[timeZoneId, default: 0] += weight
-    }
-    
-    switch source {
-    case "stay": bucket.stayCount += 1
-    case "photo": bucket.photoCount += 1
-    case "location": bucket.locationCount += 1
-    case "calendar": bucket.calendarCount += 1
-    default: break
-    }
+    return lhs.countryName.caseInsensitiveCompare(rhs.countryName) == .orderedSame
 }
 
-// MARK: - Middlewares
+fileprivate func countryMatches(_ lhs: PresenceCountryAllocation, _ rhs: ResolvedCountry) -> Bool {
+    if let lhsCode = lhs.countryCode, let rhsCode = rhs.code {
+        return lhsCode == rhsCode
+    }
+    return lhs.countryName.caseInsensitiveCompare(rhs.name) == .orderedSame
+}
 
-struct StayMiddleware: InferenceMiddleware {
-    func process(buckets: inout [String: DayBucket], context: InferenceContext) {
+// MARK: - Processors
+
+struct StayProcessor: SignalProcessor {
+    let id = "stay"
+
+    func process(state: inout InferencePipelineState, context: InferenceContext, config: InferencePipelineConfig) {
         let defaultTimeZone = context.calendar.timeZone
         for stay in context.stays {
+            guard let country = resolveCountry(countryCode: stay.countryCode, countryName: stay.countryName) else { continue }
             let stayTimeZone = DayIdentity.canonicalTimeZone(preferredTimeZoneId: stay.dayTimeZoneId, fallback: defaultTimeZone)
             guard let start = DayKey.date(for: stay.entryDayKey, timeZone: stayTimeZone) else { continue }
-            
+
             let rangeEndKey = DayKey.make(from: context.rangeEnd, timeZone: stayTimeZone)
             let clampedRangeEnd = DayKey.date(for: rangeEndKey, timeZone: stayTimeZone) ?? context.rangeEnd
             let exitKey = stay.exitDayKey ?? rangeEndKey
             let rawEnd = DayKey.date(for: exitKey, timeZone: stayTimeZone) ?? clampedRangeEnd
             let end = min(rawEnd, clampedRangeEnd)
             guard start <= end else { continue }
-            
-            var stayCalendar = Calendar(identifier: .gregorian)
-            stayCalendar.timeZone = stayTimeZone
-            
+
+            var calendar = Calendar(identifier: .gregorian)
+            calendar.timeZone = stayTimeZone
+
             var day = start
             while day <= end {
                 let dayKey = DayKey.make(from: day, timeZone: stayTimeZone)
                 if context.dayKeys.contains(dayKey) {
-                    var bucket = buckets[dayKey] ?? DayBucket()
-                    addScore(to: &bucket, countryCode: stay.countryCode, countryName: stay.countryName, weight: 5.0, source: "stay", timeZoneId: stay.dayTimeZoneId)
-                    buckets[dayKey] = bucket
+                    state.recordMutation(
+                        dayKey: dayKey,
+                        processorID: id,
+                        country: country,
+                        rawWeight: config.stayBaseWeight,
+                        calibratedWeight: config.stayBaseWeight,
+                        phase: .base,
+                        reason: "stay-coverage",
+                        timeZoneId: stay.dayTimeZoneId
+                    )
                 }
-                guard let next = stayCalendar.date(byAdding: .day, value: 1, to: day) else { break }
+                guard let next = calendar.date(byAdding: .day, value: 1, to: day) else { break }
                 day = next
             }
         }
     }
 }
 
-struct PhotoMiddleware: InferenceMiddleware {
-    func process(buckets: inout [String: DayBucket], context: InferenceContext) {
-        for photo in context.photos {
-            if context.dayKeys.contains(photo.dayKey) {
-                var bucket = buckets[photo.dayKey] ?? DayBucket()
-                addScore(to: &bucket, countryCode: photo.countryCode, countryName: photo.countryName, weight: 2.0, source: "photo", timeZoneId: photo.timeZoneId)
-                buckets[photo.dayKey] = bucket
+struct OverrideProcessor: SignalProcessor {
+    let id = "override"
+
+    func process(state: inout InferencePipelineState, context: InferenceContext, config: InferencePipelineConfig) {
+        for overrideDay in context.overrides {
+            guard context.dayKeys.contains(overrideDay.dayKey),
+                  let country = resolveCountry(countryCode: overrideDay.countryCode, countryName: overrideDay.countryName) else {
+                continue
             }
+            state.recordOverride(dayKey: overrideDay.dayKey, overrideInfo: overrideDay, country: country, weight: config.overrideWeight)
         }
     }
 }
 
-struct LocationMiddleware: InferenceMiddleware {
-    func process(buckets: inout [String: DayBucket], context: InferenceContext) {
-        for location in context.locations {
-            if context.dayKeys.contains(location.dayKey) {
-                var bucket = buckets[location.dayKey] ?? DayBucket()
-                let accuracy = max(location.accuracyMeters, 1)
-                // Dynamic Calibration Component: Smooth decay from high accuracy +3.0 to low accuracy +0.6
-                let accuracyFactor = min(1.0, max(0.2, 100.0 / accuracy))
-                addScore(to: &bucket, countryCode: location.countryCode, countryName: location.countryName, weight: 3.0 * accuracyFactor, source: "location", timeZoneId: location.timeZoneId)
-                buckets[location.dayKey] = bucket
-            }
+struct PhotoProcessor: SignalProcessor {
+    let id = "photo"
+
+    func process(state: inout InferencePipelineState, context: InferenceContext, config: InferencePipelineConfig) {
+        for photo in context.photos where context.dayKeys.contains(photo.dayKey) {
+            guard let country = resolveCountry(countryCode: photo.countryCode, countryName: photo.countryName) else { continue }
+            state.recordMutation(
+                dayKey: photo.dayKey,
+                processorID: id,
+                country: country,
+                rawWeight: config.photoBaseWeight,
+                calibratedWeight: config.photoBaseWeight,
+                phase: .base,
+                reason: "photo-signal",
+                timeZoneId: photo.timeZoneId
+            )
         }
     }
 }
 
-struct CalendarMiddleware: InferenceMiddleware {
+struct LocationProcessor: SignalProcessor {
+    let id = "location"
+
+    func process(state: inout InferencePipelineState, context: InferenceContext, config: InferencePipelineConfig) {
+        for location in context.locations where context.dayKeys.contains(location.dayKey) {
+            guard let country = resolveCountry(countryCode: location.countryCode, countryName: location.countryName) else { continue }
+            let calibratedWeight = config.calibratedLocationWeight(for: location.accuracyMeters)
+            state.recordMutation(
+                dayKey: location.dayKey,
+                processorID: id,
+                country: country,
+                rawWeight: config.locationBaseWeight,
+                calibratedWeight: calibratedWeight,
+                phase: .base,
+                reason: "location-accuracy:\(Int(location.accuracyMeters.rounded()))m",
+                timeZoneId: location.timeZoneId
+            )
+        }
+    }
+}
+
+struct CalendarProcessor: SignalProcessor {
+    let id = "calendar"
+
+    func process(state: inout InferencePipelineState, context: InferenceContext, config: InferencePipelineConfig) {
+        for signal in context.calendarSignals {
+            guard let country = resolveCountry(countryCode: signal.countryCode, countryName: signal.countryName) else { continue }
+            if isOriginFlightSignal(signal) {
+                state.recordFlightOriginCandidate(
+                    dayKey: signal.dayKey,
+                    country: country,
+                    timeZoneId: signal.bucketingTimeZoneId ?? signal.timeZoneId,
+                    reason: "flight-origin-candidate"
+                )
+                continue
+            }
+
+            guard context.dayKeys.contains(signal.dayKey) else { continue }
+            state.recordMutation(
+                dayKey: signal.dayKey,
+                processorID: id,
+                country: country,
+                rawWeight: config.calendarBaseWeight,
+                calibratedWeight: config.calendarBaseWeight,
+                phase: .base,
+                reason: signal.source ?? "calendar-signal",
+                timeZoneId: signal.bucketingTimeZoneId ?? signal.timeZoneId
+            )
+        }
+    }
+
     private func isOriginFlightSignal(_ signal: CalendarSignalInfo) -> Bool {
         if signal.source == "CalendarFlightOrigin" { return true }
         return signal.eventIdentifier?.hasSuffix("#origin") == true
-    }
-    
-    func process(buckets: inout [String: DayBucket], context: InferenceContext) {
-        for signal in context.calendarSignals {
-            var bucket = buckets[signal.dayKey] ?? DayBucket()
-            if isOriginFlightSignal(signal) {
-                // Store origin flights for contextual promotion later
-                if let country = resolveCountry(countryCode: signal.countryCode, countryName: signal.countryName) {
-                    var entry = bucket.flightOriginCandidates[country.id] ?? (country, 0, signal.bucketingTimeZoneId ?? signal.timeZoneId)
-                    entry.count += 1
-                    bucket.flightOriginCandidates[country.id] = entry
-                }
-            } else {
-                if context.dayKeys.contains(signal.dayKey) {
-                    addScore(to: &bucket, countryCode: signal.countryCode, countryName: signal.countryName, weight: 1.0, source: "calendar", timeZoneId: signal.bucketingTimeZoneId ?? signal.timeZoneId)
-                }
-            }
-            buckets[signal.dayKey] = bucket
-        }
-    }
-}
-
-struct OverrideMiddleware: InferenceMiddleware {
-    func process(buckets: inout [String: DayBucket], context: InferenceContext) {
-        for overrideDay in context.overrides {
-            guard context.dayKeys.contains(overrideDay.dayKey) else { continue }
-            var bucket = buckets[overrideDay.dayKey] ?? DayBucket()
-            bucket.overrideInfo = overrideDay
-            bucket.timeZoneScores[overrideDay.dayTimeZoneId, default: 0] += 10
-            buckets[overrideDay.dayKey] = bucket
-        }
     }
 }
 
 // MARK: - Compiler
 
-struct ResultCompiler {
+private struct PresenceResultCompiler {
     let context: InferenceContext
+    let config: InferencePipelineConfig
 
     private struct TravelEventEndpoint {
         let dayKey: String
@@ -244,186 +407,199 @@ struct ResultCompiler {
         let origin: TravelEventEndpoint
         let destination: TravelEventEndpoint
     }
-    
-    private func selectedDayTimeZoneId(for bucket: DayBucket, preferredTimeZoneId: String?, fallback: String) -> String {
+
+    func compile(state: InferencePipelineState) -> [PresenceDayResult] {
+        let defaultTimeZone = context.calendar.timeZone
+        let orderedDayKeys = context.dayKeys.sorted()
+
+        var results: [PresenceDayResult] = []
+        results.reserveCapacity(orderedDayKeys.count)
+
+        for (index, dayKey) in orderedDayKeys.enumerated() {
+            if let progress = context.progress {
+                progress(index + 1, orderedDayKeys.count)
+            }
+
+            let dayState = state.days[dayKey] ?? DayInferenceState()
+            let selectedTimeZoneId = selectedDayTimeZoneId(
+                for: dayState,
+                preferredTimeZoneId: dayState.overrideInfo?.dayTimeZoneId,
+                fallback: defaultTimeZone.identifier
+            )
+            let dayTimeZone = TimeZone(identifier: selectedTimeZoneId) ?? defaultTimeZone
+            let date = DayKey.date(for: dayKey, timeZone: dayTimeZone) ?? context.calendar.startOfDay(for: context.rangeEnd)
+            results.append(baseResult(for: dayKey, date: date, timeZoneId: dayTimeZone.identifier, dayState: dayState))
+        }
+
+        var sortedResults = results.sorted { $0.date < $1.date }
+        applyGapBridging(results: &sortedResults)
+
+        let travelEvents = buildTravelEventContexts()
+        applyAdjacentTravelPromotions(results: &sortedResults, travelEvents: travelEvents)
+        applyOriginFlightPromotions(results: &sortedResults, state: state)
+        fillSuggestions(results: &sortedResults)
+        applyTravelBackedTransitionInfill(results: &sortedResults, travelEvents: travelEvents)
+
+        return sortedResults.map(markContributingEvidence)
+    }
+
+    private func baseResult(for dayKey: String, date: Date, timeZoneId: String?, dayState: DayInferenceState) -> PresenceDayResult {
+        let sourceSummary = SignalSourceMask.from(processorIDs: dayState.evidenceEntries.map(\.processorID))
+
+        if let overrideInfo = dayState.overrideInfo,
+           let country = resolveCountry(countryCode: overrideInfo.countryCode, countryName: overrideInfo.countryName) {
+            return PresenceDayResult(
+                dayKey: dayKey,
+                date: date,
+                timeZoneId: timeZoneId,
+                countryAllocations: [PresenceCountryAllocation(countryCode: country.code, countryName: country.name, normalizedShare: 1.0)],
+                zoneOverlays: [],
+                evidenceEntries: dayState.evidenceEntries,
+                confidenceBreakdown: PresenceConfidenceBreakdown(
+                    score: config.overrideWeight,
+                    runnerUpScore: 0,
+                    margin: 1,
+                    normalizedWinningShare: 1,
+                    label: .high,
+                    calibrationSummary: "manual override"
+                ),
+                sourceSummary: sourceSummary,
+                isOverride: true,
+                isDisputed: false,
+                stayCount: dayState.counts.stayCount,
+                photoCount: dayState.counts.photoCount,
+                locationCount: dayState.counts.locationCount,
+                calendarCount: dayState.counts.calendarCount
+            )
+        }
+
+        let ranked = dayState.countryScores.compactMap { key, score -> (ResolvedCountry, Double)? in
+            guard let country = dayState.countries[key] else { return nil }
+            return (country, score)
+        }
+        .sorted {
+            if $0.1 == $1.1 {
+                return $0.0.id < $1.0.id
+            }
+            return $0.1 > $1.1
+        }
+
+        let totalScore = ranked.reduce(0) { $0 + $1.1 }
+        guard let winner = ranked.first, winner.1 >= config.resolutionThreshold, totalScore > 0 else {
+            return PresenceDayResult(
+                dayKey: dayKey,
+                date: date,
+                timeZoneId: timeZoneId,
+                countryAllocations: [],
+                zoneOverlays: [],
+                evidenceEntries: dayState.evidenceEntries,
+                confidenceBreakdown: PresenceConfidenceBreakdown(
+                    score: ranked.first?.1 ?? 0,
+                    runnerUpScore: ranked.dropFirst().first?.1 ?? 0,
+                    margin: 0,
+                    normalizedWinningShare: 0,
+                    label: .low,
+                    calibrationSummary: "below-threshold"
+                ),
+                sourceSummary: sourceSummary,
+                isOverride: false,
+                isDisputed: false,
+                stayCount: dayState.counts.stayCount,
+                photoCount: dayState.counts.photoCount,
+                locationCount: dayState.counts.locationCount,
+                calendarCount: dayState.counts.calendarCount
+            )
+        }
+
+        let runnerUpScore = ranked.dropFirst().first?.1 ?? 0
+        let winningShare = winner.1 / totalScore
+        let runnerUpShare = runnerUpScore / totalScore
+        let margin = max(0, winningShare - runnerUpShare)
+        let allocations = ranked
+            .map { country, score in
+                PresenceCountryAllocation(
+                    countryCode: country.code,
+                    countryName: country.name,
+                    normalizedShare: score / totalScore
+                )
+            }
+            .filter { $0.normalizedShare >= config.allocationFloor }
+
+        return PresenceDayResult(
+            dayKey: dayKey,
+            date: date,
+            timeZoneId: timeZoneId,
+            countryAllocations: allocations,
+            zoneOverlays: [],
+            evidenceEntries: dayState.evidenceEntries,
+            confidenceBreakdown: PresenceConfidenceBreakdown(
+                score: winner.1,
+                runnerUpScore: runnerUpScore,
+                margin: margin,
+                normalizedWinningShare: winningShare,
+                label: config.confidenceLabel(for: winner.1, winningShare: winningShare),
+                calibrationSummary: "calibrated totals"
+            ),
+            sourceSummary: sourceSummary,
+            isOverride: false,
+            isDisputed: allocations.count > 1 && margin <= config.disputeShareMarginThreshold,
+            stayCount: dayState.counts.stayCount,
+            photoCount: dayState.counts.photoCount,
+            locationCount: dayState.counts.locationCount,
+            calendarCount: dayState.counts.calendarCount
+        )
+    }
+
+    private func selectedDayTimeZoneId(for dayState: DayInferenceState, preferredTimeZoneId: String?, fallback: String) -> String {
         if let preferredTimeZoneId, TimeZone(identifier: preferredTimeZoneId) != nil {
             return preferredTimeZoneId
         }
-        return bucket.timeZoneScores.max(by: { lhs, rhs in
+        return dayState.timeZoneScores.max(by: { lhs, rhs in
             lhs.value == rhs.value ? lhs.key > rhs.key : lhs.value < rhs.value
         })?.key ?? fallback
     }
 
-    func compile(buckets: [String: DayBucket]) -> [PresenceDayResult] {
-        let defaultTimeZone = context.calendar.timeZone
-        var results: [PresenceDayResult] = []
-        let orderedDayKeys = context.dayKeys.sorted()
-        results.reserveCapacity(orderedDayKeys.count)
-        
-        // 1. Base Score Resolution and Transit Day Modeling
-        for (index, dayKey) in orderedDayKeys.enumerated() {
-            let bucket = buckets[dayKey] ?? DayBucket()
-            let selectedTimeZoneId = selectedDayTimeZoneId(for: bucket, preferredTimeZoneId: bucket.overrideInfo?.dayTimeZoneId, fallback: defaultTimeZone.identifier)
-            let dayTimeZone = TimeZone(identifier: selectedTimeZoneId) ?? defaultTimeZone
-            let date = DayKey.date(for: dayKey, timeZone: dayTimeZone) ?? context.calendar.startOfDay(for: context.rangeEnd)
-            
-            if let indexProgress = context.progress {
-                indexProgress(index + 1, orderedDayKeys.count)
-            }
-            
-            if let overrideInfo = bucket.overrideInfo,
-               let overrideCountry = resolveCountry(countryCode: overrideInfo.countryCode, countryName: overrideInfo.countryName) {
-                
-                var sources = SignalSourceMask.override
-                if bucket.stayCount > 0 { sources.formUnion(.stay) }
-                if bucket.photoCount > 0 { sources.formUnion(.photo) }
-                if bucket.locationCount > 0 { sources.formUnion(.location) }
-                if bucket.calendarCount > 0 { sources.formUnion(.calendar) }
-                
-                let contributed = ContributedCountry(countryCode: overrideCountry.code, countryName: overrideCountry.name, probability: 1.0)
-                
-                var overrideEvidence = bucket.evidence
-                overrideEvidence.append(SignalImpact(source: "override", countryCode: overrideCountry.code, countryName: overrideCountry.name, scoreDelta: 1000.0))
-                
-                results.append(PresenceDayResult(
-                    dayKey: dayKey,
-                    date: date,
-                    timeZoneId: dayTimeZone.identifier,
-                    contributedCountries: [contributed],
-                    zoneOverlays: [],
-                    evidence: overrideEvidence,
-                    confidence: 1.0,
-                    confidenceLabel: .high,
-                    sources: sources,
-                    isOverride: true,
-                    isDisputed: false,
-                    stayCount: bucket.stayCount,
-                    photoCount: bucket.photoCount,
-                    locationCount: bucket.locationCount,
-                    calendarCount: bucket.calendarCount
-                ))
-                continue
-            }
-            
-            var totalScore: Double = 0
-            let rankedCountries = bucket.countryScores.compactMap { key, score -> (ResolvedCountry, Double)? in
-                guard let c = bucket.countries[key] else { return nil }
-                totalScore += score
-                return (c, score)
-            }.sorted { $0.1 > $1.1 }
-            
-            if rankedCountries.isEmpty || rankedCountries[0].1 < 1.0 {
-                results.append(PresenceDayResult(
-                    dayKey: dayKey,
-                    date: date,
-                    timeZoneId: dayTimeZone.identifier,
-                    contributedCountries: [],
-                    zoneOverlays: [],
-                    evidence: bucket.evidence,
-                    confidence: 0,
-                    confidenceLabel: .low,
-                    sources: .none,
-                    isOverride: false,
-                    isDisputed: false,
-                    stayCount: 0,
-                    photoCount: 0,
-                    locationCount: 0, calendarCount: 0
-                ))
-                continue
-            }
-            
-            let winner = rankedCountries[0]
-            var isDisputed = false
-            if rankedCountries.count > 1 {
-                let runnerUp = rankedCountries[1]
-                let confidenceDelta = (winner.1 - runnerUp.1) / totalScore
-                if confidenceDelta <= 0.5 { isDisputed = true }
-            }
-            
-            // Nuanced Transit Days: instead of just a single winner, map to ContributedCountry array for top 2
-            let contributedCountries = rankedCountries.prefix(2).map { c, score in
-                ContributedCountry(countryCode: c.code, countryName: c.name, probability: score / totalScore)
-            }
-            
-            let confidence = min(1.0, max(0.0, winner.1 / totalScore))
-            let confidenceLabel: ConfidenceLabel = winner.1 >= 6 ? .high : (winner.1 >= 3 ? .medium : .low)
-            
-            var sources = SignalSourceMask()
-            if bucket.stayCount > 0 { sources.formUnion(.stay) }
-            if bucket.photoCount > 0 { sources.formUnion(.photo) }
-            if bucket.locationCount > 0 { sources.formUnion(.location) }
-            if bucket.calendarCount > 0 { sources.formUnion(.calendar) }
-            
-            var result = PresenceDayResult(
-                dayKey: dayKey,
-                date: date,
-                timeZoneId: dayTimeZone.identifier,
-                contributedCountries: contributedCountries,
-                zoneOverlays: [],
-                evidence: bucket.evidence,
-                confidence: confidence,
-                confidenceLabel: confidenceLabel,
-                sources: sources,
-                isOverride: false,
-                isDisputed: isDisputed,
-                stayCount: bucket.stayCount,
-                photoCount: bucket.photoCount,
-                locationCount: bucket.locationCount, calendarCount: bucket.calendarCount
-            )
-            
-            if isDisputed {
-                result.suggestedCountryCode1 = rankedCountries[0].0.code
-                result.suggestedCountryName1 = rankedCountries[0].0.name
-                if rankedCountries.count > 1 {
-                    result.suggestedCountryCode2 = rankedCountries[1].0.code
-                    result.suggestedCountryName2 = rankedCountries[1].0.name
-                }
-            }
-            
-            results.append(result)
-        }
-        
-        var sortedResults = results.sorted { $0.date < $1.date }
-        let travelEvents = buildTravelEventContexts()
-        
-        // 2. Contextual Influence and Gap Bridging (Day-before / Day-after Smoothing)
+    private func applyGapBridging(results: inout [PresenceDayResult]) {
         var i = 0
-        while i < sortedResults.count {
-            if sortedResults[i].contributedCountries.isEmpty {
+        while i < results.count {
+            if results[i].countryAllocations.isEmpty {
                 var j = i
-                while j < sortedResults.count, sortedResults[j].contributedCountries.isEmpty {
+                while j < results.count, results[j].countryAllocations.isEmpty {
                     j += 1
                 }
-                
+
                 let gapLength = j - i
-                if gapLength <= 7, i > 0, j < sortedResults.count {
-                    let prevCountries = sortedResults[i - 1].contributedCountries
-                    let nextCountries = sortedResults[j].contributedCountries
-                    
-                    if let prevPrimary = prevCountries.first,
-                       let nextPrimary = nextCountries.first,
-                       prevPrimary.countryCode == nextPrimary.countryCode || prevPrimary.countryName.lowercased() == nextPrimary.countryName.lowercased() {
-                        
-                        let bridgedCountry = ContributedCountry(countryCode: prevPrimary.countryCode, countryName: prevPrimary.countryName, probability: 1.0)
-                        
-                        for k in i..<j {
-                            var bridgingEvidence = sortedResults[k].evidence
-                            bridgingContextualSmoothing(from: prevPrimary, to: nextPrimary, evidence: &bridgingEvidence)
-                            
-                            sortedResults[k] = PresenceDayResult(
-                                dayKey: sortedResults[k].dayKey,
-                                date: sortedResults[k].date,
-                                timeZoneId: sortedResults[k].timeZoneId ?? sortedResults[i - 1].timeZoneId,
-                                contributedCountries: [bridgedCountry],
-                                zoneOverlays: [],
-                                evidence: bridgingEvidence,
-                                confidence: 0.5,
-                                confidenceLabel: .medium,
-                                sources: .none,
-                                isOverride: false, isDisputed: false,
-                                stayCount: 0, photoCount: 0, locationCount: 0, calendarCount: 0
-                            )
-                        }
+                if gapLength <= config.gapBridgeMaxDays, i > 0, j < results.count,
+                   let previous = results[i - 1].countryAllocations.first,
+                   let next = results[j].countryAllocations.first,
+                   countryMatches(previous, next) {
+                    for index in i..<j {
+                        results[index] = makeContextualResult(
+                            from: results[index],
+                            allocations: [PresenceCountryAllocation(countryCode: previous.countryCode, countryName: previous.countryName, normalizedShare: 1.0)],
+                            evidenceEntry: PresenceEvidenceEntry(
+                                dayKey: results[index].dayKey,
+                                processorID: "GapBridgingContext",
+                                countryCode: previous.countryCode,
+                                countryName: previous.countryName,
+                                rawWeight: config.gapBridgeShare,
+                                calibratedWeight: config.gapBridgeShare,
+                                phase: .contextual,
+                                reason: "GapBridgingContext",
+                                contributedToFinalResult: true,
+                                timeZoneId: results[index].timeZoneId
+                            ),
+                            confidenceBreakdown: PresenceConfidenceBreakdown(
+                                score: config.gapBridgeShare,
+                                runnerUpScore: 0,
+                                margin: config.gapBridgeShare,
+                                normalizedWinningShare: config.gapBridgeShare,
+                                label: .medium,
+                                calibrationSummary: "contextual gap bridge"
+                            ),
+                            sourceSummary: .none,
+                            isDisputed: false
+                        )
                     }
                 }
                 i = j
@@ -431,208 +607,85 @@ struct ResultCompiler {
                 i += 1
             }
         }
-        
-        // 3. Travel-backed adjacent day promotions
-        applyAdjacentTravelPromotions(results: &sortedResults, travelEvents: travelEvents)
+    }
 
-        // 4. Origin-flight promotion (Contextual Promotion)
-        for index in 0..<sortedResults.count {
-            let currentDayKey = sortedResults[index].dayKey
-            guard let bucket = buckets[currentDayKey] else { continue }
-            
-            let rankedFlights = bucket.flightOriginCandidates.values.sorted { lhs, rhs in
-                lhs.count == rhs.count ? lhs.country.id < rhs.country.id : lhs.count > rhs.count
+    private func applyOriginFlightPromotions(results: inout [PresenceDayResult], state: InferencePipelineState) {
+        for index in results.indices {
+            let dayKey = results[index].dayKey
+            guard let dayState = state.days[dayKey] else { continue }
+            let rankedFlights = dayState.flightOriginCandidates.values.sorted {
+                if $0.count == $1.count {
+                    return $0.country.id < $1.country.id
+                }
+                return $0.count > $1.count
             }
-            
-            guard let winnerFlight = rankedFlights.first else { continue }
-            if rankedFlights.count > 1 && rankedFlights[1].count == winnerFlight.count && rankedFlights[1].country.id != winnerFlight.country.id {
-                continue // tie breaker logic fails
+            guard let winner = rankedFlights.first else { continue }
+            if rankedFlights.count > 1,
+               rankedFlights[1].count == winner.count,
+               rankedFlights[1].country.id != winner.country.id {
+                continue
             }
-            
-            let isCurrentUnknown = sortedResults[index].contributedCountries.isEmpty
-            let isCurrentCalendarLow = sortedResults[index].confidenceLabel == .low && sortedResults[index].sources == .calendar && !sortedResults[index].isOverride
-            
-            if !sortedResults[index].isOverride && (isCurrentUnknown || isCurrentCalendarLow) {
-                sortedResults[index] = promoteByOriginFlightContext(result: sortedResults[index], originFlight: winnerFlight)
-            }
-            
-            guard index > 0 else { continue }
-            if sortedResults[index - 1].contributedCountries.isEmpty {
-                sortedResults[index - 1] = promoteByOriginFlightContext(
-                    result: sortedResults[index - 1],
-                    originFlight: winnerFlight,
-                    fallbackTimeZoneId: sortedResults[index - 1].timeZoneId ?? sortedResults[index].timeZoneId
+
+            if isEligibleForOriginFlightPromotion(results[index]) {
+                results[index] = makeContextualResult(
+                    from: results[index],
+                    allocations: [PresenceCountryAllocation(countryCode: winner.country.code, countryName: winner.country.name, normalizedShare: 1.0)],
+                    evidenceEntry: PresenceEvidenceEntry(
+                        dayKey: results[index].dayKey,
+                        processorID: "CalendarFlightOriginPromotion",
+                        countryCode: winner.country.code,
+                        countryName: winner.country.name,
+                        rawWeight: config.originPromotionWinningShare,
+                        calibratedWeight: config.originPromotionWinningShare,
+                        phase: .contextual,
+                        reason: "CalendarFlightOriginPromotion",
+                        contributedToFinalResult: true,
+                        timeZoneId: winner.timeZoneId ?? results[index].timeZoneId
+                    ),
+                    confidenceBreakdown: PresenceConfidenceBreakdown(
+                        score: config.originPromotionWinningShare,
+                        runnerUpScore: 0,
+                        margin: config.originPromotionWinningShare,
+                        normalizedWinningShare: config.originPromotionWinningShare,
+                        label: .medium,
+                        calibrationSummary: "origin flight context"
+                    ),
+                    sourceSummary: results[index].sources.union(.calendar),
+                    isDisputed: false,
+                    timeZoneId: winner.timeZoneId ?? results[index].timeZoneId,
+                    calendarCount: max(results[index].calendarCount, winner.count)
                 )
             }
-        }
-        
-        // 5. Fill backward and forward suggestions
-        fillSuggestions(results: &sortedResults)
 
-        // 6. Travel-backed transition gap infill
-        applyTravelBackedTransitionInfill(results: &sortedResults, travelEvents: travelEvents)
-        
-        return sortedResults
-    }
-    
-    // MARK: Compiler Utilities
-    
-    private func promoteByOriginFlightContext(
-        result: PresenceDayResult,
-        originFlight: (country: ResolvedCountry, count: Int, timeZoneId: String?),
-        fallbackTimeZoneId: String? = nil
-    ) -> PresenceDayResult {
-        var sources = result.sources
-        sources.formUnion(.calendar)
-        
-        var newEvidence = result.evidence
-        newEvidence.append(SignalImpact(source: "CalendarFlightOriginPromotion", countryCode: originFlight.country.code, countryName: originFlight.country.name, scoreDelta: 1.0))
-        
-        let tz = originFlight.timeZoneId ?? fallbackTimeZoneId ?? result.timeZoneId
-        let contributed = ContributedCountry(countryCode: originFlight.country.code, countryName: originFlight.country.name, probability: 1.0)
-        
-        return PresenceDayResult(
-            dayKey: result.dayKey,
-            date: result.date,
-            timeZoneId: tz,
-            contributedCountries: [contributed],
-            zoneOverlays: result.zoneOverlays,
-            evidence: newEvidence,
-            confidence: max(result.confidence, 0.5),
-            confidenceLabel: .medium,
-            sources: sources,
-            isOverride: false,
-            isDisputed: result.isDisputed,
-            stayCount: result.stayCount,
-            photoCount: result.photoCount,
-            locationCount: result.locationCount,
-            calendarCount: max(result.calendarCount, originFlight.count),
-            suggestedCountryCode1: result.suggestedCountryCode1,
-            suggestedCountryName1: result.suggestedCountryName1,
-            suggestedCountryCode2: result.suggestedCountryCode2,
-            suggestedCountryName2: result.suggestedCountryName2
-        )
-    }
-
-    private func promoteByAdjacentTravelContext(
-        result: PresenceDayResult,
-        country: ResolvedCountry,
-        timeZoneId: String?,
-        evidenceSource: String
-    ) -> PresenceDayResult {
-        var sources = result.sources
-        sources.formUnion(.calendar)
-
-        var newEvidence = result.evidence
-        newEvidence.append(SignalImpact(
-            source: evidenceSource,
-            countryCode: country.code,
-            countryName: country.name,
-            scoreDelta: 1.0
-        ))
-
-        return PresenceDayResult(
-            dayKey: result.dayKey,
-            date: result.date,
-            timeZoneId: timeZoneId ?? result.timeZoneId,
-            contributedCountries: [
-                ContributedCountry(countryCode: country.code, countryName: country.name, probability: 1.0)
-            ],
-            zoneOverlays: result.zoneOverlays,
-            evidence: newEvidence,
-            confidence: 0.85,
-            confidenceLabel: .high,
-            sources: sources,
-            isOverride: false,
-            isDisputed: false,
-            stayCount: result.stayCount,
-            photoCount: result.photoCount,
-            locationCount: result.locationCount,
-            calendarCount: max(result.calendarCount, 1),
-            suggestedCountryCode1: result.suggestedCountryCode1,
-            suggestedCountryName1: result.suggestedCountryName1,
-            suggestedCountryCode2: result.suggestedCountryCode2,
-            suggestedCountryName2: result.suggestedCountryName2
-        )
-    }
-
-    private func promoteByTravelTransitionInfill(
-        result: PresenceDayResult,
-        primary: ResolvedCountry,
-        secondary: ResolvedCountry
-    ) -> PresenceDayResult {
-        var sources = result.sources
-        sources.formUnion(.calendar)
-
-        var newEvidence = result.evidence
-        newEvidence.append(SignalImpact(
-            source: "CalendarTransitionInfill",
-            countryCode: primary.code,
-            countryName: primary.name,
-            scoreDelta: 0.51
-        ))
-
-        return PresenceDayResult(
-            dayKey: result.dayKey,
-            date: result.date,
-            timeZoneId: result.timeZoneId,
-            contributedCountries: [
-                ContributedCountry(countryCode: primary.code, countryName: primary.name, probability: 0.51),
-                ContributedCountry(countryCode: secondary.code, countryName: secondary.name, probability: 0.49)
-            ],
-            zoneOverlays: result.zoneOverlays,
-            evidence: newEvidence,
-            confidence: 0.51,
-            confidenceLabel: .medium,
-            sources: sources,
-            isOverride: false,
-            isDisputed: true,
-            stayCount: result.stayCount,
-            photoCount: result.photoCount,
-            locationCount: result.locationCount,
-            calendarCount: max(result.calendarCount, 1),
-            suggestedCountryCode1: result.suggestedCountryCode1,
-            suggestedCountryName1: result.suggestedCountryName1,
-            suggestedCountryCode2: result.suggestedCountryCode2,
-            suggestedCountryName2: result.suggestedCountryName2
-        )
-    }
-    
-    private func bridgingContextualSmoothing(from: ContributedCountry, to: ContributedCountry, evidence: inout [SignalImpact]) {
-        evidence.append(SignalImpact(source: "GapBridgingContext", countryCode: from.countryCode, countryName: from.countryName, scoreDelta: 0.5))
-    }
-    
-    private func fillSuggestions(results: inout [PresenceDayResult]) {
-        var backwardSuggestions = [ContributedCountry?](repeating: nil, count: results.count)
-        var currentBackward: ContributedCountry? = nil
-        for i in 0..<results.count {
-            backwardSuggestions[i] = currentBackward
-            if let c = results[i].contributedCountries.first { currentBackward = c }
-        }
-        
-        var forwardSuggestions = [ContributedCountry?](repeating: nil, count: results.count)
-        var currentForward: ContributedCountry? = nil
-        for i in stride(from: results.count - 1, through: 0, by: -1) {
-            forwardSuggestions[i] = currentForward
-            if let c = results[i].contributedCountries.first { currentForward = c }
-        }
-        
-        for i in 0..<results.count {
-            if results[i].contributedCountries.isEmpty || results[i].confidence == 0 {
-                var suggestions: [ContributedCountry] = []
-                if let b = backwardSuggestions[i] { suggestions.append(b) }
-                if let f = forwardSuggestions[i], f.countryCode != backwardSuggestions[i]?.countryCode {
-                    suggestions.append(f)
-                }
-                if !suggestions.isEmpty {
-                    results[i].suggestedCountryCode1 = suggestions[0].countryCode
-                    results[i].suggestedCountryName1 = suggestions[0].countryName
-                    if suggestions.count > 1 {
-                        results[i].suggestedCountryCode2 = suggestions[1].countryCode
-                        results[i].suggestedCountryName2 = suggestions[1].countryName
-                    }
-                }
-            }
+            guard index > 0, results[index - 1].countryAllocations.isEmpty else { continue }
+            results[index - 1] = makeContextualResult(
+                from: results[index - 1],
+                allocations: [PresenceCountryAllocation(countryCode: winner.country.code, countryName: winner.country.name, normalizedShare: 1.0)],
+                evidenceEntry: PresenceEvidenceEntry(
+                    dayKey: results[index - 1].dayKey,
+                    processorID: "CalendarFlightOriginPromotion",
+                    countryCode: winner.country.code,
+                    countryName: winner.country.name,
+                    rawWeight: config.originPromotionWinningShare,
+                    calibratedWeight: config.originPromotionWinningShare,
+                    phase: .contextual,
+                    reason: "CalendarFlightOriginPromotion",
+                    contributedToFinalResult: true,
+                    timeZoneId: winner.timeZoneId ?? results[index - 1].timeZoneId
+                ),
+                confidenceBreakdown: PresenceConfidenceBreakdown(
+                    score: config.originPromotionWinningShare,
+                    runnerUpScore: 0,
+                    margin: config.originPromotionWinningShare,
+                    normalizedWinningShare: config.originPromotionWinningShare,
+                    label: .medium,
+                    calibrationSummary: "origin flight context"
+                ),
+                sourceSummary: results[index - 1].sources.union(.calendar),
+                isDisputed: false,
+                timeZoneId: winner.timeZoneId ?? results[index - 1].timeZoneId,
+                calendarCount: max(results[index - 1].calendarCount, winner.count)
+            )
         }
     }
 
@@ -661,7 +714,7 @@ struct ResultCompiler {
                 if preferredTravelEndpoint(endpoint, over: accumulator.origin) {
                     accumulator.origin = endpoint
                 }
-            } else if signal.source == "Calendar" {
+            } else {
                 if preferredTravelEndpoint(endpoint, over: accumulator.destination) {
                     accumulator.destination = endpoint
                 }
@@ -670,14 +723,8 @@ struct ResultCompiler {
         }
 
         return grouped.compactMap { baseEventIdentifier, accumulator in
-            guard let origin = accumulator.origin, let destination = accumulator.destination else {
-                return nil
-            }
-            return TravelEventContext(
-                baseEventIdentifier: baseEventIdentifier,
-                origin: origin,
-                destination: destination
-            )
+            guard let origin = accumulator.origin, let destination = accumulator.destination else { return nil }
+            return TravelEventContext(baseEventIdentifier: baseEventIdentifier, origin: origin, destination: destination)
         }
         .sorted { lhs, rhs in
             (lhs.origin.dayKey, lhs.destination.dayKey, lhs.baseEventIdentifier) <
@@ -685,83 +732,183 @@ struct ResultCompiler {
         }
     }
 
-    private func applyAdjacentTravelPromotions(
-        results: inout [PresenceDayResult],
-        travelEvents: [TravelEventContext]
-    ) {
+    private func applyAdjacentTravelPromotions(results: inout [PresenceDayResult], travelEvents: [TravelEventContext]) {
         let indexByDayKey = Dictionary(uniqueKeysWithValues: results.enumerated().map { ($0.element.dayKey, $0.offset) })
-
         for travelEvent in travelEvents {
-            if let previousDayKey = adjacentDayKey(
-                from: travelEvent.origin.dayKey,
-                timeZoneId: travelEvent.origin.timeZoneId,
-                deltaDays: -1
-            ), let index = indexByDayKey[previousDayKey],
+            if let previousDayKey = adjacentDayKey(from: travelEvent.origin.dayKey, timeZoneId: travelEvent.origin.timeZoneId, deltaDays: -1),
+               let index = indexByDayKey[previousDayKey],
                isEligibleForAdjacentTravelPromotion(results[index]) {
-                results[index] = promoteByAdjacentTravelContext(
-                    result: results[index],
-                    country: travelEvent.origin.country,
+                results[index] = makeContextualResult(
+                    from: results[index],
+                    allocations: [PresenceCountryAllocation(countryCode: travelEvent.origin.country.code, countryName: travelEvent.origin.country.name, normalizedShare: 1.0)],
+                    evidenceEntry: PresenceEvidenceEntry(
+                        dayKey: results[index].dayKey,
+                        processorID: "CalendarTravelBeforePromotion",
+                        countryCode: travelEvent.origin.country.code,
+                        countryName: travelEvent.origin.country.name,
+                        rawWeight: config.adjacentTravelWinningShare,
+                        calibratedWeight: config.adjacentTravelWinningShare,
+                        phase: .contextual,
+                        reason: "CalendarTravelBeforePromotion",
+                        contributedToFinalResult: true,
+                        timeZoneId: travelEvent.origin.timeZoneId
+                    ),
+                    confidenceBreakdown: PresenceConfidenceBreakdown(
+                        score: config.adjacentTravelWinningShare,
+                        runnerUpScore: 0,
+                        margin: config.adjacentTravelWinningShare,
+                        normalizedWinningShare: config.adjacentTravelWinningShare,
+                        label: .high,
+                        calibrationSummary: "adjacent travel before"
+                    ),
+                    sourceSummary: results[index].sources.union(.calendar),
+                    isDisputed: false,
                     timeZoneId: travelEvent.origin.timeZoneId,
-                    evidenceSource: "CalendarTravelBeforePromotion"
+                    calendarCount: max(results[index].calendarCount, 1)
                 )
             }
 
-            if let nextDayKey = adjacentDayKey(
-                from: travelEvent.destination.dayKey,
-                timeZoneId: travelEvent.destination.timeZoneId,
-                deltaDays: 1
-            ), let index = indexByDayKey[nextDayKey],
+            if let nextDayKey = adjacentDayKey(from: travelEvent.destination.dayKey, timeZoneId: travelEvent.destination.timeZoneId, deltaDays: 1),
+               let index = indexByDayKey[nextDayKey],
                isEligibleForAdjacentTravelPromotion(results[index]) {
-                results[index] = promoteByAdjacentTravelContext(
-                    result: results[index],
-                    country: travelEvent.destination.country,
+                results[index] = makeContextualResult(
+                    from: results[index],
+                    allocations: [PresenceCountryAllocation(countryCode: travelEvent.destination.country.code, countryName: travelEvent.destination.country.name, normalizedShare: 1.0)],
+                    evidenceEntry: PresenceEvidenceEntry(
+                        dayKey: results[index].dayKey,
+                        processorID: "CalendarTravelAfterPromotion",
+                        countryCode: travelEvent.destination.country.code,
+                        countryName: travelEvent.destination.country.name,
+                        rawWeight: config.adjacentTravelWinningShare,
+                        calibratedWeight: config.adjacentTravelWinningShare,
+                        phase: .contextual,
+                        reason: "CalendarTravelAfterPromotion",
+                        contributedToFinalResult: true,
+                        timeZoneId: travelEvent.destination.timeZoneId
+                    ),
+                    confidenceBreakdown: PresenceConfidenceBreakdown(
+                        score: config.adjacentTravelWinningShare,
+                        runnerUpScore: 0,
+                        margin: config.adjacentTravelWinningShare,
+                        normalizedWinningShare: config.adjacentTravelWinningShare,
+                        label: .high,
+                        calibrationSummary: "adjacent travel after"
+                    ),
+                    sourceSummary: results[index].sources.union(.calendar),
+                    isDisputed: false,
                     timeZoneId: travelEvent.destination.timeZoneId,
-                    evidenceSource: "CalendarTravelAfterPromotion"
+                    calendarCount: max(results[index].calendarCount, 1)
                 )
             }
         }
     }
 
-    private func applyTravelBackedTransitionInfill(
-        results: inout [PresenceDayResult],
-        travelEvents: [TravelEventContext]
-    ) {
+    private func fillSuggestions(results: inout [PresenceDayResult]) {
+        var backwardSuggestions = [PresenceCountryAllocation?](repeating: nil, count: results.count)
+        var currentBackward: PresenceCountryAllocation?
+        for index in results.indices {
+            backwardSuggestions[index] = currentBackward
+            if let current = results[index].countryAllocations.first {
+                currentBackward = current
+            }
+        }
+
+        var forwardSuggestions = [PresenceCountryAllocation?](repeating: nil, count: results.count)
+        var currentForward: PresenceCountryAllocation?
+        if !results.isEmpty {
+            for index in stride(from: results.count - 1, through: 0, by: -1) {
+                forwardSuggestions[index] = currentForward
+                if let current = results[index].countryAllocations.first {
+                    currentForward = current
+                }
+            }
+        }
+
+        for index in results.indices where results[index].countryAllocations.isEmpty || results[index].confidence == 0 {
+            var suggestions: [PresenceCountryAllocation] = []
+            if let backward = backwardSuggestions[index] {
+                suggestions.append(backward)
+            }
+            if let forward = forwardSuggestions[index],
+               suggestions.contains(where: { countryMatches($0, forward) }) == false {
+                suggestions.append(forward)
+            }
+
+            guard !suggestions.isEmpty else { continue }
+            results[index] = PresenceDayResult(
+                dayKey: results[index].dayKey,
+                date: results[index].date,
+                timeZoneId: results[index].timeZoneId,
+                countryAllocations: results[index].countryAllocations,
+                zoneOverlays: results[index].zoneOverlays,
+                evidenceEntries: results[index].evidenceEntries,
+                confidenceBreakdown: results[index].confidenceBreakdown,
+                sourceSummary: results[index].sources,
+                isOverride: results[index].isOverride,
+                isDisputed: results[index].isDisputed,
+                stayCount: results[index].stayCount,
+                photoCount: results[index].photoCount,
+                locationCount: results[index].locationCount,
+                calendarCount: results[index].calendarCount,
+                suggestedCountryCode1: suggestions[0].countryCode,
+                suggestedCountryName1: suggestions[0].countryName,
+                suggestedCountryCode2: suggestions.dropFirst().first?.countryCode,
+                suggestedCountryName2: suggestions.dropFirst().first?.countryName
+            )
+        }
+    }
+
+    private func applyTravelBackedTransitionInfill(results: inout [PresenceDayResult], travelEvents: [TravelEventContext]) {
         var i = 0
         while i < results.count {
-            if results[i].contributedCountries.isEmpty {
+            if results[i].countryAllocations.isEmpty {
                 var j = i
-                while j < results.count, results[j].contributedCountries.isEmpty {
+                while j < results.count, results[j].countryAllocations.isEmpty {
                     j += 1
                 }
 
                 let gapLength = j - i
-                if gapLength <= 7, i > 0, j < results.count,
-                   let previous = results[i - 1].contributedCountries.first,
-                   let next = results[j].contributedCountries.first,
-                   !countriesMatch(previous, next),
+                if gapLength <= config.gapBridgeMaxDays,
+                   i > 0, j < results.count,
+                   let previous = results[i - 1].countryAllocations.first,
+                   let next = results[j].countryAllocations.first,
+                   !countryMatches(previous, next),
                    hasTransitionSuggestions(in: results[i..<j]),
-                   hasAnchoredTravelEvent(
-                    travelEvents: travelEvents,
-                    previousDay: results[i - 1],
-                    nextDay: results[j],
-                    previousCountry: previous,
-                    nextCountry: next
-                   ) {
-                    for k in i..<j {
-                        guard let primary = resolveCountry(
-                            countryCode: results[k].suggestedCountryCode1,
-                            countryName: results[k].suggestedCountryName1
-                        ), let secondary = resolveCountry(
-                            countryCode: results[k].suggestedCountryCode2,
-                            countryName: results[k].suggestedCountryName2
-                        ) else {
+                   hasAnchoredTravelEvent(travelEvents: travelEvents, previousDay: results[i - 1], nextDay: results[j], previousCountry: previous, nextCountry: next) {
+                    for index in i..<j {
+                        guard let primary = resolveCountry(countryCode: results[index].suggestedCountryCode1, countryName: results[index].suggestedCountryName1),
+                              let secondary = resolveCountry(countryCode: results[index].suggestedCountryCode2, countryName: results[index].suggestedCountryName2) else {
                             continue
                         }
-
-                        results[k] = promoteByTravelTransitionInfill(
-                            result: results[k],
-                            primary: primary,
-                            secondary: secondary
+                        results[index] = makeContextualResult(
+                            from: results[index],
+                            allocations: [
+                                PresenceCountryAllocation(countryCode: primary.code, countryName: primary.name, normalizedShare: config.transitionPrimaryShare),
+                                PresenceCountryAllocation(countryCode: secondary.code, countryName: secondary.name, normalizedShare: config.transitionSecondaryShare)
+                            ],
+                            evidenceEntry: PresenceEvidenceEntry(
+                                dayKey: results[index].dayKey,
+                                processorID: "CalendarTransitionInfill",
+                                countryCode: primary.code,
+                                countryName: primary.name,
+                                rawWeight: config.transitionPrimaryShare,
+                                calibratedWeight: config.transitionPrimaryShare,
+                                phase: .contextual,
+                                reason: "CalendarTransitionInfill",
+                                contributedToFinalResult: true,
+                                timeZoneId: results[index].timeZoneId
+                            ),
+                            confidenceBreakdown: PresenceConfidenceBreakdown(
+                                score: config.transitionPrimaryShare,
+                                runnerUpScore: config.transitionSecondaryShare,
+                                margin: config.transitionPrimaryShare - config.transitionSecondaryShare,
+                                normalizedWinningShare: config.transitionPrimaryShare,
+                                label: .medium,
+                                calibrationSummary: "travel-backed transition"
+                            ),
+                            sourceSummary: results[index].sources.union(.calendar),
+                            isDisputed: true,
+                            calendarCount: max(results[index].calendarCount, 1)
                         )
                     }
                 }
@@ -785,35 +932,99 @@ struct ResultCompiler {
         travelEvents: [TravelEventContext],
         previousDay: PresenceDayResult,
         nextDay: PresenceDayResult,
-        previousCountry: ContributedCountry,
-        nextCountry: ContributedCountry
+        previousCountry: PresenceCountryAllocation,
+        nextCountry: PresenceCountryAllocation
     ) -> Bool {
         travelEvents.contains { travelEvent in
             travelEvent.origin.dayKey == previousDay.dayKey &&
             travelEvent.destination.dayKey == nextDay.dayKey &&
-            countriesMatch(previousCountry, travelEvent.origin.country) &&
-            countriesMatch(nextCountry, travelEvent.destination.country)
+            countryMatches(previousCountry, travelEvent.origin.country) &&
+            countryMatches(nextCountry, travelEvent.destination.country)
         }
     }
 
-    private func countriesMatch(_ lhs: ContributedCountry, _ rhs: ContributedCountry) -> Bool {
-        if let lhsCode = lhs.countryCode, let rhsCode = rhs.countryCode {
-            return lhsCode == rhsCode
-        }
-        return lhs.countryName.caseInsensitiveCompare(rhs.countryName) == .orderedSame
+    private func makeContextualResult(
+        from result: PresenceDayResult,
+        allocations: [PresenceCountryAllocation],
+        evidenceEntry: PresenceEvidenceEntry,
+        confidenceBreakdown: PresenceConfidenceBreakdown,
+        sourceSummary: SignalSourceMask,
+        isDisputed: Bool,
+        timeZoneId: String? = nil,
+        calendarCount: Int? = nil
+    ) -> PresenceDayResult {
+        PresenceDayResult(
+            dayKey: result.dayKey,
+            date: result.date,
+            timeZoneId: timeZoneId ?? result.timeZoneId,
+            countryAllocations: allocations,
+            zoneOverlays: result.zoneOverlays,
+            evidenceEntries: result.evidenceEntries + [evidenceEntry],
+            confidenceBreakdown: confidenceBreakdown,
+            sourceSummary: sourceSummary,
+            isOverride: false,
+            isDisputed: isDisputed,
+            stayCount: result.stayCount,
+            photoCount: result.photoCount,
+            locationCount: result.locationCount,
+            calendarCount: calendarCount ?? result.calendarCount,
+            suggestedCountryCode1: result.suggestedCountryCode1,
+            suggestedCountryName1: result.suggestedCountryName1,
+            suggestedCountryCode2: result.suggestedCountryCode2,
+            suggestedCountryName2: result.suggestedCountryName2
+        )
     }
 
-    private func countriesMatch(_ lhs: ContributedCountry, _ rhs: ResolvedCountry) -> Bool {
-        if let lhsCode = lhs.countryCode, let rhsCode = rhs.code {
-            return lhsCode == rhsCode
+    private func markContributingEvidence(_ result: PresenceDayResult) -> PresenceDayResult {
+        let selectedCountries = result.countryAllocations
+        let updatedEvidence = result.evidenceEntries.map { entry in
+            var mutable = entry
+            mutable.contributedToFinalResult =
+                selectedCountries.contains(where: { allocation in
+                    if let countryCode = entry.countryCode, let allocationCode = allocation.countryCode {
+                        return countryCode == allocationCode
+                    }
+                    return entry.countryName.caseInsensitiveCompare(allocation.countryName) == .orderedSame
+                }) || entry.phase == .override
+            return mutable
         }
-        return lhs.countryName.caseInsensitiveCompare(rhs.name) == .orderedSame
+
+        return PresenceDayResult(
+            dayKey: result.dayKey,
+            date: result.date,
+            timeZoneId: result.timeZoneId,
+            countryAllocations: result.countryAllocations,
+            zoneOverlays: result.zoneOverlays,
+            evidenceEntries: updatedEvidence,
+            confidenceBreakdown: result.confidenceBreakdown,
+            sourceSummary: result.sourceSummary,
+            isOverride: result.isOverride,
+            isDisputed: result.isDisputed,
+            stayCount: result.stayCount,
+            photoCount: result.photoCount,
+            locationCount: result.locationCount,
+            calendarCount: result.calendarCount,
+            suggestedCountryCode1: result.suggestedCountryCode1,
+            suggestedCountryName1: result.suggestedCountryName1,
+            suggestedCountryCode2: result.suggestedCountryCode2,
+            suggestedCountryName2: result.suggestedCountryName2
+        )
     }
 
-    private func preferredTravelEndpoint(
-        _ candidate: TravelEventEndpoint,
-        over existing: TravelEventEndpoint?
-    ) -> Bool {
+    private func isEligibleForAdjacentTravelPromotion(_ result: PresenceDayResult) -> Bool {
+        guard !result.isOverride else { return false }
+        guard result.stayCount == 0, result.photoCount == 0, result.locationCount == 0 else { return false }
+        if result.countryAllocations.isEmpty {
+            return true
+        }
+        return result.sources == .calendar && result.confidenceLabel == .low
+    }
+
+    private func isEligibleForOriginFlightPromotion(_ result: PresenceDayResult) -> Bool {
+        isEligibleForAdjacentTravelPromotion(result)
+    }
+
+    private func preferredTravelEndpoint(_ candidate: TravelEventEndpoint, over existing: TravelEventEndpoint?) -> Bool {
         guard let existing else { return true }
         return (candidate.dayKey, candidate.country.id, candidate.timeZoneId ?? "") <
         (existing.dayKey, existing.country.id, existing.timeZoneId ?? "")
@@ -832,30 +1043,13 @@ struct ResultCompiler {
         return eventIdentifier
     }
 
-    private func adjacentDayKey(
-        from dayKey: String,
-        timeZoneId: String?,
-        deltaDays: Int
-    ) -> String? {
+    private func adjacentDayKey(from dayKey: String, timeZoneId: String?, deltaDays: Int) -> String? {
         let timeZone = DayIdentity.canonicalTimeZone(preferredTimeZoneId: timeZoneId, fallback: context.calendar.timeZone)
         guard let date = DayKey.date(for: dayKey, timeZone: timeZone) else { return nil }
-
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = timeZone
-
-        guard let adjacent = calendar.date(byAdding: .day, value: deltaDays, to: date) else {
-            return nil
-        }
+        guard let adjacent = calendar.date(byAdding: .day, value: deltaDays, to: date) else { return nil }
         return DayKey.make(from: adjacent, timeZone: timeZone)
-    }
-
-    private func isEligibleForAdjacentTravelPromotion(_ result: PresenceDayResult) -> Bool {
-        guard !result.isOverride else { return false }
-        guard result.contributedCountries.isEmpty else { return false }
-        guard result.stayCount == 0 else { return false }
-        guard result.photoCount == 0 else { return false }
-        guard result.locationCount == 0 else { return false }
-        return true
     }
 }
 
@@ -871,14 +1065,17 @@ struct PresenceInferenceEngine {
         calendar: Calendar = .current,
         progress: ((Int, Int) -> Void)? = nil
     ) -> [PresenceDayResult] {
-        let pipeline = PresenceInferencePipeline(middlewares: [
-            StayMiddleware(),
-            OverrideMiddleware(),
-            PhotoMiddleware(),
-            LocationMiddleware(),
-            CalendarMiddleware()
-        ])
-        
+        let pipeline = InferencePipeline(
+            config: InferencePipelineConfig(),
+            processors: [
+                StayProcessor(),
+                OverrideProcessor(),
+                PhotoProcessor(),
+                LocationProcessor(),
+                CalendarProcessor()
+            ]
+        )
+
         let context = InferenceContext(
             dayKeys: dayKeys,
             stays: stays,
@@ -890,7 +1087,7 @@ struct PresenceInferenceEngine {
             calendar: calendar,
             progress: progress
         )
-        
+
         return pipeline.execute(context: context)
     }
 }

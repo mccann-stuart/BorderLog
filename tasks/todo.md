@@ -99,3 +99,18 @@
 - [x] `swiftc -parse` passed for all edited production and test files
 - [x] Targeted `xcodebuild test` could not start because this environment cannot discover or boot iOS Simulator runtimes (`simdiskimaged` / destination resolution failure)
 - [x] Generic `xcodebuild build` is still blocked in this environment by SwiftData macro/plugin failures unrelated to these edits
+
+## Task: Phase 2 Presence Inference Engine Rewrite
+- [x] Rewrite shared inference/result types for normalized allocations and rich evidence audit entries
+- [x] Replace `PresenceInferenceEngine.swift` with typed pipeline state, config, processors, and contextual compilation
+- [x] Persist the rewritten contract in `PresenceDay` and ledger upsert paths
+- [x] Update downstream consumers that read evidence or country allocations
+- [x] Rewrite inference tests and repair stale `PresenceDay` fixtures
+- [ ] Run targeted verification and document results
+
+## Review
+- [x] Replaced flat score impacts with richer evidence entries carrying raw weight, calibrated weight, phase, reason, and contribution flags
+- [x] Rebuilt the inference engine around typed pipeline config/state/processors while preserving travel promotions, gap bridging, and transition infill
+- [x] Updated `PresenceDay` persistence, ledger writes, and day detail UI to surface normalized allocations and the inference audit trail
+- [x] Added regression coverage for calibration metadata and winning-vs-losing evidence flags; repaired stale test fixture helpers
+- [ ] `swiftc -parse` passed for all edited production and test files, but `xcodebuild test` remains blocked in this environment by simulator runtime failures (`simdiskimaged` / runtime discovery)

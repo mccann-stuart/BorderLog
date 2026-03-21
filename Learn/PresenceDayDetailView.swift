@@ -34,6 +34,14 @@ struct PresenceDayDetailView: View {
     }
 
     private var countryText: String {
+        if !day.contributedCountries.isEmpty {
+            return day.contributedCountries
+                .map { allocation in
+                    let percent = Int((allocation.normalizedShare * 100).rounded())
+                    return "\(allocation.countryName) (\(percent)%)"
+                }
+                .joined(separator: ", ")
+        }
         if let name = day.countryName ?? day.countryCode {
             return name
         }
@@ -41,7 +49,8 @@ struct PresenceDayDetailView: View {
     }
 
     private var confidenceText: String {
-        day.confidenceLabel.rawValue.capitalized
+        let percent = Int((day.confidence * 100).rounded())
+        return "\(day.confidenceLabel.rawValue.capitalized) (\(percent)%)"
     }
 
     private var localDate: Date {
@@ -152,6 +161,17 @@ struct PresenceDayDetailView: View {
                     Text("This day has a manual override and will always win.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
+                }
+
+                if !day.contributedCountries.isEmpty {
+                    ForEach(Array(day.contributedCountries.enumerated()), id: \.offset) { _, allocation in
+                        HStack {
+                            Text(allocation.countryName)
+                            Spacer()
+                            Text("\(Int((allocation.normalizedShare * 100).rounded()))%")
+                                .foregroundStyle(.secondary)
+                        }
+                    }
                 }
             }
 
@@ -379,6 +399,36 @@ private struct EvidenceSection: View {
                             }
                             .font(.caption)
                             .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+            }
+
+            Section("Inference Audit (\(day.evidence.count))") {
+                if day.evidence.isEmpty {
+                    Text("No inference audit entries")
+                        .foregroundStyle(.secondary)
+                } else {
+                    ForEach(Array(day.evidence.enumerated()), id: \.offset) { _, entry in
+                        VStack(alignment: .leading, spacing: 4) {
+                            HStack {
+                                Text(entry.source)
+                                    .font(.subheadline.weight(.semibold))
+                                Spacer()
+                                Text(entry.phase.rawValue.capitalized)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                            Text(entry.countryName)
+                                .font(.caption)
+                            Text("raw \(entry.rawWeight, format: .number.precision(.fractionLength(0...2))) • calibrated \(entry.calibratedWeight, format: .number.precision(.fractionLength(0...2)))")
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                            if entry.contributedToFinalResult {
+                                Text("Contributed to final result")
+                                    .font(.caption2)
+                                    .foregroundStyle(.green)
+                            }
                         }
                     }
                 }

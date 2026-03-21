@@ -246,12 +246,18 @@ public actor LedgerRecomputeService {
                 dayKey: dayKey,
                 date: date,
                 timeZoneId: timeZone.identifier,
-                contributedCountries: [],
+                countryAllocations: [],
                 zoneOverlays: [],
-                evidence: [],
-                confidence: 0,
-                confidenceLabel: .low,
-                sources: .none,
+                evidenceEntries: [],
+                confidenceBreakdown: PresenceConfidenceBreakdown(
+                    score: 0,
+                    runnerUpScore: 0,
+                    margin: 0,
+                    normalizedWinningShare: 0,
+                    label: .low,
+                    calibrationSummary: "empty"
+                ),
+                sourceSummary: .none,
                 isOverride: false,
                 stayCount: 0,
                 photoCount: 0,
@@ -280,12 +286,11 @@ public actor LedgerRecomputeService {
             if let existing = existingMap[result.dayKey] {
                 existing.date = result.date
                 existing.timeZoneId = result.timeZoneId
-                existing.contributedCountries = result.contributedCountries
+                existing.countryAllocations = result.countryAllocations
                 existing.zoneOverlays = result.zoneOverlays
-                existing.evidence = result.evidence
-                existing.confidence = result.confidence
-                existing.confidenceLabel = result.confidenceLabel
-                existing.sources = result.sources
+                existing.evidenceEntries = result.evidenceEntries
+                existing.confidenceBreakdown = result.confidenceBreakdown
+                existing.sourceSummary = result.sourceSummary
                 existing.isOverride = result.isOverride
                 existing.stayCount = result.stayCount
                 existing.photoCount = result.photoCount
@@ -301,12 +306,11 @@ public actor LedgerRecomputeService {
                     dayKey: result.dayKey,
                     date: result.date,
                     timeZoneId: result.timeZoneId,
-                    contributedCountries: result.contributedCountries,
+                    countryAllocations: result.countryAllocations,
                     zoneOverlays: result.zoneOverlays,
-                    evidence: result.evidence,
-                    confidence: result.confidence,
-                    confidenceLabel: result.confidenceLabel,
-                    sources: result.sources,
+                    evidenceEntries: result.evidenceEntries,
+                    confidenceBreakdown: result.confidenceBreakdown,
+                    sourceSummary: result.sourceSummary,
                     isOverride: result.isOverride,
                     stayCount: result.stayCount,
                     photoCount: result.photoCount,
