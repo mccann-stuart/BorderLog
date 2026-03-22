@@ -7,8 +7,11 @@
 
 import SwiftUI
 import SwiftData
+import os
 
 struct CalendarTabView: View {
+    private static let logger = Logger(subsystem: "com.MCCANN.Border", category: "CalendarTabView")
+
     @Environment(\.modelContext) private var modelContext
     @Environment(\.scenePhase) private var scenePhase
 
@@ -158,7 +161,8 @@ struct CalendarTabView: View {
             loadPresenceDays(for: summaryPresenceDayKeys(from: loadedSnapshot))
         } catch {
             guard requestedMonth == visibleMonthStart, requestedRange == summaryRange else { return }
-            loadError = error.localizedDescription
+            Self.logger.error("Failed to load calendar snapshot: \(error, privacy: .private)")
+            loadError = "Failed to load calendar data. Please try again."
             loadPresenceDays(for: summaryPresenceDayKeys(from: snapshot))
         }
 
