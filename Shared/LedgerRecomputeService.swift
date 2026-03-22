@@ -6,7 +6,7 @@
 //
 
 import Foundation
-import SwiftData
+@preconcurrency import SwiftData
 import os
 
 @ModelActor
@@ -35,122 +35,174 @@ public actor LedgerRecomputeService {
 
         let calendar = Calendar.current
         let timeZone = calendar.timeZone
-        let scope: (start: Date, end: Date, dayKeys: [String])
-        do {
-            guard let expandedScope = try self.makeImpactedScope(
-                seedDayKeys: Set(dayKeys),
-                timeZone: timeZone,
-                calendar: calendar
-            ) else {
+        
+        var currentSeedDayKeys = Set(dayKeys)
+        var stable = false
+        var finalResults: [PresenceDayResult] = []
+        var finalScopeKeys: [String] = []
+        
+        // Loop up to 15 times max to prevent infinite cascading, normally stabilizes in 1-2 passes
+        var passCount = 0
+        
+        while !stable && passCount < 15 {
+            passCount += 1
+            
+            let scope: (start: Date, end: Date, dayKeys: [String])
+            do {
+                guard let expandedScope = try self.makeImmediateImpactScope(
+                    seedDayKeys: currentSeedDayKeys,
+                    timeZone: timeZone,
+                    calendar: calendar
+                ) else {
+                    return
+                }
+                scope = expandedScope
+            } catch {
+                Self.logger.error("LedgerRecomputeService scope error: \(error, privacy: .private)")
+                onRecomputeError?(error)
                 return
             }
-            scope = expandedScope
-        } catch {
-            Self.logger.error("LedgerRecomputeService scope error: \(error, privacy: .private)")
-            onRecomputeError?(error)
-            return
-        }
 
-        let dayKeySet = Set(scope.dayKeys)
-        guard !dayKeySet.isEmpty else { return }
+            let dayKeySet = Set(scope.dayKeys)
+            guard !dayKeySet.isEmpty else { return }
 
-        // Fetch one day on each side so timestamp-based evidence near midnight is available.
-        let rangeStart = calendar.date(byAdding: .day, value: -1, to: scope.start) ?? scope.start
-        let rangeEnd = calendar.date(byAdding: .day, value: 1, to: scope.end) ?? scope.end
+            // Fetch one day on each side so timestamp-based evidence near midnight is available.
+            let rangeStart = calendar.date(byAdding: .day, value: -1, to: scope.start) ?? scope.start
+            let rangeEnd = calendar.date(byAdding: .day, value: 1, to: scope.end) ?? scope.end
 
-        let stays: [Stay]
-        let overrides: [DayOverride]
-        let locations: [LocationSample]
-        let photos: [PhotoSignal]
-        let calendarSignals: [CalendarSignal]
+            let stays: [Stay]
+            let overrides: [DayOverride]
+            let locations: [LocationSample]
+            let photos: [PhotoSignal]
+            let calendarSignals: [CalendarSignal]
 
-        do {
-            stays = try dataFetcher.fetchStays(from: rangeStart, to: rangeEnd)
-            overrides = try dataFetcher.fetchOverrides(dayKeys: Array(dayKeySet))
-            locations = try dataFetcher.fetchLocations(from: rangeStart, to: rangeEnd)
-            photos = try dataFetcher.fetchPhotos(from: rangeStart, to: rangeEnd)
-            calendarSignals = try dataFetcher.fetchCalendarSignals(from: rangeStart, to: rangeEnd)
-        } catch {
-            Self.logger.error("LedgerRecomputeService fetch error: \(error, privacy: .private)")
-            onRecomputeError?(error)
-            return
-        }
+            do {
+                stays = try dataFetcher.fetchStays(from: rangeStart, to: rangeEnd)
+                overrides = try dataFetcher.fetchOverrides(dayKeys: Array(dayKeySet))
+                locations = try dataFetcher.fetchLocations(from: rangeStart, to: rangeEnd)
+                photos = try dataFetcher.fetchPhotos(from: rangeStart, to: rangeEnd)
+                calendarSignals = try dataFetcher.fetchCalendarSignals(from: rangeStart, to: rangeEnd)
+            } catch {
+                Self.logger.error("LedgerRecomputeService fetch error: \(error, privacy: .private)")
+                onRecomputeError?(error)
+                return
+            }
 
-        let stayInfos = stays.map {
-            StayPresenceInfo(
-                entryDayKey: $0.entryDayKey,
-                exitDayKey: $0.exitDayKey,
-                dayTimeZoneId: $0.dayTimeZoneId,
-                countryCode: $0.countryCode,
-                countryName: $0.countryName
+            let stayInfos = stays.map {
+                StayPresenceInfo(
+                    entryDayKey: $0.entryDayKey,
+                    exitDayKey: $0.exitDayKey,
+                    dayTimeZoneId: $0.dayTimeZoneId,
+                    countryCode: $0.countryCode,
+                    countryName: $0.countryName
+                )
+            }
+
+            let overrideInfos = overrides.map {
+                OverridePresenceInfo(
+                    dayKey: $0.dayKey,
+                    dayTimeZoneId: $0.dayTimeZoneId,
+                    countryCode: $0.countryCode,
+                    countryName: $0.countryName
+                )
+            }
+
+            let locationInfos = locations.compactMap { sample -> LocationSignalInfo? in
+                guard let name = sample.countryName ?? sample.countryCode else { return nil }
+                return LocationSignalInfo(
+                    dayKey: sample.dayKey,
+                    countryCode: sample.countryCode,
+                    countryName: name,
+                    accuracyMeters: sample.accuracyMeters,
+                    timeZoneId: sample.timeZoneId
+                )
+            }
+
+            let photoInfos = photos.compactMap { signal -> PhotoSignalInfo? in
+                guard let name = signal.countryName ?? signal.countryCode else { return nil }
+                return PhotoSignalInfo(
+                    dayKey: signal.dayKey,
+                    countryCode: signal.countryCode,
+                    countryName: name,
+                    timeZoneId: signal.timeZoneId
+                )
+            }
+
+            let calendarInfos = calendarSignals.compactMap { signal -> CalendarSignalInfo? in
+                guard let name = signal.countryName ?? signal.countryCode else { return nil }
+                return CalendarSignalInfo(
+                    dayKey: signal.dayKey,
+                    countryCode: signal.countryCode,
+                    countryName: name,
+                    timeZoneId: signal.timeZoneId,
+                    bucketingTimeZoneId: signal.bucketingTimeZoneId,
+                    eventIdentifier: signal.eventIdentifier,
+                    source: signal.source
+                )
+            }
+
+            if !didBeginInference {
+                let totalDayKeys = dayKeySet.count
+                await MainActor.run { InferenceActivity.shared.beginInference(totalDays: totalDayKeys) }
+                didBeginInference = true
+            }
+
+            let results = PresenceInferenceEngine.compute(
+                dayKeys: dayKeySet,
+                stays: stayInfos,
+                overrides: overrideInfos,
+                locations: locationInfos,
+                photos: photoInfos,
+                calendarSignals: calendarInfos,
+                rangeEnd: scope.end,
+                calendar: calendar,
+                progress: { processed, total in
+                    Task { @MainActor in
+                        InferenceActivity.shared.updateInferenceProgress(processedDays: processed)
+                    }
+                }
             )
-        }
-
-        let overrideInfos = overrides.map {
-            OverridePresenceInfo(
-                dayKey: $0.dayKey,
-                dayTimeZoneId: $0.dayTimeZoneId,
-                countryCode: $0.countryCode,
-                countryName: $0.countryName
-            )
-        }
-
-        let locationInfos = locations.compactMap { sample -> LocationSignalInfo? in
-            guard let name = sample.countryName ?? sample.countryCode else { return nil }
-            return LocationSignalInfo(
-                dayKey: sample.dayKey,
-                countryCode: sample.countryCode,
-                countryName: name,
-                accuracyMeters: sample.accuracyMeters,
-                timeZoneId: sample.timeZoneId
-            )
-        }
-
-        let photoInfos = photos.compactMap { signal -> PhotoSignalInfo? in
-            guard let name = signal.countryName ?? signal.countryCode else { return nil }
-            return PhotoSignalInfo(
-                dayKey: signal.dayKey,
-                countryCode: signal.countryCode,
-                countryName: name,
-                timeZoneId: signal.timeZoneId
-            )
-        }
-
-        let calendarInfos = calendarSignals.compactMap { signal -> CalendarSignalInfo? in
-            guard let name = signal.countryName ?? signal.countryCode else { return nil }
-            return CalendarSignalInfo(
-                dayKey: signal.dayKey,
-                countryCode: signal.countryCode,
-                countryName: name,
-                timeZoneId: signal.timeZoneId,
-                bucketingTimeZoneId: signal.bucketingTimeZoneId
-            )
-        }
-
-        let totalDayKeys = dayKeySet.count
-        await MainActor.run {
-            InferenceActivity.shared.beginInference(totalDays: totalDayKeys)
-        }
-        didBeginInference = true
-
-        let results = await PresenceInferenceEngine.compute(
-            dayKeys: dayKeySet,
-            stays: stayInfos,
-            overrides: overrideInfos,
-            locations: locationInfos,
-            photos: photoInfos,
-            calendarSignals: calendarInfos,
-            rangeEnd: scope.end,
-            calendar: calendar,
-            progress: { processed, total in
-                Task { @MainActor in
-                    InferenceActivity.shared.updateInferenceProgress(processedDays: processed)
+            
+            // Incremental dependency check: Have the boundary days changed their primary result?
+            let existingDays = (try? dataFetcher.fetchPresenceDays(keys: Array(dayKeySet))) ?? []
+            let existingMap = Dictionary(uniqueKeysWithValues: existingDays.map { ($0.dayKey, $0) })
+            
+            var needsExpansion = false
+            for result in results {
+                let existing = existingMap[result.dayKey]
+                let previousCode = existing?.contributedCountries.first?.countryCode
+                let newCode = result.contributedCountries.first?.countryCode
+                
+                if previousCode != newCode || passCount == 1 {
+                    // Result changed, we should include neighbors to see if it cascades
+                    // (But to optimize, we only expand if it's currently on the edge of the scope)
+                    if let date = DayKey.date(for: result.dayKey, timeZone: timeZone) {
+                        let prevDay = calendar.date(byAdding: .day, value: -1, to: date)!
+                        let nextDay = calendar.date(byAdding: .day, value: 1, to: date)!
+                        let prevKey = DayKey.make(from: prevDay, timeZone: timeZone)
+                        let nextKey = DayKey.make(from: nextDay, timeZone: timeZone)
+                        
+                        if !currentSeedDayKeys.contains(prevKey) {
+                            currentSeedDayKeys.insert(prevKey)
+                            needsExpansion = true
+                        }
+                        if !currentSeedDayKeys.contains(nextKey) {
+                            currentSeedDayKeys.insert(nextKey)
+                            needsExpansion = true
+                        }
+                    }
                 }
             }
-        )
+            
+            stable = !needsExpansion
+            if stable || passCount == 15 {
+                finalResults = results
+                finalScopeKeys = scope.dayKeys
+            }
+        }
 
         do {
-            try self.upsertPresenceDays(results)
+            try self.upsertPresenceDays(finalResults, originalKeys: finalScopeKeys)
             try dataFetcher.save()
         } catch {
             Self.logger.error("LedgerRecomputeService save error: \(error, privacy: .private)")
@@ -165,15 +217,11 @@ public actor LedgerRecomputeService {
         let twoYearsAgo = calendar.date(byAdding: .year, value: -2, to: today) ?? today
         let earliestSignal = try? self.earliestSignalDate()
 
-        // Ensure we cover at least the last 2 years, or earlier if data exists
         let earliest = [earliestSignal, twoYearsAgo].compactMap { $0 }.min() ?? twoYearsAgo
-
         let dayKeys = self.makeDayKeys(from: earliest, to: today, calendar: calendar)
         await self.recompute(dayKeys: dayKeys)
     }
 
-    /// Ensures every calendar day from two years ago (rolling) to today
-    /// has a PresenceDay entry in the store. Missing days are inserted as unknown/empty.
     public func fillMissingDays(asOf: Date = Date(), calendar: Calendar = .current) async {
         let timeZone = calendar.timeZone
         let today = calendar.startOfDay(for: asOf)
@@ -198,11 +246,18 @@ public actor LedgerRecomputeService {
                 dayKey: dayKey,
                 date: date,
                 timeZoneId: timeZone.identifier,
-                countryCode: nil,
-                countryName: nil,
-                confidence: 0,
-                confidenceLabel: .low,
-                sources: .none,
+                countryAllocations: [],
+                zoneOverlays: [],
+                evidenceEntries: [],
+                confidenceBreakdown: PresenceConfidenceBreakdown(
+                    score: 0,
+                    runnerUpScore: 0,
+                    margin: 0,
+                    normalizedWinningShare: 0,
+                    label: .low,
+                    calibrationSummary: "empty"
+                ),
+                sourceSummary: .none,
                 isOverride: false,
                 stayCount: 0,
                 photoCount: 0,
@@ -219,7 +274,7 @@ public actor LedgerRecomputeService {
         }
     }
 
-    private func upsertPresenceDays(_ results: [PresenceDayResult]) throws {
+    private func upsertPresenceDays(_ results: [PresenceDayResult], originalKeys: [String]) throws {
         let keys = results.map { $0.dayKey }
         let existing = try dataFetcher.fetchPresenceDays(keys: keys)
         var existingMap: [String: PresenceDay] = [:]
@@ -231,11 +286,11 @@ public actor LedgerRecomputeService {
             if let existing = existingMap[result.dayKey] {
                 existing.date = result.date
                 existing.timeZoneId = result.timeZoneId
-                existing.countryCode = result.countryCode
-                existing.countryName = result.countryName
-                existing.confidence = result.confidence
-                existing.confidenceLabel = result.confidenceLabel
-                existing.sources = result.sources
+                existing.countryAllocations = result.countryAllocations
+                existing.zoneOverlays = result.zoneOverlays
+                existing.evidenceEntries = result.evidenceEntries
+                existing.confidenceBreakdown = result.confidenceBreakdown
+                existing.sourceSummary = result.sourceSummary
                 existing.isOverride = result.isOverride
                 existing.stayCount = result.stayCount
                 existing.photoCount = result.photoCount
@@ -251,11 +306,11 @@ public actor LedgerRecomputeService {
                     dayKey: result.dayKey,
                     date: result.date,
                     timeZoneId: result.timeZoneId,
-                    countryCode: result.countryCode,
-                    countryName: result.countryName,
-                    confidence: result.confidence,
-                    confidenceLabel: result.confidenceLabel,
-                    sources: result.sources,
+                    countryAllocations: result.countryAllocations,
+                    zoneOverlays: result.zoneOverlays,
+                    evidenceEntries: result.evidenceEntries,
+                    confidenceBreakdown: result.confidenceBreakdown,
+                    sourceSummary: result.sourceSummary,
                     isOverride: result.isOverride,
                     stayCount: result.stayCount,
                     photoCount: result.photoCount,
@@ -288,7 +343,7 @@ public actor LedgerRecomputeService {
         return keys
     }
 
-    private func makeImpactedScope(
+    private func makeImmediateImpactScope(
         seedDayKeys: Set<String>,
         timeZone: TimeZone,
         calendar: Calendar
@@ -301,17 +356,12 @@ public actor LedgerRecomputeService {
             return nil
         }
 
-        let paddingDays = 8
-        let paddedStart = calendar.date(byAdding: .day, value: -paddingDays, to: mutationStart) ?? mutationStart
-        let paddedEnd = calendar.date(byAdding: .day, value: paddingDays, to: mutationEnd) ?? mutationEnd
-
         let today = calendar.startOfDay(for: Date())
         let lowerBound = try self.coverageLowerBound(today: today, calendar: calendar)
 
-        var scopeStart = max(paddedStart, lowerBound)
-        var scopeEnd = min(paddedEnd, today)
+        var scopeStart = max(mutationStart, lowerBound)
+        var scopeEnd = min(mutationEnd, today)
         if scopeStart > scopeEnd {
-            // Clamp out-of-bound seeds to the nearest valid in-range day.
             if mutationEnd < lowerBound {
                 scopeStart = lowerBound
                 scopeEnd = lowerBound
@@ -322,14 +372,6 @@ public actor LedgerRecomputeService {
                 return nil
             }
         }
-
-        if let leftAnchor = try dataFetcher.fetchNearestKnownPresenceDay(before: scopeStart) {
-            scopeStart = max(calendar.startOfDay(for: leftAnchor.date), lowerBound)
-        }
-        if let rightAnchor = try dataFetcher.fetchNearestKnownPresenceDay(after: scopeEnd) {
-            scopeEnd = min(calendar.startOfDay(for: rightAnchor.date), today)
-        }
-        guard scopeStart <= scopeEnd else { return nil }
 
         return (
             start: scopeStart,
@@ -352,5 +394,4 @@ public actor LedgerRecomputeService {
         let c = try dataFetcher.fetchEarliestCalendarSignalDate()
         return [s, o, l, p, c].compactMap { $0 }.min()
     }
-
 }

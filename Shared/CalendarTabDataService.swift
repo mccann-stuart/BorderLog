@@ -6,7 +6,7 @@
 //
 
 import Foundation
-import SwiftData
+@preconcurrency import SwiftData
 
 enum CalendarCountrySummaryRange: String, CaseIterable, Identifiable {
     case visibleMonth = "Visible Month"
@@ -81,6 +81,8 @@ struct CalendarDaySummary: Identifiable, Sendable {
     let date: Date
     let dayNumber: Int
     let countries: [CalendarDayCountry]
+    let flightOriginCountry: CalendarDayCountry?
+    let flightDestinationCountry: CalendarDayCountry?
     let hasFlight: Bool
     let isToday: Bool
     let isInCurrentMonth: Bool
@@ -101,6 +103,7 @@ struct CalendarTabSnapshot: Sendable {
     let visibleMonthStart: Date
     let daySummaries: [CalendarDaySummary]
     let countrySummaries: [CalendarCountryDaysSummary]
+    let summaryUnknownDayKeys: [String]
     let earliestAvailableMonth: Date
     let latestAvailableMonth: Date
 
@@ -115,6 +118,7 @@ struct CalendarTabSnapshot: Sendable {
         let daySummaries = CalendarTabDataService.makeMonthDaySummaries(
             for: normalizedMonthStart,
             accumulators: [:],
+            presenceDays: [],
             calendar: calendar,
             now: now
         )
@@ -122,6 +126,7 @@ struct CalendarTabSnapshot: Sendable {
             visibleMonthStart: normalizedMonthStart,
             daySummaries: daySummaries,
             countrySummaries: [],
+            summaryUnknownDayKeys: [],
             earliestAvailableMonth: normalizedMonthStart,
             latestAvailableMonth: latestMonth
         )
@@ -130,9 +135,17 @@ struct CalendarTabSnapshot: Sendable {
 
 @ModelActor
 actor CalendarTabDataService {
+    fileprivate struct FlightCountryCandidate {
+        let country: CalendarDayCountry
+        let timestamp: Date
+        let eventIdentifier: String
+    }
+
     fileprivate struct DayAccumulator {
         var countriesByID: [String: CalendarDayCountry] = [:]
         var hasFlight = false
+        var flightOriginCandidates: [FlightCountryCandidate] = []
+        var flightDestinationCandidates: [FlightCountryCandidate] = []
     }
 
     fileprivate struct DayKeyRange {
@@ -166,6 +179,7 @@ actor CalendarTabDataService {
         let locations = try fetchLocations(dayKeys: fetchDayKeys)
         let photos = try fetchPhotos(dayKeys: fetchDayKeys)
         let calendarSignals = try fetchCalendarSignals(dayKeys: fetchDayKeys)
+        let presenceDays = try fetchPresenceDays(dayKeys: fetchDayKeys)
         let stays = try fetchStays(rangeStartKey: rangeStartKey, rangeEndKey: rangeEndKey)
         let countryConfigs = try modelContext.fetch(FetchDescriptor<CountryConfig>())
 
@@ -199,13 +213,7 @@ actor CalendarTabDataService {
         }
 
         for signal in calendarSignals {
-            addCountry(
-                to: &accumulators,
-                dayKey: signal.dayKey,
-                countryCode: signal.countryCode,
-                countryName: signal.countryName
-            )
-            accumulators[signal.dayKey, default: DayAccumulator()].hasFlight = true
+            addCalendarSignal(signal, to: &accumulators)
         }
 
         if let rangeStartKey, let rangeEndKey {
@@ -224,15 +232,25 @@ actor CalendarTabDataService {
         let daySummaries = Self.makeMonthDaySummaries(
             for: normalizedVisibleMonth,
             accumulators: accumulators,
+            presenceDays: presenceDays,
             calendar: calendar,
             now: now
         )
         let countrySummaries = makeCountrySummaries(
             from: accumulators,
+            presenceDays: presenceDays,
             summaryDayKeys: summaryDayRange.dayKeys,
             summaryRange: summaryRange,
             visibleMonthStart: normalizedVisibleMonth,
             configByID: configByID,
+            now: now,
+            calendar: calendar
+        )
+        let summaryUnknownDayKeys = makeSummaryUnknownDayKeys(
+            presenceDays: presenceDays,
+            summaryDayKeys: summaryDayRange.dayKeys,
+            summaryRange: summaryRange,
+            visibleMonthStart: normalizedVisibleMonth,
             now: now,
             calendar: calendar
         )
@@ -244,6 +262,7 @@ actor CalendarTabDataService {
             visibleMonthStart: normalizedVisibleMonth,
             daySummaries: daySummaries,
             countrySummaries: countrySummaries,
+            summaryUnknownDayKeys: summaryUnknownDayKeys,
             earliestAvailableMonth: earliestMonth,
             latestAvailableMonth: latestMonth
         )
@@ -284,6 +303,16 @@ actor CalendarTabDataService {
         let descriptor = FetchDescriptor<CalendarSignal>(
             predicate: #Predicate { signal in
                 dayKeys.contains(signal.dayKey)
+            }
+        )
+        return try modelContext.fetch(descriptor)
+    }
+
+    private func fetchPresenceDays(dayKeys: [String]) throws -> [PresenceDay] {
+        guard !dayKeys.isEmpty else { return [] }
+        let descriptor = FetchDescriptor<PresenceDay>(
+            predicate: #Predicate { day in
+                dayKeys.contains(day.dayKey)
             }
         )
         return try modelContext.fetch(descriptor)
@@ -356,7 +385,7 @@ actor CalendarTabDataService {
         countryName: String?
     ) {
         guard var accumulator = accumulators[dayKey],
-              let country = normalizedCountry(countryCode: countryCode, countryName: countryName) else {
+              let country = Self.normalizedCountry(countryCode: countryCode, countryName: countryName) else {
             return
         }
         accumulator.countriesByID[country.id] = country
@@ -402,20 +431,49 @@ actor CalendarTabDataService {
         }
     }
 
-    private func normalizedCountry(
+    private func addCalendarSignal(
+        _ signal: CalendarSignal,
+        to accumulators: inout [String: DayAccumulator]
+    ) {
+        guard var accumulator = accumulators[signal.dayKey] else { return }
+
+        if let country = Self.normalizedCountry(
+            countryCode: signal.countryCode,
+            countryName: signal.countryName
+        ) {
+            accumulator.countriesByID[country.id] = country
+
+            if Self.isFlightSignalSource(signal.source) {
+                accumulator.hasFlight = true
+                let candidate = FlightCountryCandidate(
+                    country: country,
+                    timestamp: signal.timestamp,
+                    eventIdentifier: signal.eventIdentifier
+                )
+
+                if Self.isFlightOriginSignalSource(signal.source) {
+                    accumulator.flightOriginCandidates.append(candidate)
+                } else {
+                    accumulator.flightDestinationCandidates.append(candidate)
+                }
+            }
+        }
+
+        accumulators[signal.dayKey] = accumulator
+    }
+
+    private nonisolated static func normalizedCountry(
         countryCode: String?,
         countryName: String?
     ) -> CalendarDayCountry? {
-        let normalizedCode = CountryCodeNormalizer.normalize(countryCode)
-        let trimmedName = countryName?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-        guard normalizedCode != nil || !trimmedName.isEmpty else { return nil }
-
-        let resolvedName: String
-        if !trimmedName.isEmpty {
-            resolvedName = trimmedName
-        } else if let normalizedCode {
-            resolvedName = Locale.current.localizedString(forRegionCode: normalizedCode) ?? normalizedCode
-        } else {
+        let normalizedCode = CountryCodeNormalizer.canonicalCode(
+            countryCode: countryCode,
+            countryName: countryName
+        )
+        guard let resolvedName = CountryCodeNormalizer.canonicalName(
+            countryCode: normalizedCode,
+            countryName: countryName
+        ) ?? normalizedCode else {
             return nil
         }
 
@@ -437,6 +495,7 @@ actor CalendarTabDataService {
 
     private func makeCountrySummaries(
         from accumulators: [String: DayAccumulator],
+        presenceDays: [PresenceDay],
         summaryDayKeys: [String],
         summaryRange: CalendarCountrySummaryRange,
         visibleMonthStart: Date,
@@ -445,13 +504,26 @@ actor CalendarTabDataService {
         calendar: Calendar
     ) -> [CalendarCountryDaysSummary] {
         var counts: [String: (country: CalendarDayCountry, totalDays: Int)] = [:]
+        let resolvedDayMap = Dictionary(uniqueKeysWithValues: presenceDays.map { ($0.dayKey, $0) })
 
         for dayKey in summaryDayKeys {
-            guard summaryRange.contains(dayKey: dayKey, visibleMonthStart: visibleMonthStart, now: now, calendar: calendar),
-                  let accumulator = accumulators[dayKey] else {
+            guard summaryRange.contains(dayKey: dayKey, visibleMonthStart: visibleMonthStart, now: now, calendar: calendar) else {
                 continue
             }
 
+            if let resolvedDay = resolvedDayMap[dayKey] {
+                guard let country = Self.normalizedCountry(
+                    countryCode: resolvedDay.countryCode,
+                    countryName: resolvedDay.countryName
+                ) else {
+                    continue
+                }
+                let current = counts[country.id] ?? (country, 0)
+                counts[country.id] = (country: current.country, totalDays: current.totalDays + 1)
+                continue
+            }
+
+            guard let accumulator = accumulators[dayKey] else { continue }
             for country in accumulator.countriesByID.values {
                 let current = counts[country.id] ?? (country, 0)
                 counts[country.id] = (country: current.country, totalDays: current.totalDays + 1)
@@ -475,6 +547,34 @@ actor CalendarTabDataService {
                 }
                 return lhs.totalDays > rhs.totalDays
             }
+    }
+
+    private func makeSummaryUnknownDayKeys(
+        presenceDays: [PresenceDay],
+        summaryDayKeys: [String],
+        summaryRange: CalendarCountrySummaryRange,
+        visibleMonthStart: Date,
+        now: Date,
+        calendar: Calendar
+    ) -> [String] {
+        let resolvedDayMap = Dictionary(uniqueKeysWithValues: presenceDays.map { ($0.dayKey, $0) })
+        var unknownDayKeys: [String] = []
+
+        for dayKey in summaryDayKeys {
+            guard summaryRange.contains(dayKey: dayKey, visibleMonthStart: visibleMonthStart, now: now, calendar: calendar),
+                  let resolvedDay = resolvedDayMap[dayKey] else {
+                continue
+            }
+
+            if Self.normalizedCountry(
+                countryCode: resolvedDay.countryCode,
+                countryName: resolvedDay.countryName
+            ) == nil {
+                unknownDayKeys.append(dayKey)
+            }
+        }
+
+        return unknownDayKeys
     }
 
     nonisolated fileprivate static func monthStart(for date: Date, calendar: Calendar) -> Date {
@@ -538,26 +638,170 @@ actor CalendarTabDataService {
     nonisolated fileprivate static func makeMonthDaySummaries(
         for visibleMonthStart: Date,
         accumulators: [String: DayAccumulator],
+        presenceDays: [PresenceDay],
         calendar: Calendar,
         now: Date
     ) -> [CalendarDaySummary] {
         let monthRange = makeMonthRange(for: visibleMonthStart, calendar: calendar)
         let todayKey = DayKey.make(from: now, timeZone: calendar.timeZone)
+        let resolvedDayMap = Dictionary(uniqueKeysWithValues: presenceDays.map { ($0.dayKey, $0) })
 
         return monthRange.dayKeys.compactMap { dayKey in
             guard let date = DayKey.date(for: dayKey, timeZone: calendar.timeZone) else { return nil }
-            let countries = accumulators[dayKey]?.countriesByID.values.sorted { lhs, rhs in
-                lhs.countryName.localizedCaseInsensitiveCompare(rhs.countryName) == .orderedAscending
-            } ?? []
+            let accumulator = accumulators[dayKey]
+            let resolvedDay = resolvedDayMap[dayKey]
+            let resolvedCountry = resolvedDay.flatMap {
+                Self.normalizedCountry(
+                    countryCode: $0.countryCode,
+                    countryName: $0.countryName
+                )
+            }
+            let flightOriginCountry = accumulator.flatMap {
+                preferredFlightCountry(
+                    from: $0.flightOriginCandidates,
+                    resolvedCountry: resolvedCountry,
+                    preferLatest: false
+                )
+            }
+            let flightDestinationCountry = accumulator.flatMap {
+                preferredFlightCountry(
+                    from: $0.flightDestinationCandidates,
+                    resolvedCountry: resolvedCountry,
+                    preferLatest: true
+                )
+            }
+            let countries: [CalendarDayCountry]
+
+            if let accumulator, accumulator.hasFlight {
+                countries = makeFlightDecorationCountries(
+                    accumulator: accumulator,
+                    resolvedCountry: resolvedCountry,
+                    flightOriginCountry: flightOriginCountry,
+                    flightDestinationCountry: flightDestinationCountry
+                )
+            } else if let resolvedCountry {
+                countries = [resolvedCountry]
+            } else if let accumulator, !accumulator.countriesByID.isEmpty {
+                countries = sortedCountries(accumulator.countriesByID.values)
+            } else {
+                countries = suggestionCountries(from: resolvedDay)
+            }
+
             return CalendarDaySummary(
                 dayKey: dayKey,
                 date: date,
                 dayNumber: calendar.component(.day, from: date),
                 countries: countries,
-                hasFlight: accumulators[dayKey]?.hasFlight ?? false,
+                flightOriginCountry: flightOriginCountry,
+                flightDestinationCountry: flightDestinationCountry,
+                hasFlight: accumulator?.hasFlight ?? false,
                 isToday: dayKey == todayKey,
                 isInCurrentMonth: true
             )
         }
+    }
+
+    nonisolated fileprivate static func makeFlightDecorationCountries(
+        accumulator: DayAccumulator,
+        resolvedCountry: CalendarDayCountry?,
+        flightOriginCountry: CalendarDayCountry?,
+        flightDestinationCountry: CalendarDayCountry?
+    ) -> [CalendarDayCountry] {
+        var countries: [CalendarDayCountry] = []
+        var seenIDs = Set<String>()
+
+        func append(_ country: CalendarDayCountry?) {
+            guard let country, seenIDs.insert(country.id).inserted else { return }
+            countries.append(country)
+        }
+
+        append(flightOriginCountry)
+        append(flightDestinationCountry)
+        append(resolvedCountry)
+
+        for country in sortedCountries(accumulator.countriesByID.values) {
+            append(country)
+        }
+
+        return countries
+    }
+
+    nonisolated fileprivate static func sortedCountries<S: Sequence>(
+        _ countries: S
+    ) -> [CalendarDayCountry] where S.Element == CalendarDayCountry {
+        Array(countries).sorted { lhs, rhs in
+            lhs.countryName.localizedCaseInsensitiveCompare(rhs.countryName) == .orderedAscending
+        }
+    }
+
+    private nonisolated static func isFlightSignalSource(_ source: String?) -> Bool {
+        guard let source else { return false }
+        return source.hasPrefix("CalendarFlight")
+    }
+
+    private nonisolated static func isFlightOriginSignalSource(_ source: String?) -> Bool {
+        source == "CalendarFlightOrigin"
+    }
+
+    private nonisolated static func preferredFlightCountry(
+        from candidates: [FlightCountryCandidate],
+        resolvedCountry: CalendarDayCountry?,
+        preferLatest: Bool
+    ) -> CalendarDayCountry? {
+        candidates.sorted {
+            compareFlightCandidates(
+                lhs: $0,
+                rhs: $1,
+                resolvedCountry: resolvedCountry,
+                preferLatest: preferLatest
+            )
+        }.first?.country
+    }
+
+    private nonisolated static func compareFlightCandidates(
+        lhs: FlightCountryCandidate,
+        rhs: FlightCountryCandidate,
+        resolvedCountry: CalendarDayCountry?,
+        preferLatest: Bool
+    ) -> Bool {
+        if lhs.timestamp != rhs.timestamp {
+            return preferLatest ? lhs.timestamp > rhs.timestamp : lhs.timestamp < rhs.timestamp
+        }
+
+        let resolvedID = resolvedCountry?.id
+        let lhsMatchesResolved = lhs.country.id == resolvedID
+        let rhsMatchesResolved = rhs.country.id == resolvedID
+        if lhsMatchesResolved != rhsMatchesResolved {
+            return lhsMatchesResolved
+        }
+
+        let lhsHasCode = lhs.country.countryCode != nil
+        let rhsHasCode = rhs.country.countryCode != nil
+        if lhsHasCode != rhsHasCode {
+            return lhsHasCode
+        }
+
+        if lhs.eventIdentifier != rhs.eventIdentifier {
+            return lhs.eventIdentifier.localizedCaseInsensitiveCompare(rhs.eventIdentifier) == .orderedAscending
+        }
+
+        return lhs.country.id.localizedCaseInsensitiveCompare(rhs.country.id) == .orderedAscending
+    }
+
+    private nonisolated static func suggestionCountries(from presenceDay: PresenceDay?) -> [CalendarDayCountry] {
+        guard let presenceDay else { return [] }
+
+        var countries: [CalendarDayCountry] = []
+        var seenIDs = Set<String>()
+
+        func append(countryCode: String?, countryName: String?) {
+            guard let country = normalizedCountry(countryCode: countryCode, countryName: countryName),
+                  seenIDs.insert(country.id).inserted else { return }
+            countries.append(country)
+        }
+
+        append(countryCode: presenceDay.suggestedCountryCode1, countryName: presenceDay.suggestedCountryName1)
+        append(countryCode: presenceDay.suggestedCountryCode2, countryName: presenceDay.suggestedCountryName2)
+        return countries
     }
 }

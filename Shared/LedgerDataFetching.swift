@@ -6,7 +6,7 @@
 //
 
 import Foundation
-import SwiftData
+@preconcurrency import SwiftData
 
 protocol LedgerDataFetching {
     func fetchStays(from start: Date, to end: Date) throws -> [Stay]

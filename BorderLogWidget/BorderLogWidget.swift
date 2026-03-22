@@ -183,16 +183,18 @@ struct TopCountriesWidgetProvider: TimelineProvider {
 
             var countryDict: [String: WidgetCountryDaysInfo] = [:]
             for day in presenceDays {
-                guard let countryName = day.countryName ?? day.countryCode else { continue }
-                let normalizedCode = CountryCodeNormalizer.normalize(day.countryCode)
-                let key = normalizedCode ?? countryName
+                let primaryCountry = day.contributedCountries.first
+                let countryName = primaryCountry?.countryName ?? day.suggestedCountryName1 ?? day.suggestedCountryCode1
+                guard let resolvedName = countryName else { continue }
+                let normalizedCode = CountryCodeNormalizer.normalize(primaryCountry?.countryCode ?? day.suggestedCountryCode1)
+                let key = normalizedCode ?? resolvedName
                 
                 if countryDict[key] != nil {
                     // ⚡ Bolt: Mutate struct directly to avoid intermediate allocations
                     countryDict[key]?.totalDays += 1
                 } else {
                     countryDict[key] = WidgetCountryDaysInfo(
-                        countryName: countryName,
+                        countryName: resolvedName,
                         countryCode: normalizedCode,
                         totalDays: 1,
                         region: normalizedCode.flatMap { SchengenMembers.isMember($0) ? .schengen : .nonSchengen } ?? .other

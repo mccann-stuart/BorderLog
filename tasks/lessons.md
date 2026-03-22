@@ -43,3 +43,35 @@
 ## Calendar Row Insets
 - **Pattern**: Removed all `List` row insets around a `UICalendarView`, which left the native calendar flush to the screen edge and visually outside the intended safe zone.
 - **Lesson**: When embedding wide UIKit content inside a SwiftUI `List`, do not default to `.listRowInsets(EdgeInsets())`; preserve or reintroduce small horizontal row insets unless truly edge-to-edge behavior is required and verified on device widths.
+
+## Respect No-Test Requests
+- **Pattern**: Continued toward verification after the user explicitly asked for a code-only change without testing.
+- **Lesson**: When the user says not to test or build, stop the verification step immediately, record that it was intentionally skipped, and close out with the untested status clearly stated.
+
+## Calendar Header Coverage
+- **Pattern**: Fixed the calendar body safe-area issue by changing only the row container and assumed the native `UICalendarView` header content would align automatically.
+- **Lesson**: When adjusting margins for embedded UIKit calendars, verify the month header and weekday subtitle row separately; prefer a single inset applied to the calendar surface itself when both header and grid need to move together.
+
+## UICalendarView Margin Assumption
+- **Pattern**: Assumed `UICalendarView` would honor `layoutMargins`/`directionalLayoutMargins` for its native month header and chevrons, but the screenshot showed those elements still rendering flush to the edges.
+- **Lesson**: For `UICalendarView`, prefer wrapping the calendar in a container view and constraining it with explicit horizontal insets when the whole control, including the native header, needs to move together.
+
+## Unknown Bucket Coverage
+- **Pattern**: Fixed country-count aggregation paths without also surfacing days whose `PresenceDay` exists but still resolves to no country, which hid part of the selected range from total-count views.
+- **Lesson**: Whenever a range summary buckets days by country, treat unresolved days as a first-class `Unknown` bucket with the same selection scope and drill-down behavior as the named-country rows.
+
+## MapKit Country Extraction
+- **Pattern**: Treated MapKit region fields as country identity and, in calendar search results, discarded matches unless a country code already existed, which caused usable name-only country matches to fall through to `Unknown`.
+- **Lesson**: For MapKit-backed country inference, prefer placemark `countryCode`/`country` first and normalize name-only matches instead of requiring a code before persisting the signal.
+
+## Overnight Flight Origin Context
+- **Pattern**: Preserved only the destination-side country for overnight flight events, which left the departure day and the immediately previous unknown day without the origin-country context needed to reduce `Unknown`.
+- **Lesson**: When using destination-first calendar flight ingestion, also preserve origin-country context for overnight flights and apply it narrowly in inference so departure-adjacent unknown days can inherit a medium-confidence origin country without creating same-day route conflicts.
+
+## Flight Day-Key Equality Trap
+- **Pattern**: Used `origin.dayKey != destination.dayKey` as the gate for preserving origin-flight context, which dropped valid origin evidence for timezone-crossing flights that still resolved to the same string day key.
+- **Lesson**: Do not use day-key equality as the proxy for whether a destination-based flight needs origin context. Preserve the origin-side signal whenever the origin resolves, then keep it out of the base winner and apply it only in the targeted inference pass that backfills the flight day and previous unknown day.
+
+## Same-Day Evidence Fetch Assumption
+- **Pattern**: Fixed flight-day inference but left the day-detail evidence loader fetching calendar rows only by the selected day’s `dayKey`, so adjacent inferred days still rendered `No calendar evidence` even though their calendar-derived evidence existed on the neighboring flight day.
+- **Lesson**: When a day can inherit calendar evidence from an adjacent flight signal, day-detail evidence loading must resolve linked adjacent-day signals instead of assuming all supporting `CalendarSignal` rows share the selected day’s key.

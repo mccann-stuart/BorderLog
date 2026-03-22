@@ -12,6 +12,12 @@ import MapKit
 
 @ModelActor
 actor CalendarSignalIngestor {
+    private static let primarySignalSource = "Calendar"
+    private static let flightPrimarySignalSource = "CalendarFlight"
+    private static let flightOriginSignalSource = "CalendarFlightOrigin"
+    private static let originSignalSuffix = "#origin"
+    private static let legacyEndSignalSuffix = "#end"
+
     enum IngestMode {
         case auto
         case manualFullScan
@@ -129,13 +135,20 @@ actor CalendarSignalIngestor {
             }
 
             let id = event.eventIdentifier ?? event.calendarItemIdentifier
-            let endId = id + "#end"
+            let originId = id + Self.originSignalSuffix
+            let endId = id + Self.legacyEndSignalSuffix
             var eventMutations = 0
             let snapshot = eventSnapshot(for: event)
+            let ingestability = classify(snapshot)
 
-            guard shouldIngest(snapshot) else {
+            guard ingestability.shouldIngest else {
                 eventMutations += deleteSignalIfExists(
                     identifier: id,
+                    existingSignalByIdentifier: &existingSignalByIdentifier,
+                    touchedDayKeys: &touchedDayKeys
+                )
+                eventMutations += deleteSignalIfExists(
+                    identifier: originId,
                     existingSignalByIdentifier: &existingSignalByIdentifier,
                     touchedDayKeys: &touchedDayKeys
                 )
@@ -145,6 +158,7 @@ actor CalendarSignalIngestor {
                     touchedDayKeys: &touchedDayKeys
                 )
                 seenIdentifiers.insert(id)
+                seenIdentifiers.insert(originId)
                 seenIdentifiers.insert(endId)
 
                 if eventMutations > 0 {
@@ -176,12 +190,28 @@ actor CalendarSignalIngestor {
                 activeResolver: activeResolver
             )
 
+            let originResolved: ResolvedCalendarSignal?
+            if ingestability.shouldDecorateAsFlight,
+               primarySelection.usesDestinationRule,
+               let originLocation = nonEmptyLocation(parsedFrom) {
+                originResolved = await resolveSignal(
+                    locationString: originLocation,
+                    coordinate: nil,
+                    date: eventStartDate,
+                    event: event,
+                    activeResolver: activeResolver
+                )
+            } else {
+                originResolved = nil
+            }
+
             seenIdentifiers.insert(id)
             if let startResolved {
                 if upsertSignal(
                     identifier: id,
                     resolved: startResolved,
                     title: event.title,
+                    source: ingestability.shouldDecorateAsFlight ? Self.flightPrimarySignalSource : Self.primarySignalSource,
                     existingSignalByIdentifier: &existingSignalByIdentifier,
                     touchedDayKeys: &touchedDayKeys
                 ) {
@@ -190,6 +220,29 @@ actor CalendarSignalIngestor {
             } else {
                 eventMutations += deleteSignalIfExists(
                     identifier: id,
+                    existingSignalByIdentifier: &existingSignalByIdentifier,
+                    touchedDayKeys: &touchedDayKeys
+                )
+            }
+
+            seenIdentifiers.insert(originId)
+            let shouldPersistOriginSignal = shouldPersistOriginSignal(
+                originResolved: originResolved
+            )
+            if shouldPersistOriginSignal, let originResolved {
+                if upsertSignal(
+                    identifier: originId,
+                    resolved: originResolved,
+                    title: event.title,
+                    source: Self.flightOriginSignalSource,
+                    existingSignalByIdentifier: &existingSignalByIdentifier,
+                    touchedDayKeys: &touchedDayKeys
+                ) {
+                    eventMutations += 1
+                }
+            } else {
+                eventMutations += deleteSignalIfExists(
+                    identifier: originId,
                     existingSignalByIdentifier: &existingSignalByIdentifier,
                     touchedDayKeys: &touchedDayKeys
                 )
@@ -240,8 +293,8 @@ actor CalendarSignalIngestor {
         )
     }
 
-    private func shouldIngest(_ snapshot: CalendarEventTextSnapshot) -> Bool {
-        CalendarFlightParsing.shouldIngest(event: snapshot)
+    private func classify(_ snapshot: CalendarEventTextSnapshot) -> CalendarEventIngestability {
+        CalendarFlightParsing.classify(event: snapshot)
     }
 
     private func parseFlightInfo(_ snapshot: CalendarEventTextSnapshot) -> (from: String?, to: String?) {
@@ -284,6 +337,12 @@ actor CalendarSignalIngestor {
             date: eventStartDate,
             usesDestinationRule: false
         )
+    }
+
+    private func shouldPersistOriginSignal(
+        originResolved: ResolvedCalendarSignal?
+    ) -> Bool {
+        return originResolved != nil
     }
 
     private func nonEmptyLocation(_ value: String?) -> String? {
@@ -343,7 +402,14 @@ actor CalendarSignalIngestor {
             }
         }
 
-        guard let resolvedCountryCode = countryCode else { return nil }
+        guard let resolution = CountryResolution.normalized(
+            countryCode: countryCode,
+            countryName: countryName,
+            timeZone: resolvedTimeZoneId.flatMap(TimeZone.init(identifier:))
+        ), let resolvedCountryName = resolution.countryName,
+        let resolvedCountryCode = resolution.countryCode else {
+            return nil
+        }
 
         let bucketingTimeZone = DayIdentity.canonicalTimeZone(
             preferredTimeZoneId: resolvedTimeZoneId ?? event.timeZone?.identifier
@@ -358,7 +424,7 @@ actor CalendarSignalIngestor {
             latitude: latitude,
             longitude: longitude,
             countryCode: resolvedCountryCode,
-            countryName: countryName ?? Locale.current.localizedString(forRegionCode: resolvedCountryCode) ?? resolvedCountryCode
+            countryName: resolvedCountryName
         )
     }
 
@@ -366,6 +432,7 @@ actor CalendarSignalIngestor {
         identifier: String,
         resolved: ResolvedCalendarSignal,
         title: String?,
+        source: String = "Calendar",
         existingSignalByIdentifier: inout [String: CalendarSignal],
         touchedDayKeys: inout Set<String>
     ) -> Bool {
@@ -409,8 +476,8 @@ actor CalendarSignalIngestor {
                 existing.title = title
                 didChange = true
             }
-            if existing.source != "Calendar" {
-                existing.source = "Calendar"
+            if existing.source != source {
+                existing.source = source
                 didChange = true
             }
 
@@ -431,7 +498,7 @@ actor CalendarSignalIngestor {
             bucketingTimeZoneId: resolved.bucketingTimeZoneId,
             eventIdentifier: identifier,
             title: title,
-            source: "Calendar"
+            source: source
         )
         modelContext.insert(signal)
         existingSignalByIdentifier[identifier] = signal
@@ -542,6 +609,29 @@ actor CalendarSignalIngestor {
             date: selection.date,
             usesCoordinate: selection.coordinate != nil
         )
+    }
+
+    func testShouldPersistOriginSignal(
+        originDayKey: String,
+        destinationDayKey: String?,
+        eventStartDate: Date,
+        eventEndDate: Date?,
+        eventTimeZoneId: String?
+    ) -> Bool {
+        let originResolved = ResolvedCalendarSignal(
+            timestamp: eventStartDate,
+            dayKey: originDayKey,
+            timeZoneId: "UTC",
+            bucketingTimeZoneId: "UTC",
+            latitude: 0,
+            longitude: 0,
+            countryCode: "GB",
+            countryName: "United Kingdom"
+        )
+        _ = destinationDayKey
+        _ = eventEndDate
+        _ = eventTimeZoneId
+        return shouldPersistOriginSignal(originResolved: originResolved)
     }
 
     func testDestinationFirstLegacyEndCleanup(

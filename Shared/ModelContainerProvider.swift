@@ -150,6 +150,72 @@ enum BorderLogSchemaV4: VersionedSchema {
 
 enum BorderLogSchemaV5: VersionedSchema {
     static var versionIdentifier: Schema.Version = .init(5, 0, 0)
+
+    @Model
+    final class PresenceDay {
+        @Attribute(.unique) var dayKey: String
+        var date: Date
+        var timeZoneId: String?
+        var contributedCountries: [ContributedCountry] = []
+        var zoneOverlays: [String] = []
+        var evidence: [SignalImpact] = []
+        var confidence: Double
+        var confidenceLabelRaw: String
+        var sourcesRaw: Int
+        var isOverride: Bool
+        var stayCount: Int
+        var photoCount: Int
+        var locationCount: Int
+        var calendarCount: Int = 0
+        var isDisputed: Bool = false
+        var suggestedCountryCode1: String?
+        var suggestedCountryName1: String?
+        var suggestedCountryCode2: String?
+        var suggestedCountryName2: String?
+
+        init(
+            dayKey: String,
+            date: Date,
+            timeZoneId: String?,
+            contributedCountries: [ContributedCountry],
+            zoneOverlays: [String],
+            evidence: [SignalImpact],
+            confidence: Double,
+            confidenceLabelRaw: String,
+            sourcesRaw: Int,
+            isOverride: Bool,
+            stayCount: Int,
+            photoCount: Int,
+            locationCount: Int,
+            calendarCount: Int = 0,
+            isDisputed: Bool = false,
+            suggestedCountryCode1: String? = nil,
+            suggestedCountryName1: String? = nil,
+            suggestedCountryCode2: String? = nil,
+            suggestedCountryName2: String? = nil
+        ) {
+            self.dayKey = dayKey
+            self.date = date
+            self.timeZoneId = timeZoneId
+            self.contributedCountries = contributedCountries
+            self.zoneOverlays = zoneOverlays
+            self.evidence = evidence
+            self.confidence = confidence
+            self.confidenceLabelRaw = confidenceLabelRaw
+            self.sourcesRaw = sourcesRaw
+            self.isOverride = isOverride
+            self.stayCount = stayCount
+            self.photoCount = photoCount
+            self.locationCount = locationCount
+            self.calendarCount = calendarCount
+            self.isDisputed = isDisputed
+            self.suggestedCountryCode1 = suggestedCountryCode1
+            self.suggestedCountryName1 = suggestedCountryName1
+            self.suggestedCountryCode2 = suggestedCountryCode2
+            self.suggestedCountryName2 = suggestedCountryName2
+        }
+    }
+
     static var models: [any PersistentModel.Type] = [
         Stay.self,
         DayOverride.self,
@@ -164,6 +230,98 @@ enum BorderLogSchemaV5: VersionedSchema {
 
 enum BorderLogSchemaV6: VersionedSchema {
     static var versionIdentifier: Schema.Version = .init(6, 0, 0)
+
+    @Model
+    final class PresenceDay {
+        @Attribute(.unique) var dayKey: String
+        var date: Date
+        var timeZoneId: String?
+        var countryAllocations: [PresenceCountryAllocation] = []
+        var zoneOverlays: [String] = []
+        var evidenceEntries: [PresenceEvidenceEntry] = []
+        var confidence: Double
+        var confidenceLabelRaw: String
+        var sourcesRaw: Int
+        var isOverride: Bool
+        var stayCount: Int
+        var photoCount: Int
+        var locationCount: Int
+        var calendarCount: Int = 0
+        var isDisputed: Bool = false
+        var confidenceScore: Double = 0
+        var confidenceRunnerUpScore: Double = 0
+        var confidenceMargin: Double = 0
+        var confidenceCalibrationSummary: String = ""
+        var suggestedCountryCode1: String?
+        var suggestedCountryName1: String?
+        var suggestedCountryCode2: String?
+        var suggestedCountryName2: String?
+
+        init(
+            dayKey: String,
+            date: Date,
+            timeZoneId: String?,
+            countryAllocations: [PresenceCountryAllocation],
+            zoneOverlays: [String],
+            evidenceEntries: [PresenceEvidenceEntry],
+            confidence: Double,
+            confidenceLabelRaw: String,
+            sourcesRaw: Int,
+            isOverride: Bool,
+            stayCount: Int,
+            photoCount: Int,
+            locationCount: Int,
+            calendarCount: Int = 0,
+            isDisputed: Bool = false,
+            confidenceScore: Double = 0,
+            confidenceRunnerUpScore: Double = 0,
+            confidenceMargin: Double = 0,
+            confidenceCalibrationSummary: String = "",
+            suggestedCountryCode1: String? = nil,
+            suggestedCountryName1: String? = nil,
+            suggestedCountryCode2: String? = nil,
+            suggestedCountryName2: String? = nil
+        ) {
+            self.dayKey = dayKey
+            self.date = date
+            self.timeZoneId = timeZoneId
+            self.countryAllocations = countryAllocations
+            self.zoneOverlays = zoneOverlays
+            self.evidenceEntries = evidenceEntries
+            self.confidence = confidence
+            self.confidenceLabelRaw = confidenceLabelRaw
+            self.sourcesRaw = sourcesRaw
+            self.isOverride = isOverride
+            self.stayCount = stayCount
+            self.photoCount = photoCount
+            self.locationCount = locationCount
+            self.calendarCount = calendarCount
+            self.isDisputed = isDisputed
+            self.confidenceScore = confidenceScore
+            self.confidenceRunnerUpScore = confidenceRunnerUpScore
+            self.confidenceMargin = confidenceMargin
+            self.confidenceCalibrationSummary = confidenceCalibrationSummary
+            self.suggestedCountryCode1 = suggestedCountryCode1
+            self.suggestedCountryName1 = suggestedCountryName1
+            self.suggestedCountryCode2 = suggestedCountryCode2
+            self.suggestedCountryName2 = suggestedCountryName2
+        }
+    }
+
+    static var models: [any PersistentModel.Type] = [
+        Stay.self,
+        DayOverride.self,
+        LocationSample.self,
+        PhotoSignal.self,
+        PresenceDay.self,
+        PhotoIngestState.self,
+        CountryConfig.self,
+        CalendarSignal.self
+    ]
+}
+
+enum BorderLogSchemaV7: VersionedSchema {
+    static var versionIdentifier: Schema.Version = .init(7, 0, 0)
     static var models: [any PersistentModel.Type] = [
         Stay.self,
         DayOverride.self,
@@ -183,28 +341,30 @@ enum BorderLogMigrationPlan: SchemaMigrationPlan {
         BorderLogSchemaV3.self,
         BorderLogSchemaV4.self,
         BorderLogSchemaV5.self,
-        BorderLogSchemaV6.self
+        BorderLogSchemaV6.self,
+        BorderLogSchemaV7.self
     ]
     static var stages: [MigrationStage] = [
         .lightweight(fromVersion: BorderLogSchemaV1.self, toVersion: BorderLogSchemaV2.self),
         .lightweight(fromVersion: BorderLogSchemaV2.self, toVersion: BorderLogSchemaV3.self),
         .lightweight(fromVersion: BorderLogSchemaV3.self, toVersion: BorderLogSchemaV4.self),
         .lightweight(fromVersion: BorderLogSchemaV4.self, toVersion: BorderLogSchemaV5.self),
-        .lightweight(fromVersion: BorderLogSchemaV5.self, toVersion: BorderLogSchemaV6.self)
+        .lightweight(fromVersion: BorderLogSchemaV5.self, toVersion: BorderLogSchemaV6.self),
+        .lightweight(fromVersion: BorderLogSchemaV6.self, toVersion: BorderLogSchemaV7.self)
     ]
 }
 
 enum ModelContainerProvider {
     private static let logger = Logger(subsystem: "com.MCCANN.Border", category: "Persistence")
     private static let storeEpochDefaultsKey = "storeEpochV2"
-    private static let currentStoreEpoch = 6
+    private static let currentStoreEpoch = 8
 
     internal static var storeEpochKeyForTests: String { storeEpochDefaultsKey }
     internal static var currentStoreEpochForTests: Int { currentStoreEpoch }
 
     static func makeContainer() -> ModelContainer {
         _ = enforceStoreEpoch()
-        let schema = Schema(versionedSchema: BorderLogSchemaV6.self)
+        let schema = Schema(versionedSchema: BorderLogSchemaV7.self)
         let cloudKitDatabase: ModelConfiguration.CloudKitDatabase =
             (AppConfig.isCloudKitFeatureEnabled && AppConfig.isCloudKitSyncEnabled)
                 ? .private(AppConfig.cloudKitContainerId)

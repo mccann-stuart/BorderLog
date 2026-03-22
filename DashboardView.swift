@@ -35,10 +35,10 @@ struct DashboardView: View {
         }
         return unknownDays
     }
-    
-    // Group stays by country and calculate total days
-    private var countryDaysSummary: [CountryDaysInfo] {
+
+    private var visitedCountriesSummaryData: (countries: [CountryDaysInfo], unknownDays: [PresenceDay]) {
         var countryDict: [String: CountryDaysInfo] = [:]
+        var unknownDays: [PresenceDay] = []
         let calendar = Calendar.current
         let now = Date()
         
@@ -65,8 +65,21 @@ struct DashboardView: View {
                 continue
             }
 
-            guard let countryName = day.countryName ?? day.countryCode else { continue }
-            let normalizedCode = CountryCodeNormalizer.normalize(day.countryCode)
+            if day.countryCode == nil && day.countryName == nil {
+                unknownDays.append(day)
+                continue
+            }
+
+            let normalizedCode = CountryCodeNormalizer.canonicalCode(
+                countryCode: day.countryCode,
+                countryName: day.countryName
+            )
+            guard let countryName = CountryCodeNormalizer.canonicalName(
+                countryCode: normalizedCode,
+                countryName: day.countryName
+            ) ?? normalizedCode else {
+                continue
+            }
             let key = normalizedCode ?? countryName
 
             if countryDict[key] != nil {
@@ -84,14 +97,16 @@ struct DashboardView: View {
             }
         }
 
-        return countryDict.values.sorted { $0.totalDays > $1.totalDays }
-    }
-
-    private var visitedCountryCodes: Set<String> {
-        Set(countryDaysSummary.compactMap(\.countryCode))
+        return (
+            countries: countryDict.values.sorted { $0.totalDays > $1.totalDays },
+            unknownDays: unknownDays
+        )
     }
     
     var body: some View {
+        let visitedSummary = visitedCountriesSummaryData
+        let visitedCountryCodes = Set(visitedSummary.countries.compactMap(\.countryCode))
+
         ScrollView {
             VStack(spacing: 20) {
                 WorldMapSection(visitedCountries: visitedCountryCodes)
@@ -117,7 +132,11 @@ struct DashboardView: View {
                 if showSchengenDashboardSection {
                     SchengenSummarySection(summary: schengenSummary, unknownDays: unknownSchengenDays)
                 }
-                CountriesListSection(countries: countryDaysSummary, selectedTimeframe: $selectedTimeframe)
+                CountriesListSection(
+                    countries: visitedSummary.countries,
+                    unknownDays: visitedSummary.unknownDays,
+                    selectedTimeframe: $selectedTimeframe
+                )
             }
             .padding(.vertical)
         }
@@ -329,11 +348,18 @@ private struct SchengenSummarySection: View {
 
 private struct CountriesListSection: View {
     let countries: [CountryDaysInfo]
+    let unknownDays: [PresenceDay]
     let warningThreshold: Int
     @Binding var selectedTimeframe: VisitedCountriesTimeframe
     
-    init(countries: [CountryDaysInfo], warningThreshold: Int = 80, selectedTimeframe: Binding<VisitedCountriesTimeframe>) {
+    init(
+        countries: [CountryDaysInfo],
+        unknownDays: [PresenceDay],
+        warningThreshold: Int = 80,
+        selectedTimeframe: Binding<VisitedCountriesTimeframe>
+    ) {
         self.countries = countries
+        self.unknownDays = unknownDays
         self.warningThreshold = warningThreshold
         self._selectedTimeframe = selectedTimeframe
     }
@@ -353,7 +379,7 @@ private struct CountriesListSection: View {
             }
             .padding(.horizontal)
             
-            if countries.isEmpty {
+            if countries.isEmpty && unknownDays.isEmpty {
                 ContentUnavailableView(
                     "No countries yet",
                     systemImage: "globe",
@@ -363,26 +389,63 @@ private struct CountriesListSection: View {
             } else {
                 LazyVStack(spacing: 0) {
                     ForEach(countries) { info in
-                            NavigationLink(destination: CountryDetailView(
-                                countryName: info.countryName,
-                                countryCode: info.countryCode,
-                                selectedTimeframe: selectedTimeframe
-                            )) {
-                                CountryDaysRow(info: info, warningThreshold: warningThreshold)
-                                    .padding(.horizontal)
-                                    .padding(.vertical, 8)
-                            }
-                            .buttonStyle(.plain)
+                        NavigationLink(destination: CountryDetailView(
+                            countryName: info.countryName,
+                            countryCode: info.countryCode,
+                            selectedTimeframe: selectedTimeframe
+                        )) {
+                            CountryDaysRow(info: info, warningThreshold: warningThreshold)
+                                .padding(.horizontal)
+                                .padding(.vertical, 8)
+                        }
+                        .buttonStyle(.plain)
 
-                            if info.id != countries.last?.id {
-                                Divider()
-                                    .padding(.leading, 60)
-                            }
+                        if info.id != countries.last?.id || !unknownDays.isEmpty {
+                            Divider()
+                                .padding(.leading, 60)
+                        }
+                    }
+
+                    if !unknownDays.isEmpty {
+                        NavigationLink {
+                            FilteredLedgerView(days: unknownDays, title: "Unknown Days")
+                        } label: {
+                            UnknownDaysSummaryRow(count: unknownDays.count)
+                                .padding(.horizontal)
+                                .padding(.vertical, 8)
+                        }
+                        .buttonStyle(.plain)
                     }
                 }
                 .cardShell()
                 .padding(.horizontal)
             }
+        }
+    }
+}
+
+struct UnknownDaysSummaryRow: View {
+    let count: Int
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: "questionmark.circle.fill")
+                .font(.title2)
+                .foregroundStyle(.secondary)
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Unknown")
+                    .font(.system(.headline, design: .rounded))
+                Text("Days without a resolved location")
+                    .font(.system(.caption, design: .rounded))
+                    .foregroundStyle(.secondary)
+            }
+
+            Spacer()
+
+            Text("\(count)d")
+                .font(.system(.headline, design: .rounded))
+                .foregroundStyle(.secondary)
         }
     }
 }

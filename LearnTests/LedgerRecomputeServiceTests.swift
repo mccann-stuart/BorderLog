@@ -10,6 +10,50 @@ final class LedgerRecomputeServiceTests: XCTestCase {
     var context: ModelContext!
     var service: LedgerRecomputeService!
 
+    private func makePresenceDay(
+        dayKey: String,
+        date: Date,
+        timeZoneId: String,
+        countryCode: String?,
+        countryName: String?,
+        confidence: Double,
+        confidenceLabel: ConfidenceLabel,
+        sources: SignalSourceMask,
+        isOverride: Bool,
+        stayCount: Int,
+        photoCount: Int,
+        locationCount: Int,
+        calendarCount: Int,
+        isDisputed: Bool = false
+    ) -> PresenceDay {
+        let contributedCountries: [ContributedCountry]
+        if let countryName {
+            contributedCountries = [
+                ContributedCountry(countryCode: countryCode, countryName: countryName, probability: 1.0)
+            ]
+        } else {
+            contributedCountries = []
+        }
+
+        return PresenceDay(
+            dayKey: dayKey,
+            date: date,
+            timeZoneId: timeZoneId,
+            contributedCountries: contributedCountries,
+            zoneOverlays: [],
+            evidence: [],
+            confidence: confidence,
+            confidenceLabel: confidenceLabel,
+            sources: sources,
+            isOverride: isOverride,
+            stayCount: stayCount,
+            photoCount: photoCount,
+            locationCount: locationCount,
+            calendarCount: calendarCount,
+            isDisputed: isDisputed
+        )
+    }
+
     override func setUp() async throws {
         let config = ModelConfiguration(isStoredInMemoryOnly: true)
         container = try ModelContainer(for: PresenceDay.self, Stay.self, DayOverride.self, LocationSample.self, PhotoSignal.self, CalendarSignal.self, configurations: config)
@@ -193,7 +237,7 @@ final class LedgerRecomputeServiceTests: XCTestCase {
         let mock = MockLedgerDataFetcher()
         await service.setMock(mock)
 
-        mock.presenceDays[seedKey] = PresenceDay(
+        mock.presenceDays[seedKey] = makePresenceDay(
             dayKey: seedKey,
             date: seedDate,
             timeZoneId: calendar.timeZone.identifier,
@@ -267,7 +311,7 @@ final class LedgerRecomputeServiceTests: XCTestCase {
     }
 
     private func knownPresenceDay(dayKey: String, date: Date, timeZoneId: String) -> PresenceDay {
-        PresenceDay(
+        makePresenceDay(
             dayKey: dayKey,
             date: date,
             timeZoneId: timeZoneId,

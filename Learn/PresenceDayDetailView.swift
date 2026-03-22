@@ -34,6 +34,14 @@ struct PresenceDayDetailView: View {
     }
 
     private var countryText: String {
+        if !day.contributedCountries.isEmpty {
+            return day.contributedCountries
+                .map { allocation in
+                    let percent = Int((allocation.normalizedShare * 100).rounded())
+                    return "\(allocation.countryName) (\(percent)%)"
+                }
+                .joined(separator: ", ")
+        }
         if let name = day.countryName ?? day.countryCode {
             return name
         }
@@ -41,7 +49,8 @@ struct PresenceDayDetailView: View {
     }
 
     private var confidenceText: String {
-        day.confidenceLabel.rawValue.capitalized
+        let percent = Int((day.confidence * 100).rounded())
+        return "\(day.confidenceLabel.rawValue.capitalized) (\(percent)%)"
     }
 
     private var localDate: Date {
@@ -153,13 +162,20 @@ struct PresenceDayDetailView: View {
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
+
+                if !day.contributedCountries.isEmpty {
+                    ForEach(Array(day.contributedCountries.enumerated()), id: \.offset) { _, allocation in
+                        HStack {
+                            Text(allocation.countryName)
+                            Spacer()
+                            Text("\(Int((allocation.normalizedShare * 100).rounded()))%")
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
             }
 
-            EvidenceSection(
-                dayKey: day.dayKey,
-                date: day.date,
-                dayTimeZoneId: day.timeZoneId
-            )
+            EvidenceSection(day: day)
         }
         .navigationTitle("Day Details")
         .navigationBarTitleDisplayMode(.inline)
@@ -267,9 +283,7 @@ struct PresenceDayDetailView: View {
 
 
 private struct EvidenceSection: View {
-    let dayKey: String
-    let date: Date
-    let dayTimeZoneId: String?
+    let day: PresenceDay
     
     @Environment(\.modelContext) private var modelContext
 
@@ -279,13 +293,7 @@ private struct EvidenceSection: View {
     @State private var calendarSignals: [CalendarSignal] = []
     
     private var dayTimeZone: TimeZone {
-        DayIdentity.canonicalTimeZone(preferredTimeZoneId: dayTimeZoneId)
-    }
-
-    init(dayKey: String, date: Date, dayTimeZoneId: String?) {
-        self.dayKey = dayKey
-        self.date = date
-        self.dayTimeZoneId = dayTimeZoneId
+        DayIdentity.canonicalTimeZone(preferredTimeZoneId: day.timeZoneId)
     }
     
     var body: some View {
@@ -395,18 +403,59 @@ private struct EvidenceSection: View {
                     }
                 }
             }
+
+            Section("Inference Audit (\(day.evidence.count))") {
+                if day.evidence.isEmpty {
+                    Text("No inference audit entries")
+                        .foregroundStyle(.secondary)
+                } else {
+                    ForEach(Array(day.evidence.enumerated()), id: \.offset) { _, entry in
+                        VStack(alignment: .leading, spacing: 4) {
+                            HStack {
+                                Text(entry.source)
+                                    .font(.subheadline.weight(.semibold))
+                                Spacer()
+                                Text(entry.phase.rawValue.capitalized)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                            Text(entry.countryName)
+                                .font(.caption)
+                            Text("raw \(entry.rawWeight, format: .number.precision(.fractionLength(0...2))) • calibrated \(entry.calibratedWeight, format: .number.precision(.fractionLength(0...2)))")
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                            if entry.contributedToFinalResult {
+                                Text("Contributed to final result")
+                                    .font(.caption2)
+                                    .foregroundStyle(.green)
+                            }
+                        }
+                    }
+                }
+            }
         }
         .onAppear { loadData() }
-        .onChange(of: dayKey) { loadData() }
-        .onChange(of: date) { loadData() }
-        .onChange(of: dayTimeZoneId) { loadData() }
+        .onChange(of: day.dayKey) { loadData() }
+        .onChange(of: day.date) { loadData() }
+        .onChange(of: day.timeZoneId) { loadData() }
+        .onChange(of: day.countryCode) { loadData() }
+        .onChange(of: day.countryName) { loadData() }
+        .onChange(of: day.calendarCount) { loadData() }
+        .onChange(of: day.sourcesRaw) { loadData() }
     }
     
     private func loadData() {
+        let selectedDayKey = day.dayKey
+        let selectedTimeZoneId = day.timeZoneId
+        let selectedCountryCode = day.countryCode
+        let selectedCountryName = day.countryName
+        let selectedCalendarCount = day.calendarCount
+        let selectedSources = day.sources
+
         // Locations for this dayKey, sorted by timestamp
         do {
             let locPredicate = #Predicate<LocationSample> { target in
-                target.dayKey == dayKey
+                target.dayKey == selectedDayKey
             }
             var locFetch = FetchDescriptor<LocationSample>(predicate: locPredicate)
             locFetch.sortBy = [SortDescriptor(\.timestamp, order: .forward)]
@@ -418,7 +467,7 @@ private struct EvidenceSection: View {
         // Photos for this dayKey, sorted by timestamp
         do {
             let photoPredicate = #Predicate<PhotoSignal> { target in
-                target.dayKey == dayKey
+                target.dayKey == selectedDayKey
             }
             var photoFetch = FetchDescriptor<PhotoSignal>(predicate: photoPredicate)
             photoFetch.sortBy = [SortDescriptor(\.timestamp, order: .forward)]
@@ -429,12 +478,37 @@ private struct EvidenceSection: View {
 
         // Calendar signals for this dayKey, sorted by timestamp
         do {
-            let calPredicate = #Predicate<CalendarSignal> { target in
-                target.dayKey == dayKey
+            let sameDayPredicate = #Predicate<CalendarSignal> { target in
+                target.dayKey == selectedDayKey
             }
-            var calFetch = FetchDescriptor<CalendarSignal>(predicate: calPredicate)
-            calFetch.sortBy = [SortDescriptor(\.timestamp, order: .forward)]
-            calendarSignals = try modelContext.fetch(calFetch)
+            var sameDayFetch = FetchDescriptor<CalendarSignal>(predicate: sameDayPredicate)
+            sameDayFetch.sortBy = [SortDescriptor(\.timestamp, order: .forward)]
+            let sameDaySignals = try modelContext.fetch(sameDayFetch)
+
+            let adjacentSignals: [CalendarSignal]
+            let adjacentDayKeys = CalendarEvidenceResolver.adjacentDayKeys(
+                for: selectedDayKey,
+                dayTimeZoneId: selectedTimeZoneId
+            )
+            if adjacentDayKeys.isEmpty {
+                adjacentSignals = []
+            } else {
+                let adjacentPredicate = #Predicate<CalendarSignal> { target in
+                    adjacentDayKeys.contains(target.dayKey)
+                }
+                var adjacentFetch = FetchDescriptor<CalendarSignal>(predicate: adjacentPredicate)
+                adjacentFetch.sortBy = [SortDescriptor(\.timestamp, order: .forward)]
+                adjacentSignals = try modelContext.fetch(adjacentFetch)
+            }
+
+            calendarSignals = CalendarEvidenceResolver.resolve(
+                sameDaySignals: sameDaySignals,
+                adjacentSignals: adjacentSignals,
+                dayCountryCode: selectedCountryCode,
+                dayCountryName: selectedCountryName,
+                calendarCount: selectedCalendarCount,
+                sources: selectedSources
+            )
         } catch {
             calendarSignals = []
         }
@@ -442,8 +516,8 @@ private struct EvidenceSection: View {
         // Stays sorted by enteredOn, reverse order
         do {
             let window = DayIdentity.dayWindow(
-                dayKey: dayKey,
-                dayTimeZoneId: dayTimeZoneId,
+                dayKey: selectedDayKey,
+                dayTimeZoneId: selectedTimeZoneId,
                 fallback: dayTimeZone
             )
             let startOfDay = window.start
@@ -484,8 +558,14 @@ private struct EvidenceSection: View {
         dayKey: "2026-02-15",
         date: Date(),
         timeZoneId: TimeZone.current.identifier,
-        countryCode: "ES",
-        countryName: "Spain",
+        contributedCountries: [
+            ContributedCountry(countryCode: "ES", countryName: "Spain", probability: 0.7)
+        ],
+        zoneOverlays: ["Europe/Madrid"],
+        evidence: [
+            SignalImpact(source: "photo", countryCode: "ES", countryName: "Spain", scoreDelta: 0.4),
+            SignalImpact(source: "location", countryCode: "ES", countryName: "Spain", scoreDelta: 0.3)
+        ],
         confidence: 0.7,
         confidenceLabel: .medium,
         sources: [.photo, .location],

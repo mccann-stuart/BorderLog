@@ -1,29 +1,50 @@
-# Task Plan: Fix Git Sync
+# Task: Warning Cleanup (Swift 6 / iOS 26)
 
-- [ ] Sync local main branch with remote origin/main.
+## Plan
+- [x] Inspect the reported warning groups and confirm the smallest safe fixes
+- [x] Remove redundant `await` usage and pure helper isolation warnings
+- [x] Replace deprecated `MKMapItem.placemark` reads with supported iOS 26 address APIs
+- [x] Resolve the remaining SwiftData actor-isolation warnings without refactoring behavior
+- [ ] Run a targeted build and capture the verification result
 
----
+## Review
+- [x] Added narrow `nonisolated` annotations for pure helper/value code that should not inherit actor isolation
+- [x] Replaced `MKMapItem.placemark` country extraction with iOS 26 `addressRepresentations`/`location` usage in calendar and geocode flows
+- [x] Removed redundant `await` sites called out by the build log
+- [x] `swiftc -parse` passed for all edited files
+- [ ] `xcodebuild build` is still blocked in this environment by the pre-existing SwiftData macro/plugin failure in `Shared/PresenceDay.swift`
 
-# Task Plan (Calendar Safe Area Margins)
+# Task: Fix CountryResolver region code compile error
 
-- [x] Review `Learn/CalendarTabView.swift` and identify the layout cause of the calendar overflowing the safe area.
-- [x] Add small safe-area-aware horizontal margins to keep the Calendar content on screen.
-- [x] Run an app build and record the verification result.
+## Plan
+- [x] Inspect the failing line and confirm the current MapKit address API
+- [x] Replace invalid region code access with a supported region identifier
+- [x] Verify diagnostics for the updated file
 
-## Review (Calendar Safe Area Margins)
+## Review
+- [x] Updated country code extraction to use `addressRepresentations?.region?.identifier`
+- [x] Xcode diagnostics report no issues in `Learn/Shared/CountryResolver.swift`
 
-- Cause identified: the calendar row removes all list insets with `.listRowInsets(EdgeInsets())`, which leaves the `UICalendarView` flush to the screen edge.
-- Fix applied: changed the calendar row to `EdgeInsets(top: 0, leading: 12, bottom: 0, trailing: 12)` so the native calendar stays slightly inset from the screen edges.
-- Verification: `xcodebuild -scheme Learn -destination 'generic/platform=iOS Simulator' -derivedDataPath /tmp/BorderLogDerivedData build` completed successfully on March 20, 2026 with `** BUILD SUCCEEDED **`.
+# Task: Fix CalendarSignalIngestor region code compile error
 
----
+## Plan
+- [x] Inspect the failing `MKAddressRepresentations` access in the calendar search path
+- [x] Replace invalid region code access with a supported locale region identifier
+- [x] Verify diagnostics for `Learn/Shared/CalendarSignalIngestor.swift`
+- [x] Run an Xcode build to confirm no new compile errors
 
-# Rebuild Calendar Tab
+## Review
+- [x] Updated calendar search country code extraction to use `addressRepresentations?.region?.identifier`
+- [x] Xcode diagnostics report no issues in `Learn/Shared/CalendarSignalIngestor.swift`
+- [x] Xcode build succeeded
 
-- [x] Create PR branch (`feature/rebuild-calendar-tab`).
-- [x] Investigate existing `CalendarTabView.swift` and related components.
-- [x] Write detailed specs in `implementation_plan.md`.
-- [x] Get user approval for the plan.
-- [x] Rebuild the Calendar tab using native iOS 26 styling.
-- [x] Verify the new UI and functionality.
-- [x] Wrap up and mark done.
+# Task: Fix CalendarFlightParsing Equatable isolation warning
+
+## Plan
+- [x] Inspect `CalendarEventIngestability` computed properties using `==`/`!=`
+- [x] Replace comparisons with `switch` to avoid isolated Equatable usage in nonisolated context
+- [x] Verify diagnostics for `Shared/CalendarFlightParsing.swift`
+
+## Review
+- [x] Replaced `==`/`!=` comparisons with `switch` to avoid isolated Equatable usage
+- [x] Xcode diagnostics report no issues in `Shared/CalendarFlightParsing.swift`

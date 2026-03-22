@@ -7,8 +7,11 @@
 
 import SwiftUI
 import SwiftData
+import os
 
 struct CalendarTabView: View {
+    private static let logger = Logger(subsystem: "com.MCCANN.Border", category: "CalendarTabView")
+
     @Environment(\.modelContext) private var modelContext
     @Environment(\.scenePhase) private var scenePhase
 
@@ -44,6 +47,12 @@ struct CalendarTabView: View {
         }
     }
 
+    private var summaryUnknownDays: [PresenceDay] {
+        snapshot.summaryUnknownDayKeys
+            .compactMap { presenceDaysByKey[$0] }
+            .sorted { $0.date > $1.date }
+    }
+
     var body: some View {
         List {
             Section {
@@ -57,7 +66,7 @@ struct CalendarTabView: View {
                     }
                 )
                 .frame(minHeight: 450)
-                .listRowInsets(EdgeInsets(top: 0, leading: 12, bottom: 0, trailing: 12))
+                .listRowInsets(EdgeInsets())
                 .listRowBackground(Color.clear)
             }
             
@@ -81,16 +90,24 @@ struct CalendarTabView: View {
             } header: {
                 Text("Travel Summary")
             } footer: {
-                Text("Each country counts once per day, even when multiple sources agree.")
+                Text("Totals use the day's resolved Summary location, including inferred bridge days.")
             }
 
             Section {
-                if countryRows.isEmpty {
+                if countryRows.isEmpty && snapshot.summaryUnknownDayKeys.isEmpty {
                     Text("No country days found")
                         .foregroundStyle(.secondary)
                 } else {
                     ForEach(countryRows) { info in
                         CalendarCountrySummaryRow(info: info)
+                    }
+
+                    if !snapshot.summaryUnknownDayKeys.isEmpty {
+                        NavigationLink {
+                            FilteredLedgerView(days: summaryUnknownDays, title: "Unknown Days")
+                        } label: {
+                            UnknownDaysSummaryRow(count: snapshot.summaryUnknownDayKeys.count)
+                        }
                     }
                 }
             }
@@ -141,16 +158,22 @@ struct CalendarTabView: View {
             guard requestedMonth == visibleMonthStart, requestedRange == summaryRange else { return }
 
             snapshot = loadedSnapshot
-            loadPresenceDays(for: loadedSnapshot.daySummaries.map(\.dayKey))
+            loadPresenceDays(for: summaryPresenceDayKeys(from: loadedSnapshot))
         } catch {
             guard requestedMonth == visibleMonthStart, requestedRange == summaryRange else { return }
-            loadError = error.localizedDescription
-            loadPresenceDays(for: snapshot.daySummaries.map(\.dayKey))
+            Self.logger.error("Failed to load calendar snapshot: \(error, privacy: .private)")
+            loadError = "Failed to load calendar data. Please try again."
+            loadPresenceDays(for: summaryPresenceDayKeys(from: snapshot))
         }
 
         if requestedMonth == visibleMonthStart, requestedRange == summaryRange {
             isLoading = false
         }
+    }
+
+    private func summaryPresenceDayKeys(from snapshot: CalendarTabSnapshot) -> [String] {
+        let visibleMonthKeys = Set(snapshot.daySummaries.map(\.dayKey))
+        return Array(visibleMonthKeys.union(snapshot.summaryUnknownDayKeys)).sorted()
     }
 
     private func loadPresenceDays(for dayKeys: [String]) {
@@ -178,6 +201,49 @@ struct CalendarTabView: View {
     }
 }
 
+func calendarDayDecorationTokens(for summary: CalendarDaySummary) -> [String] {
+    func emoji(for country: CalendarDayCountry) -> String {
+        guard let code = country.countryCode else { return "🌍" }
+        return countryCodeToEmoji(code)
+    }
+
+    let flightOriginID = summary.flightOriginCountry?.id
+    let flightDestinationID = summary.flightDestinationCountry?.id
+    let extraCountries = summary.countries.filter { country in
+        country.id != flightOriginID && country.id != flightDestinationID
+    }
+
+    if summary.flightOriginCountry != nil || summary.flightDestinationCountry != nil {
+        var tokens: [String] = []
+
+        if let origin = summary.flightOriginCountry {
+            tokens.append(emoji(for: origin))
+        }
+
+        tokens.append("✈️")
+
+        if let destination = summary.flightDestinationCountry,
+           destination.id != flightOriginID {
+            tokens.append(emoji(for: destination))
+        }
+
+        tokens.append(contentsOf: extraCountries.map { emoji(for: $0) })
+        return tokens
+    }
+
+    var tokens = summary.countries.map { emoji(for: $0) }
+    if summary.hasFlight {
+        tokens.append("✈️")
+    }
+    return tokens
+}
+
+func calendarDayDecorationString(for summary: CalendarDaySummary) -> String? {
+    let tokens = calendarDayDecorationTokens(for: summary)
+    guard !tokens.isEmpty else { return nil }
+    return tokens.joined(separator: " ")
+}
+
 // MARK: - Native Calendar Wrapper
 
 struct NativeCalendarView: UIViewRepresentable {
@@ -185,8 +251,9 @@ struct NativeCalendarView: UIViewRepresentable {
     let snapshot: CalendarTabSnapshot
     let onDateSelected: (String) -> Void
 
-    func makeUIView(context: Context) -> UICalendarView {
-        let calendarView = UICalendarView()
+    func makeUIView(context: Context) -> CalendarContainerView {
+        let containerView = CalendarContainerView(horizontalInset: 12)
+        let calendarView = containerView.calendarView
         calendarView.calendar = Calendar.current
         calendarView.locale = Locale.current
         calendarView.fontDesign = .rounded
@@ -197,17 +264,18 @@ struct NativeCalendarView: UIViewRepresentable {
         
         calendarView.visibleDateComponents = Calendar.current.dateComponents([.year, .month], from: visibleMonthStart)
 
-        return calendarView
+        return containerView
     }
 
-    func updateUIView(_ uiView: UICalendarView, context: Context) {
+    func updateUIView(_ uiView: CalendarContainerView, context: Context) {
+        let calendarView = uiView.calendarView
         context.coordinator.snapshot = snapshot
         
         // Sync visible date if it changed upstream
         let targetMonthComponent = Calendar.current.dateComponents([.year, .month], from: visibleMonthStart)
-        if uiView.visibleDateComponents.year != targetMonthComponent.year || 
-           uiView.visibleDateComponents.month != targetMonthComponent.month {
-            uiView.setVisibleDateComponents(targetMonthComponent, animated: true)
+        if calendarView.visibleDateComponents.year != targetMonthComponent.year || 
+           calendarView.visibleDateComponents.month != targetMonthComponent.month {
+            calendarView.setVisibleDateComponents(targetMonthComponent, animated: true)
         }
         
         // Reload decorations for displayed month
@@ -215,7 +283,7 @@ struct NativeCalendarView: UIViewRepresentable {
             let datesToReload = summaries.map { summary in
                 Calendar.current.dateComponents([.year, .month, .day], from: summary.date)
             }
-            uiView.reloadDecorations(forDateComponents: datesToReload, animated: true)
+            calendarView.reloadDecorations(forDateComponents: datesToReload, animated: true)
         }
     }
 
@@ -223,11 +291,46 @@ struct NativeCalendarView: UIViewRepresentable {
         Coordinator(self, visibleMonthStart: $visibleMonthStart, onDateSelected: onDateSelected)
     }
 
+    final class CalendarContainerView: UIView {
+        let calendarView = UICalendarView()
+
+        init(horizontalInset: CGFloat) {
+            super.init(frame: .zero)
+            layoutMargins = UIEdgeInsets(top: 0, left: horizontalInset, bottom: 0, right: horizontalInset)
+            directionalLayoutMargins = NSDirectionalEdgeInsets(top: 0, leading: horizontalInset, bottom: 0, trailing: horizontalInset)
+
+            addSubview(calendarView)
+            calendarView.translatesAutoresizingMaskIntoConstraints = false
+
+            NSLayoutConstraint.activate([
+                calendarView.leadingAnchor.constraint(equalTo: layoutMarginsGuide.leadingAnchor),
+                calendarView.trailingAnchor.constraint(equalTo: layoutMarginsGuide.trailingAnchor),
+                calendarView.topAnchor.constraint(equalTo: topAnchor),
+                calendarView.bottomAnchor.constraint(equalTo: bottomAnchor)
+            ])
+        }
+
+        @available(*, unavailable)
+        required init?(coder: NSCoder) {
+            fatalError("init(coder:) has not been implemented")
+        }
+    }
+
     class Coordinator: NSObject, UICalendarViewDelegate, UICalendarSelectionSingleDateDelegate {
         var parent: NativeCalendarView
-        var snapshot: CalendarTabSnapshot?
+        var snapshot: CalendarTabSnapshot? {
+            didSet {
+                if let summaries = snapshot?.daySummaries {
+                    summaryDict = Dictionary(summaries.map { ($0.dayKey, $0) }, uniquingKeysWith: { first, _ in first })
+                } else {
+                    summaryDict = [:]
+                }
+            }
+        }
         var visibleMonthStart: Binding<Date>
         var onDateSelected: (String) -> Void
+
+        private var summaryDict: [String: CalendarDaySummary] = [:]
 
         init(_ parent: NativeCalendarView, visibleMonthStart: Binding<Date>, onDateSelected: @escaping (String) -> Void) {
             self.parent = parent
@@ -238,19 +341,11 @@ struct NativeCalendarView: UIViewRepresentable {
         func calendarView(_ calendarView: UICalendarView, decorationFor dateComponents: DateComponents) -> UICalendarView.Decoration? {
             guard let date = Calendar.current.date(from: dateComponents) else { return nil }
             let dayKey = DayKey.make(from: date, timeZone: Calendar.current.timeZone)
-            guard let summary = snapshot?.daySummaries.first(where: { $0.dayKey == dayKey }) else { return nil }
-            
-            let flags = summary.countries.map { country in
-                guard let code = country.countryCode else { return "🌍" }
-                return countryCodeToEmoji(code)
-            }
-            var emojis = flags
-            if summary.hasFlight {
-                emojis.append("✈️")
-            }
-            
-            let emojiString = emojis.joined(separator: " ")
-            if emojiString.isEmpty { return nil }
+
+            // ⚡ Bolt: O(1) dictionary lookup replaces O(N) array scan
+            guard let summary = summaryDict[dayKey] else { return nil }
+
+            guard let emojiString = calendarDayDecorationString(for: summary) else { return nil }
             
             return .customView {
                 let label = UILabel()

@@ -13,6 +13,31 @@ struct CountryResolution: Sendable {
     let countryCode: String?
     let countryName: String?
     let timeZone: TimeZone?
+
+    nonisolated static func normalized(
+        countryCode: String?,
+        countryName: String?,
+        timeZone: TimeZone?
+    ) -> CountryResolution? {
+        let canonicalCode = CountryCodeNormalizer.canonicalCode(
+            countryCode: countryCode,
+            countryName: countryName
+        )
+        let canonicalName = CountryCodeNormalizer.canonicalName(
+            countryCode: canonicalCode ?? countryCode,
+            countryName: countryName
+        )
+
+        guard canonicalCode != nil || canonicalName != nil else {
+            return nil
+        }
+
+        return CountryResolution(
+            countryCode: canonicalCode,
+            countryName: canonicalName,
+            timeZone: timeZone
+        )
+    }
 }
 
 protocol CountryResolving {
@@ -53,7 +78,7 @@ actor GeocodeCoordinator {
 
         let task: Task<CountryResolution?, Never> = Task { [self] in
             defer {
-                Task { await self.clearInFlight(for: key) }
+                Task { self.clearInFlight(for: key) }
             }
 
             await self.waitForPermit()
@@ -65,13 +90,13 @@ actor GeocodeCoordinator {
                 let mapItems = try await request.mapItems
                 let mapItem = mapItems.first
                 let addressRepresentations = mapItem?.addressRepresentations
-                let resolution = CountryResolution(
+                let resolution = CountryResolution.normalized(
                     countryCode: addressRepresentations?.region?.identifier,
                     countryName: addressRepresentations?.regionName,
                     timeZone: mapItem?.timeZone
                 )
-                if resolution.countryCode != nil || resolution.countryName != nil {
-                    await self.store(resolution, for: key)
+                if let resolution {
+                    self.store(resolution, for: key)
                 }
                 return resolution
             } catch {
