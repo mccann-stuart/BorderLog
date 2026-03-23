@@ -10,6 +10,25 @@ Pricing: Free (no subscriptions, no paid tiers)
 
 Weekly Changelog
 
+Week of Mar 16-22, 2026
+
+Highlights:
+- Added and then rebuilt the Calendar tab into a more native daily travel view, with follow-up fixes for safe-area/header alignment, richer decorations, adjacent flight evidence, unknown-day totals, and flight route context.
+- Expanded presence inference with richer evidence, multi-pass ledger recomputation, travel-backed transitions, broader travel event support (train, ferry, bus, hotel), and schema fixes for `PresenceDay`.
+- Continued performance and security hardening across hot paths, including O(1) calendar rendering and country normalization, faster Schengen and flight-text processing, tighter backend cross-origin headers, and safer user-facing error disclosure.
+
+Key PRs:
+- [#138](https://github.com/mccann-stuart/BorderLog/pull/138) O(1) calendar rendering.
+- [#137](https://github.com/mccann-stuart/BorderLog/pull/137) Fix error message information disclosure.
+- [#135](https://github.com/mccann-stuart/BorderLog/pull/135) Add an O(1) fast-path to `CountryCodeNormalizer`.
+- [#134](https://github.com/mccann-stuart/BorderLog/pull/134) Rebuild the Calendar tab.
+- [#133](https://github.com/mccann-stuart/BorderLog/pull/133) Add a native Calendar tab for daily travel evidence.
+- [#131](https://github.com/mccann-stuart/BorderLog/pull/131) Enhance backend cross-origin protection.
+- [#129](https://github.com/mccann-stuart/BorderLog/pull/129) Optimize Unicode scalar preprocessing in flight parsing.
+- [#127](https://github.com/mccann-stuart/BorderLog/pull/127) Optimize the `SchengenLedgerCalculator` summary loop.
+
+⸻
+
 Week of Mar 9-15, 2026
 
 Highlights:
