@@ -126,12 +126,7 @@ actor GeocodeCoordinator {
             var didMutate = false
 
             if let blockedUntil = state.blockedUntil, blockedUntil > nowInterval {
-                if !didEnterHold {
-                    await MainActor.run {
-                        InferenceActivity.shared.beginGeoLookupHold()
-                    }
-                    didEnterHold = true
-                }
+                await beginHoldIfNeeded(&didEnterHold)
                 let delay = blockedUntil - nowInterval
                 let nanos = UInt64((delay + 0.01) * 1_000_000_000)
                 try? await Task.sleep(nanoseconds: nanos)
@@ -155,11 +150,7 @@ actor GeocodeCoordinator {
                 if didMutate {
                     throttleStore.saveState(state)
                 }
-                if didEnterHold {
-                    await MainActor.run {
-                        InferenceActivity.shared.endGeoLookupHold()
-                    }
-                }
+                await endHoldIfNeeded(didEnterHold)
                 return
             }
 
@@ -167,18 +158,30 @@ actor GeocodeCoordinator {
                 throttleStore.saveState(state)
             }
 
-            if !didEnterHold {
-                await MainActor.run {
-                    InferenceActivity.shared.beginGeoLookupHold()
-                }
-                didEnterHold = true
-            }
+            await beginHoldIfNeeded(&didEnterHold)
 
             let earliest = state.timestamps.min() ?? nowInterval
             let nextAvailable = earliest + windowSeconds
             let delay = max(0, nextAvailable - nowInterval)
             let nanos = UInt64((delay + 0.01) * 1_000_000_000)
             try? await Task.sleep(nanoseconds: nanos)
+        }
+    }
+
+    private func beginHoldIfNeeded(_ didEnterHold: inout Bool) async {
+        if !didEnterHold {
+            await MainActor.run {
+                InferenceActivity.shared.beginGeoLookupHold()
+            }
+            didEnterHold = true
+        }
+    }
+
+    private func endHoldIfNeeded(_ didEnterHold: Bool) async {
+        if didEnterHold {
+            await MainActor.run {
+                InferenceActivity.shared.endGeoLookupHold()
+            }
         }
     }
 
@@ -189,20 +192,11 @@ actor GeocodeCoordinator {
             pruneRequests(now: now)
             if requestTimes.count < maxRequests {
                 requestTimes.append(now)
-                if didEnterHold {
-                    await MainActor.run {
-                        InferenceActivity.shared.endGeoLookupHold()
-                    }
-                }
+                await endHoldIfNeeded(didEnterHold)
                 return
             }
 
-            if !didEnterHold {
-                await MainActor.run {
-                    InferenceActivity.shared.beginGeoLookupHold()
-                }
-                didEnterHold = true
-            }
+            await beginHoldIfNeeded(&didEnterHold)
 
             let earliest = requestTimes.first ?? now
             let nextAvailable = earliest.addingTimeInterval(windowSeconds)
