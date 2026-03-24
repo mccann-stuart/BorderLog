@@ -385,6 +385,14 @@ struct SettingsView: View {
 
     // MARK: – Smart Location Row
 
+    private func openSettingsButton(title: String) -> some View {
+        Button {
+            openAppSettings()
+        } label: {
+            Label(title, systemImage: "gear")
+        }
+    }
+
     @ViewBuilder
     private var locationActionRow: some View {
         switch locationStatus {
@@ -396,11 +404,7 @@ struct SettingsView: View {
                 Label("Request Location Access", systemImage: "hand.raised")
             }
         case .denied, .restricted:
-            Button {
-                openAppSettings()
-            } label: {
-                Label("Open Settings to Enable Location", systemImage: "gear")
-            }
+            openSettingsButton(title: "Open Settings to Enable Location")
         case .authorizedWhenInUse, .authorizedAlways:
             EmptyView()
         @unknown default:
@@ -420,11 +424,7 @@ struct SettingsView: View {
                 Label("Request Photos Access", systemImage: "hand.raised")
             }
         case .denied, .restricted:
-            Button {
-                openAppSettings()
-            } label: {
-                Label("Open Settings to Enable Photos", systemImage: "gear")
-            }
+            openSettingsButton(title: "Open Settings to Enable Photos")
         case .authorized, .limited:
             EmptyView()
         @unknown default:
@@ -444,17 +444,9 @@ struct SettingsView: View {
                 Label("Request Calendar Access", systemImage: "hand.raised")
             }
         case .denied, .restricted:
-            Button {
-                openAppSettings()
-            } label: {
-                Label("Open Settings to Enable Calendar", systemImage: "gear")
-            }
+            openSettingsButton(title: "Open Settings to Enable Calendar")
         case .writeOnly:
-            Button {
-                openAppSettings()
-            } label: {
-                Label("Open Settings to Allow Calendar Read Access", systemImage: "gear")
-            }
+            openSettingsButton(title: "Open Settings to Allow Calendar Read Access")
         case .fullAccess:
             EmptyView()
         @unknown default:
