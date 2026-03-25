@@ -748,14 +748,17 @@ actor CalendarTabDataService {
         resolvedCountry: CalendarDayCountry?,
         preferLatest: Bool
     ) -> CalendarDayCountry? {
-        candidates.sorted {
+        // ⚡ Bolt: Replace O(N log N) sorting and array allocation with O(N) min/max tracking.
+        // `compareFlightCandidates` defines the "less than" or "comes first" relationship,
+        // so we use `.min(by:)` to find the highest-priority element.
+        candidates.min(by: {
             compareFlightCandidates(
                 lhs: $0,
                 rhs: $1,
                 resolvedCountry: resolvedCountry,
                 preferLatest: preferLatest
             )
-        }.first?.country
+        })?.country
     }
 
     private nonisolated static func compareFlightCandidates(

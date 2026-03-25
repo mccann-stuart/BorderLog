@@ -67,3 +67,6 @@
 ## 2024-05-28 - O(N) array scans in UIKit delegate loops
 **Learning:** Performing `O(N)` linear array scans (like `array.first(where:)`) inside repeatedly called UIKit rendering delegates (e.g., `UICalendarView.calendarView(_:decorationFor:)`) can severely bottleneck rendering performance.
 **Action:** Pre-compute O(1) dictionary lookups inside the `didSet` observer of the state/snapshot object, rather than scanning the array inside the delegate loop. Use `Dictionary(_:uniquingKeysWith: { first, _ in first })` to ensure robustness against duplicates.
+## 2026-06-12 - Replaced Sorting with Min for Top K Selection
+**Learning:** Extracting a single top element using `.sorted { ... }.first` incurs an unnecessary O(N log N) processing cost and extra memory allocations compared to `.min(by: { ... })` (since `.min` returns the element that comes first under the predicate). Inside loops or widget generation paths, this degrades performance and creates ARC overhead.
+**Action:** When you only need the highest scoring element, use `.min(by:)` (or `.max(by:)`) to perform a single O(N) pass with O(1) space complexity instead of sorting the whole array.
