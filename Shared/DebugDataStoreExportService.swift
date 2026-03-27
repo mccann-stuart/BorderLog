@@ -571,10 +571,40 @@ actor DebugDataStoreExportService {
             }
         )
 
+        // ⚡ Bolt: Replace O(N * M) chained .filter { ... }.count allocations with a single O(N) pass and O(1) memory counters
+        var unknownCount = 0
+        var disputedCount = 0
+        var manualCount = 0
+        var overrideSourceCount = 0
+        var staySourceCount = 0
+        var photoSourceCount = 0
+        var locationSourceCount = 0
+        var calendarSourceCount = 0
+
+        for day in records.presenceDays {
+            if day.countryCode == nil && day.countryName == nil { unknownCount += 1 }
+            if day.isDisputed { disputedCount += 1 }
+            if day.isManuallyModified { manualCount += 1 }
+
+            if day.sourceLabels.contains("override") { overrideSourceCount += 1 }
+            if day.sourceLabels.contains("stay") { staySourceCount += 1 }
+            if day.sourceLabels.contains("photo") { photoSourceCount += 1 }
+            if day.sourceLabels.contains("location") { locationSourceCount += 1 }
+            if day.sourceLabels.contains("calendar") { calendarSourceCount += 1 }
+        }
+
+        var appLocationCount = 0
+        var widgetLocationCount = 0
+
+        for sample in records.locationSamples {
+            if sample.sourceRaw == LocationSampleSource.app.rawValue { appLocationCount += 1 }
+            else if sample.sourceRaw == LocationSampleSource.widget.rawValue { widgetLocationCount += 1 }
+        }
+
         let presenceDayTotals = DebugExportPresenceDayTotals(
-            unknown: records.presenceDays.filter { $0.countryCode == nil && $0.countryName == nil }.count,
-            disputed: records.presenceDays.filter(\.isDisputed).count,
-            manual: records.presenceDays.filter(\.isManuallyModified).count
+            unknown: unknownCount,
+            disputed: disputedCount,
+            manual: manualCount
         )
 
         let sourceTotals = DebugExportSourceTotals(
@@ -583,13 +613,13 @@ actor DebugDataStoreExportService {
             locationSampleRecords: records.locationSamples.count,
             photoSignalRecords: records.photoSignals.count,
             calendarSignalRecords: records.calendarSignals.count,
-            appLocationSamples: records.locationSamples.filter { $0.sourceRaw == LocationSampleSource.app.rawValue }.count,
-            widgetLocationSamples: records.locationSamples.filter { $0.sourceRaw == LocationSampleSource.widget.rawValue }.count,
-            presenceDaysWithOverrideSource: records.presenceDays.filter { $0.sourceLabels.contains("override") }.count,
-            presenceDaysWithStaySource: records.presenceDays.filter { $0.sourceLabels.contains("stay") }.count,
-            presenceDaysWithPhotoSource: records.presenceDays.filter { $0.sourceLabels.contains("photo") }.count,
-            presenceDaysWithLocationSource: records.presenceDays.filter { $0.sourceLabels.contains("location") }.count,
-            presenceDaysWithCalendarSource: records.presenceDays.filter { $0.sourceLabels.contains("calendar") }.count
+            appLocationSamples: appLocationCount,
+            widgetLocationSamples: widgetLocationCount,
+            presenceDaysWithOverrideSource: overrideSourceCount,
+            presenceDaysWithStaySource: staySourceCount,
+            presenceDaysWithPhotoSource: photoSourceCount,
+            presenceDaysWithLocationSource: locationSourceCount,
+            presenceDaysWithCalendarSource: calendarSourceCount
         )
 
         return DebugExportSummary(
