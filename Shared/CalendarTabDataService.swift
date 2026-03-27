@@ -748,14 +748,16 @@ actor CalendarTabDataService {
         resolvedCountry: CalendarDayCountry?,
         preferLatest: Bool
     ) -> CalendarDayCountry? {
-        candidates.sorted {
+        // ⚡ Bolt: Use .max(by:) instead of .sorted().first to find the top candidate in O(N) time
+        // without allocating a new array or paying O(N log N) sorting costs.
+        candidates.max { lhs, rhs in
             compareFlightCandidates(
-                lhs: $0,
-                rhs: $1,
+                lhs: rhs,
+                rhs: lhs,
                 resolvedCountry: resolvedCountry,
                 preferLatest: preferLatest
             )
-        }.first?.country
+        }?.country
     }
 
     private nonisolated static func compareFlightCandidates(
