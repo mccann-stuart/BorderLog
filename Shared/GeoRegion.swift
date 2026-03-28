@@ -27,7 +27,7 @@ enum GeoRegion: String, CaseIterable, Identifiable {
 
     /// Returns the geographic region for a given ISO 3166-1 alpha-2 country code.
     static func region(for countryCode: String) -> GeoRegion {
-        let code = countryCode.uppercased()
+        let code = countryCode.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
         return codeToRegion[code] ?? .europe // fallback; most obscure territories are European
     }
 
