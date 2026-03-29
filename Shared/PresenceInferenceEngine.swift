@@ -473,19 +473,33 @@ private struct PresenceResultCompiler {
             )
         }
 
-        let ranked = dayState.countryScores.compactMap { key, score -> (ResolvedCountry, Double)? in
-            guard let country = dayState.countries[key] else { return nil }
-            return (country, score)
-        }
-        .sorted {
-            if $0.1 == $1.1 {
-                return $0.0.id < $1.0.id
+        // ⚡ Bolt: Replace O(N log N) sorting + reduce + multiple passes with a single O(N) loop
+        var totalScore: Double = 0
+        var winner: (country: ResolvedCountry, score: Double)?
+        var runnerUp: (country: ResolvedCountry, score: Double)?
+
+        for (key, score) in dayState.countryScores {
+            guard let country = dayState.countries[key] else { continue }
+            totalScore += score
+
+            let current = (country: country, score: score)
+            if let w = winner {
+                if score > w.score || (score == w.score && country.id < w.country.id) {
+                    runnerUp = winner
+                    winner = current
+                } else if let r = runnerUp {
+                    if score > r.score || (score == r.score && country.id < r.country.id) {
+                        runnerUp = current
+                    }
+                } else {
+                    runnerUp = current
+                }
+            } else {
+                winner = current
             }
-            return $0.1 > $1.1
         }
 
-        let totalScore = ranked.reduce(0) { $0 + $1.1 }
-        guard let winner = ranked.first, winner.1 >= config.resolutionThreshold, totalScore > 0 else {
+        guard let winner = winner, winner.score >= config.resolutionThreshold, totalScore > 0 else {
             return PresenceDayResult(
                 dayKey: dayKey,
                 date: date,
@@ -494,8 +508,8 @@ private struct PresenceResultCompiler {
                 zoneOverlays: [],
                 evidenceEntries: dayState.evidenceEntries,
                 confidenceBreakdown: PresenceConfidenceBreakdown(
-                    score: ranked.first?.1 ?? 0,
-                    runnerUpScore: ranked.dropFirst().first?.1 ?? 0,
+                    score: winner?.score ?? 0,
+                    runnerUpScore: runnerUp?.score ?? 0,
                     margin: 0,
                     normalizedWinningShare: 0,
                     label: .low,
@@ -511,19 +525,22 @@ private struct PresenceResultCompiler {
             )
         }
 
-        let runnerUpScore = ranked.dropFirst().first?.1 ?? 0
-        let winningShare = winner.1 / totalScore
+        let runnerUpScore = runnerUp?.score ?? 0
+        let winningShare = winner.score / totalScore
         let runnerUpShare = runnerUpScore / totalScore
         let margin = max(0, winningShare - runnerUpShare)
-        let allocations = ranked
-            .map { country, score in
-                PresenceCountryAllocation(
-                    countryCode: country.code,
-                    countryName: country.name,
-                    normalizedShare: score / totalScore
-                )
-            }
-            .filter { $0.normalizedShare >= config.allocationFloor }
+
+        // ⚡ Bolt: Use a single compactMap pass to generate allocations above the floor without O(N) intermediate filtering
+        let allocations: [PresenceCountryAllocation] = dayState.countryScores.compactMap { key, score in
+            guard let country = dayState.countries[key] else { return nil }
+            let normalizedShare = score / totalScore
+            guard normalizedShare >= config.allocationFloor else { return nil }
+            return PresenceCountryAllocation(
+                countryCode: country.code,
+                countryName: country.name,
+                normalizedShare: normalizedShare
+            )
+        }.sorted { $0.normalizedShare > $1.normalizedShare || ($0.normalizedShare == $1.normalizedShare && $0.countryCode < $1.countryCode) }
 
         return PresenceDayResult(
             dayKey: dayKey,
@@ -533,11 +550,11 @@ private struct PresenceResultCompiler {
             zoneOverlays: [],
             evidenceEntries: dayState.evidenceEntries,
             confidenceBreakdown: PresenceConfidenceBreakdown(
-                score: winner.1,
+                score: winner.score,
                 runnerUpScore: runnerUpScore,
                 margin: margin,
                 normalizedWinningShare: winningShare,
-                label: config.confidenceLabel(for: winner.1, winningShare: winningShare),
+                label: config.confidenceLabel(for: winner.score, winningShare: winningShare),
                 calibrationSummary: "calibrated totals"
             ),
             sourceSummary: sourceSummary,
@@ -613,16 +630,30 @@ private struct PresenceResultCompiler {
         for index in results.indices {
             let dayKey = results[index].dayKey
             guard let dayState = state.days[dayKey] else { continue }
-            let rankedFlights = dayState.flightOriginCandidates.values.sorted {
-                if $0.count == $1.count {
-                    return $0.country.id < $1.country.id
+
+            // ⚡ Bolt: Replace O(N log N) sorting with a single O(N) Top-2 Selection pass
+            var winner: FlightOriginCandidate?
+            var runnerUp: FlightOriginCandidate?
+
+            for candidate in dayState.flightOriginCandidates.values {
+                if let w = winner {
+                    if candidate.count > w.count || (candidate.count == w.count && candidate.country.id < w.country.id) {
+                        runnerUp = winner
+                        winner = candidate
+                    } else if let r = runnerUp {
+                        if candidate.count > r.count || (candidate.count == r.count && candidate.country.id < r.country.id) {
+                            runnerUp = candidate
+                        }
+                    } else {
+                        runnerUp = candidate
+                    }
+                } else {
+                    winner = candidate
                 }
-                return $0.count > $1.count
             }
-            guard let winner = rankedFlights.first else { continue }
-            if rankedFlights.count > 1,
-               rankedFlights[1].count == winner.count,
-               rankedFlights[1].country.id != winner.country.id {
+
+            guard let winner = winner else { continue }
+            if let runnerUp = runnerUp, runnerUp.count == winner.count, runnerUp.country.id != winner.country.id {
                 continue
             }
 
