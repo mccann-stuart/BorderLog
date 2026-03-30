@@ -10,6 +10,22 @@ Pricing: Free (no subscriptions, no paid tiers)
 
 Weekly Changelog
 
+Week of Mar 23-29, 2026
+
+Highlights:
+- Reduced duplicated code in `CountryResolver` and `SettingsView`, simplifying shared hold/button logic without changing the feature surface.
+- Hardened biometric lock behavior by fixing the fallback path in `SecurityLockView` to avoid a lockout risk during authentication.
+- Continued performance work in travel-data hot paths by replacing sorting and repeated filter/count passes with single-pass lookups in calendar inference and debug export code.
+
+Key PRs:
+- [#145](https://github.com/mccann-stuart/BorderLog/pull/145) Optimize `DebugDataStoreExportService` with a single-pass count aggregation.
+- [#144](https://github.com/mccann-stuart/BorderLog/pull/144) Optimize `preferredFlightCountry` with `max(by:)`.
+- [#141](https://github.com/mccann-stuart/BorderLog/pull/141) Fix biometric authentication fallback lockout risk.
+- [#140](https://github.com/mccann-stuart/BorderLog/pull/140) Refactor duplicated settings button logic in `SettingsView`.
+- [#139](https://github.com/mccann-stuart/BorderLog/pull/139) Refactor duplicate `GeoLookupHold` logic in `CountryResolver`.
+
+⸻
+
 Week of Mar 16-22, 2026
 
 Highlights:
