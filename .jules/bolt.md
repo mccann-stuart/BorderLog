@@ -68,3 +68,7 @@
 **Learning:** Performing `O(N)` linear array scans (like `array.first(where:)`) inside repeatedly called UIKit rendering delegates (e.g., `UICalendarView.calendarView(_:decorationFor:)`) can severely bottleneck rendering performance.
 **Action:** Pre-compute O(1) dictionary lookups inside the `didSet` observer of the state/snapshot object, rather than scanning the array inside the delegate loop. Use `Dictionary(_:uniquingKeysWith: { first, _ in first })` to ensure robustness against duplicates.
 - 2024-XX-XX - O(N * M) chained filter.count pattern
+
+## 2026-03-31 - Lazy Map for Set Initialization
+**Learning:** Initializing a `Set` from a transformed Swift collection using standard `.map` (e.g., `Set(collection.map(\.property))`) evaluates the transformation on all elements and creates an O(N) intermediate array before inserting elements into the `Set`. This is an unnecessary memory allocation.
+**Action:** Use `.lazy.map` (e.g., `Set(collection.lazy.map(\.property))`) when transforming collections strictly to initialize or form unions on a `Set`. This evaluates elements on-demand, bypassing O(N) heap allocations for intermediate arrays.

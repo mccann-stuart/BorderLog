@@ -444,7 +444,8 @@ private struct PresenceResultCompiler {
     }
 
     private func baseResult(for dayKey: String, date: Date, timeZoneId: String?, dayState: DayInferenceState) -> PresenceDayResult {
-        let sourceSummary = SignalSourceMask.from(processorIDs: dayState.evidenceEntries.map(\.processorID))
+        // ⚡ Bolt: Use .lazy.map to avoid O(N) string array allocation when calculating the mask
+        let sourceSummary = SignalSourceMask.from(processorIDs: dayState.evidenceEntries.lazy.map(\.processorID))
 
         if let overrideInfo = dayState.overrideInfo,
            let country = resolveCountry(countryCode: overrideInfo.countryCode, countryName: overrideInfo.countryName) {

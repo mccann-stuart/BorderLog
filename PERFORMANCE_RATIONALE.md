@@ -364,3 +364,17 @@ We replaced the multiple collection passes and O(N log N) `.sorted` calls with s
 
 ## Verification
 Simulations in Python measuring operations over 1,000 runs show that the O(N) single-pass approach is roughly twice as fast at N=50 and N=100 compared to full sorting, and also avoids all ARC retain/release overhead for intermediate arrays. This directly reduces memory pressure when iterating over large datasets in the backend inference logic.
+
+# Performance Optimization Rationale: Set Initialization with .lazy.map
+
+## Current State
+When initializing a `Set` from a Swift collection (e.g., extracting values from objects like `records.presenceDays.map(\.dayKey)`), standard `.map` operations iterate through the original collection and allocate a new intermediate array `[String]` in heap memory. That array is then passed to the `Set` initializer or `formUnion`, which extracts values into the hash table.
+
+## Problem
+Chaining multiple `.map` operations when initializing sets or calculating unions creates redundant O(N) array allocations in memory. For instance, `Set(records.presenceDays.map(\.dayKey))` and `allDayKeys.formUnion(records.dayOverrides.map(\.dayKey))` create intermediate arrays at each step. This wastes memory allocations and slightly degrades performance, especially in long loops or when parsing many elements like `modelContext.fetch(descriptor)`.
+
+## Optimization
+Replace standard `.map` with `.lazy.map` during initialization of sets and masking logic. For example, `Set(records.presenceDays.lazy.map(\.dayKey))`. This avoids the O(N) heap allocation of intermediate arrays by iterating over elements directly and evaluating them on-demand when the `Set` needs the element.
+
+## Verification
+By analyzing Swift's memory model, chaining multiple arrays produces O(N) heap allocations for every array, and each array will increase GC overhead for ARC in Swift. The lazy map operation provides a view sequence for elements evaluated on demand and produces a time complexity reduction when memory is allocated directly into the Set's buffer memory rather than being re-copied.
