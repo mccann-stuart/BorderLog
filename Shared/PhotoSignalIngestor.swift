@@ -220,7 +220,8 @@ actor PhotoSignalIngestor {
                 }
             )
         }
-        return Set(try modelContext.fetch(descriptor).map(\.assetIdHash))
+        // ⚡ Bolt: Use .lazy.map to avoid allocating an intermediate array of string hashes
+        return Set(try modelContext.fetch(descriptor).lazy.map(\.assetIdHash))
     }
 
     internal func saveContextIfNeeded() throws {

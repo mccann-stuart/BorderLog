@@ -635,11 +635,12 @@ actor DebugDataStoreExportService {
         records: DebugExportRecords,
         exportedAt: Date
     ) -> [DebugExportDaySnapshot] {
-        var allDayKeys = Set(records.presenceDays.map(\.dayKey))
-        allDayKeys.formUnion(records.dayOverrides.map(\.dayKey))
-        allDayKeys.formUnion(records.locationSamples.map(\.dayKey))
-        allDayKeys.formUnion(records.photoSignals.map(\.dayKey))
-        allDayKeys.formUnion(records.calendarSignals.map(\.dayKey))
+        // ⚡ Bolt: Use .lazy.map to avoid O(N) array allocation overhead during Set initialization and union
+        var allDayKeys = Set(records.presenceDays.lazy.map(\.dayKey))
+        allDayKeys.formUnion(records.dayOverrides.lazy.map(\.dayKey))
+        allDayKeys.formUnion(records.locationSamples.lazy.map(\.dayKey))
+        allDayKeys.formUnion(records.photoSignals.lazy.map(\.dayKey))
+        allDayKeys.formUnion(records.calendarSignals.lazy.map(\.dayKey))
 
         var staysByDayKey: [String: [DebugExportStayRecord]] = [:]
         for stay in records.stays {
