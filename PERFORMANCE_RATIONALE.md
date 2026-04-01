@@ -364,3 +364,24 @@ We replaced the multiple collection passes and O(N log N) `.sorted` calls with s
 
 ## Verification
 Simulations in Python measuring operations over 1,000 runs show that the O(N) single-pass approach is roughly twice as fast at N=50 and N=100 compared to full sorting, and also avoids all ARC retain/release overhead for intermediate arrays. This directly reduces memory pressure when iterating over large datasets in the backend inference logic.
+
+# Performance Optimization Rationale: Replaced chained .map().filter() with .compactMap()
+
+## Current State
+In `Shared/CloudKitDataResetService.swift`, the `deleteAllUserData` method used chained sequence operations to filter out the default zone ID:
+```swift
+let zoneIDsToDelete = zones.map(\.zoneID).filter { $0 != defaultZoneID }
+```
+
+## Problem
+Chaining `.map` and `.filter` on a non-lazy Swift collection causes the Swift runtime to evaluate the entire `.map` operation first, allocating and populating a complete intermediate array in heap memory. It then iterates over that intermediate array to perform the `.filter`, allocating *another* array for the final result. This double-iteration and intermediate heap allocation is inefficient and increases ARC thrashing.
+
+## Optimization
+Combined the transformation and conditional logic into a single `.compactMap` pass:
+```swift
+let zoneIDsToDelete = zones.compactMap { $0.zoneID != defaultZoneID ? $0.zoneID : nil }
+```
+
+## Verification
+- **Time Complexity**: Reduced from `O(2N)` (two full iterations over the collection) to `O(N)` (a single pass).
+- **Space Complexity**: Eliminated the `O(N)` intermediate array allocation entirely, reducing heap memory pressure.
