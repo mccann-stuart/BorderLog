@@ -209,9 +209,6 @@ func calendarDayDecorationTokens(for summary: CalendarDaySummary) -> [String] {
 
     let flightOriginID = summary.flightOriginCountry?.id
     let flightDestinationID = summary.flightDestinationCountry?.id
-    let extraCountries = summary.countries.filter { country in
-        country.id != flightOriginID && country.id != flightDestinationID
-    }
 
     if summary.flightOriginCountry != nil || summary.flightDestinationCountry != nil {
         var tokens: [String] = []
@@ -227,7 +224,11 @@ func calendarDayDecorationTokens(for summary: CalendarDaySummary) -> [String] {
             tokens.append(emoji(for: destination))
         }
 
-        tokens.append(contentsOf: extraCountries.map { emoji(for: $0) })
+        // ⚡ Bolt: Replace chained .filter().map() with a single .compactMap() pass
+        // to minimize heap memory allocations and avoid creating intermediate arrays.
+        tokens.append(contentsOf: summary.countries.compactMap { country in
+            (country.id != flightOriginID && country.id != flightDestinationID) ? emoji(for: country) : nil
+        })
         return tokens
     }
 
