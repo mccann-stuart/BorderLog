@@ -95,7 +95,9 @@ class MockLedgerDataFetcher: LedgerDataFetching {
 
     func fetchPresenceDayKeys(from start: Date, to end: Date) throws -> Set<String> {
         if let error = fetchPresenceDayKeysError { throw error }
-        let keys = presenceDays.values.filter { $0.date >= start && $0.date <= end }.map { $0.dayKey }
+        // ⚡ Bolt: Replace chained .filter().map() with a single .compactMap() pass
+        // to minimize heap memory allocations and avoid creating intermediate arrays.
+        let keys = presenceDays.values.compactMap { ($0.date >= start && $0.date <= end) ? $0.dayKey : nil }
         return Set(keys)
     }
 
