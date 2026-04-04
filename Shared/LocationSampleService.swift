@@ -151,9 +151,28 @@ final class LocationSampleService: NSObject, CLLocationManagerDelegate {
         let resolution = await resolver.resolveCountry(for: bestLocation)
         let timeZone = resolution?.timeZone ?? TimeZone.current
 
-        let selectedLocations = locations
-            .sorted { $0.horizontalAccuracy < $1.horizontalAccuracy }
-            .prefix(targetSamples)
+        // ⚡ Bolt: Replace O(N log N) sorting + prefix with an O(N) top-K extraction to eliminate ARC thrashing
+        var selectedLocations: [CLLocation] = []
+        if targetSamples > 0 {
+            selectedLocations.reserveCapacity(targetSamples)
+            for location in locations {
+                if selectedLocations.count < targetSamples {
+                    selectedLocations.append(location)
+                    if selectedLocations.count == targetSamples {
+                        selectedLocations.sort { $0.horizontalAccuracy < $1.horizontalAccuracy }
+                    }
+                } else if let last = selectedLocations.last, location.horizontalAccuracy < last.horizontalAccuracy {
+                    // Find insertion point to keep the top K array sorted
+                    if let insertionIndex = selectedLocations.firstIndex(where: { $0.horizontalAccuracy > location.horizontalAccuracy }) {
+                        selectedLocations.insert(location, at: insertionIndex)
+                        selectedLocations.removeLast()
+                    }
+                }
+            }
+            if selectedLocations.count < targetSamples {
+                selectedLocations.sort { $0.horizontalAccuracy < $1.horizontalAccuracy }
+            }
+        }
 
         var dayKeys = Set<String>()
         var storedSamples: [LocationSample] = []
