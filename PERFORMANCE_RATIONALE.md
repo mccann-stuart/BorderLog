@@ -349,6 +349,26 @@ if utf8.count == 2 {
 ## Verification
 - **Time Complexity**: Reduced from an `O(N)` string scan to strict `O(1)` integer bounds checking for the vast majority of cases (where codes are cleanly normalized from SwiftData).
 - **Space Complexity**: Completely eliminated the heap string allocations, dropping memory overhead from `O(N)` temporary memory to `O(1)`.
+# Performance Optimization Rationale: Top-K Selection for Location Bursts
+
+## Current State
+In `LocationSampleService.swift`, the `captureAndStoreBurst` function extracted the top `maxSamples` best-accuracy location fixes by sorting the entire array of captured locations and then slicing a prefix:
+```swift
+let selectedLocations = locations
+    .sorted { $0.horizontalAccuracy < $1.horizontalAccuracy }
+    .prefix(targetSamples)
+```
+
+## Problem
+Sorting the entire `locations` array to find just a few top elements incurs an unnecessary O(N log N) processing cost and generates intermediate array allocations on the heap. This causes ARC thrashing, particularly in background location-tracking scenarios (like widget timelines or background inferences) where power and memory are heavily constrained. This violates the `2026-06-12 - Replace Prefix of Sorted Array with O(N) Top-K Selection` guideline.
+
+## Optimization
+We replaced the O(N log N) full-array sort with an O(N) top-K insertion sort loop. The algorithm maintains a small, fixed-size buffer of the best elements, inserting new items only when their accuracy improves upon the current worst element in the buffer.
+
+## Verification
+- **Time Complexity**: Reduced from `O(N log N)` to expected `O(N * K)` (which simplifies to O(N) since K is typically very small, e.g., 6).
+- **Space Complexity**: Eliminates the intermediate sorted array allocation completely, limiting memory use strictly to the small K-sized buffer.
+
 # Performance Optimization Rationale: Top-K Selection in PresenceInferenceEngine
 
 ## Current State
