@@ -364,3 +364,22 @@ We replaced the multiple collection passes and O(N log N) `.sorted` calls with s
 
 ## Verification
 Simulations in Python measuring operations over 1,000 runs show that the O(N) single-pass approach is roughly twice as fast at N=50 and N=100 compared to full sorting, and also avoids all ARC retain/release overhead for intermediate arrays. This directly reduces memory pressure when iterating over large datasets in the backend inference logic.
+
+# Performance Optimization Rationale: Replaced Dictionary(uniqueKeysWithValues:) with reduce(into:)
+
+## Current State
+Across multiple services and views, arrays were mapped and converted into dictionaries using `Dictionary(uniqueKeysWithValues: array.map { ($0.key, $0) })`.
+
+## Problem
+1. **O(N) Intermediate Array Allocation**: The `.map` operation creates a complete intermediate array of tuples before the dictionary is even constructed. This consumes memory proportional to the input array size, causing unnecessary ARC pressure.
+2. **Crash Risk on Duplicates**: `Dictionary(uniqueKeysWithValues:)` causes a fatal error if the input sequence contains duplicate keys. In dynamic environments involving Core Data or SwiftData fetching, relying strictly on uniqueness guarantees can lead to unexpected crashes.
+
+## Optimization
+Replace the `.map` and initializer sequence with `.reduce(into: [Key: Value](minimumCapacity: array.count)) { dict, item in ... }`:
+1. **O(1) Intermediate Memory**: `reduce(into:)` builds the dictionary in place. No intermediate array of tuples is ever allocated.
+2. **Safe Key Handling**: A simple `if dict[key] == nil` ensures that duplicate keys simply preserve their first occurrence rather than crashing the app.
+3. **Pre-allocated Capacity**: Initializing the dictionary with `minimumCapacity: array.count` prevents costly rehashing during loop insertion.
+
+## Verification
+- **Time Complexity**: Remains O(N) but constant factors drop considerably by bypassing full array mapping.
+- **Space Complexity**: Drops from O(N) array allocation + O(N) dictionary allocation to only O(N) for the destination dictionary itself.

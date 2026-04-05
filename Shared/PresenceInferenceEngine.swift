@@ -94,7 +94,9 @@ struct InferencePipelineState: Sendable {
     var days: [String: DayInferenceState]
 
     init(dayKeys: Set<String>) {
-        self.days = Dictionary(uniqueKeysWithValues: dayKeys.map { ($0, DayInferenceState()) })
+        self.days = dayKeys.reduce(into: [String: DayInferenceState](minimumCapacity: dayKeys.count)) { dict, key in
+            dict[key] = DayInferenceState()
+        }
     }
 
     subscript(dayKey: String) -> DayInferenceState {
@@ -764,7 +766,11 @@ private struct PresenceResultCompiler {
     }
 
     private func applyAdjacentTravelPromotions(results: inout [PresenceDayResult], travelEvents: [TravelEventContext]) {
-        let indexByDayKey = Dictionary(uniqueKeysWithValues: results.enumerated().map { ($0.element.dayKey, $0.offset) })
+        let indexByDayKey = results.enumerated().reduce(into: [String: Int](minimumCapacity: results.count)) { dict, item in
+            if dict[item.element.dayKey] == nil {
+                dict[item.element.dayKey] = item.offset
+            }
+        }
         for travelEvent in travelEvents {
             if let previousDayKey = adjacentDayKey(from: travelEvent.origin.dayKey, timeZoneId: travelEvent.origin.timeZoneId, deltaDays: -1),
                let index = indexByDayKey[previousDayKey],

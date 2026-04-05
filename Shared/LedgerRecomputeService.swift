@@ -165,7 +165,11 @@ public actor LedgerRecomputeService {
             
             // Incremental dependency check: Have the boundary days changed their primary result?
             let existingDays = (try? dataFetcher.fetchPresenceDays(keys: Array(dayKeySet))) ?? []
-            let existingMap = Dictionary(uniqueKeysWithValues: existingDays.map { ($0.dayKey, $0) })
+            let existingMap = existingDays.reduce(into: [String: PresenceDay]()) { dict, day in
+                if dict[day.dayKey] == nil {
+                    dict[day.dayKey] = day
+                }
+            }
             
             var needsExpansion = false
             for result in results {

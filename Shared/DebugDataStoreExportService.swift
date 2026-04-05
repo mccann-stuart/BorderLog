@@ -649,8 +649,16 @@ actor DebugDataStoreExportService {
             }
         }
 
-        let presenceByDayKey = Dictionary(uniqueKeysWithValues: records.presenceDays.map { ($0.dayKey, $0) })
-        let overridesByDayKey = Dictionary(uniqueKeysWithValues: records.dayOverrides.map { ($0.dayKey, $0) })
+        let presenceByDayKey = records.presenceDays.reduce(into: [String: PresenceDay](minimumCapacity: records.presenceDays.count)) { dict, day in
+            if dict[day.dayKey] == nil {
+                dict[day.dayKey] = day
+            }
+        }
+        let overridesByDayKey = records.dayOverrides.reduce(into: [String: DayOverride](minimumCapacity: records.dayOverrides.count)) { dict, override in
+            if dict[override.dayKey] == nil {
+                dict[override.dayKey] = override
+            }
+        }
         let locationsByDayKey = Dictionary(grouping: records.locationSamples, by: \.dayKey)
         let photosByDayKey = Dictionary(grouping: records.photoSignals, by: \.dayKey)
         let calendarSignalsByDayKey = Dictionary(grouping: records.calendarSignals, by: \.dayKey)
