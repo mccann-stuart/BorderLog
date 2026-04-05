@@ -10,7 +10,6 @@ import Foundation
 
 struct DebugExportAppVariantFlags: Codable, Sendable {
     let cloudKitFeatureEnabled: Bool
-    let appleSignInEnabled: Bool
     let appGroupAvailable: Bool
 }
 
@@ -57,13 +56,11 @@ struct DebugExportUserData: Codable, Sendable {
     let passportNationality: String?
     let homeCountry: String?
     let appleUserId: String?
-    let appleSignInEnabled: Bool
 
     enum CodingKeys: String, CodingKey {
         case passportNationality
         case homeCountry
         case appleUserId
-        case appleSignInEnabled
     }
 
     func encode(to encoder: Encoder) throws {
@@ -71,7 +68,6 @@ struct DebugExportUserData: Codable, Sendable {
         try container.encode(passportNationality, forKey: .passportNationality)
         try container.encode(homeCountry, forKey: .homeCountry)
         try container.encode(appleUserId, forKey: .appleUserId)
-        try container.encode(appleSignInEnabled, forKey: .appleSignInEnabled)
     }
 }
 
