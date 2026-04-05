@@ -154,7 +154,11 @@ final class CalendarTabDataServiceTests: XCTestCase {
         XCTAssertEqual(march19.flightDestinationCountry?.id, "GB")
         XCTAssertEqual(march19.countries.map(\.id), ["GB", "US"])
 
-        let totals = Dictionary(uniqueKeysWithValues: snapshot.countrySummaries.map { ($0.id, $0) })
+        let totals = snapshot.countrySummaries.reduce(into: [String: CalendarCountryDaysSummary](minimumCapacity: snapshot.countrySummaries.count)) { dict, summary in
+            if dict[summary.id] == nil {
+                dict[summary.id] = summary
+            }
+        }
         XCTAssertEqual(totals["US"]?.totalDays, 1)
         XCTAssertEqual(totals["GB"]?.totalDays, 1)
         XCTAssertEqual(totals["GB"]?.maxAllowedDays, 180)
@@ -326,7 +330,11 @@ final class CalendarTabDataServiceTests: XCTestCase {
         XCTAssertEqual(bridgeDay.countries.map(\.id), ["ES"])
         XCTAssertEqual(bridgeDay.countries.first?.countryCode, "ES")
 
-        let totals = Dictionary(uniqueKeysWithValues: snapshot.countrySummaries.map { ($0.id, $0) })
+        let totals = snapshot.countrySummaries.reduce(into: [String: CalendarCountryDaysSummary](minimumCapacity: snapshot.countrySummaries.count)) { dict, summary in
+            if dict[summary.id] == nil {
+                dict[summary.id] = summary
+            }
+        }
         XCTAssertEqual(totals["ES"]?.countryName, spainName)
         XCTAssertEqual(totals["ES"]?.totalDays, 1)
         XCTAssertEqual(snapshot.countrySummaries.count, 1)
