@@ -68,3 +68,7 @@
 **Learning:** Performing `O(N)` linear array scans (like `array.first(where:)`) inside repeatedly called UIKit rendering delegates (e.g., `UICalendarView.calendarView(_:decorationFor:)`) can severely bottleneck rendering performance.
 **Action:** Pre-compute O(1) dictionary lookups inside the `didSet` observer of the state/snapshot object, rather than scanning the array inside the delegate loop. Use `Dictionary(_:uniquingKeysWith: { first, _ in first })` to ensure robustness against duplicates.
 - 2024-XX-XX - O(N * M) chained filter.count pattern
+
+## 2026-06-15 - Dictionary Mapping Allocations
+**Learning:** Using `Dictionary(uniqueKeysWithValues: array.map { ... })` creates an intermediate array of tuples, consuming O(N) memory and causing unnecessary ARC overhead. It also risks runtime crashes if the source array contains duplicate elements.
+**Action:** Replace this pattern with `array.reduce(into: [Key: Value](minimumCapacity: array.count)) { $0[key] = value }` to eliminate the intermediate heap allocation, provide safe handling for potential duplicate keys, and drop memory overhead strictly to O(1) beyond the resulting dictionary.

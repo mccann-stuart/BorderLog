@@ -189,7 +189,7 @@ struct CalendarTabView: View {
                 }
             )
             let days = try modelContext.fetch(descriptor)
-            presenceDaysByKey = Dictionary(uniqueKeysWithValues: days.map { ($0.dayKey, $0) })
+            presenceDaysByKey = days.reduce(into: [String: PresenceDay](minimumCapacity: days.count)) { $0[$1.dayKey] = $1 }
         } catch {
             presenceDaysByKey = [:]
         }
