@@ -183,7 +183,7 @@ actor CalendarTabDataService {
         let stays = try fetchStays(rangeStartKey: rangeStartKey, rangeEndKey: rangeEndKey)
         let countryConfigs = try modelContext.fetch(FetchDescriptor<CountryConfig>())
 
-        var accumulators = Dictionary(uniqueKeysWithValues: fetchDayKeys.map { ($0, DayAccumulator()) })
+        var accumulators = fetchDayKeys.reduce(into: [String: DayAccumulator](minimumCapacity: fetchDayKeys.count)) { $0[$1] = DayAccumulator() }
 
         for override in overrides {
             addCountry(
@@ -228,7 +228,11 @@ actor CalendarTabDataService {
             }
         }
 
-        let configByID = Dictionary(countryConfigs.map { ($0.countryCode, $0.maxAllowedDays) }, uniquingKeysWith: { current, _ in current })
+        let configByID = countryConfigs.reduce(into: [String: Int?](minimumCapacity: countryConfigs.count)) { result, config in
+            if result[config.countryCode] == nil {
+                result[config.countryCode] = config.maxAllowedDays
+            }
+        }
         let daySummaries = Self.makeMonthDaySummaries(
             for: normalizedVisibleMonth,
             accumulators: accumulators,
@@ -504,7 +508,7 @@ actor CalendarTabDataService {
         calendar: Calendar
     ) -> [CalendarCountryDaysSummary] {
         var counts: [String: (country: CalendarDayCountry, totalDays: Int)] = [:]
-        let resolvedDayMap = Dictionary(uniqueKeysWithValues: presenceDays.map { ($0.dayKey, $0) })
+        let resolvedDayMap = presenceDays.reduce(into: [String: PresenceDay](minimumCapacity: presenceDays.count)) { $0[$1.dayKey] = $1 }
 
         for dayKey in summaryDayKeys {
             guard summaryRange.contains(dayKey: dayKey, visibleMonthStart: visibleMonthStart, now: now, calendar: calendar) else {
@@ -557,7 +561,7 @@ actor CalendarTabDataService {
         now: Date,
         calendar: Calendar
     ) -> [String] {
-        let resolvedDayMap = Dictionary(uniqueKeysWithValues: presenceDays.map { ($0.dayKey, $0) })
+        let resolvedDayMap = presenceDays.reduce(into: [String: PresenceDay](minimumCapacity: presenceDays.count)) { $0[$1.dayKey] = $1 }
         var unknownDayKeys: [String] = []
 
         for dayKey in summaryDayKeys {
@@ -644,7 +648,7 @@ actor CalendarTabDataService {
     ) -> [CalendarDaySummary] {
         let monthRange = makeMonthRange(for: visibleMonthStart, calendar: calendar)
         let todayKey = DayKey.make(from: now, timeZone: calendar.timeZone)
-        let resolvedDayMap = Dictionary(uniqueKeysWithValues: presenceDays.map { ($0.dayKey, $0) })
+        let resolvedDayMap = presenceDays.reduce(into: [String: PresenceDay](minimumCapacity: presenceDays.count)) { $0[$1.dayKey] = $1 }
 
         return monthRange.dayKeys.compactMap { dayKey in
             guard let date = DayKey.date(for: dayKey, timeZone: calendar.timeZone) else { return nil }
