@@ -482,7 +482,7 @@ enum ModelContainerProvider {
                 return try makeTemporaryFallbackContainer(schema: schema)
             } catch {
                 logger.critical("Unable to initialize any SwiftData container: \(error, privacy: .private)")
-                fatalError("Unable to initialize any SwiftData container")
+                fatalError("App initialization failed due to a critical storage error. Please restart the application.")
             }
         }
     }
