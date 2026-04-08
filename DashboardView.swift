@@ -46,7 +46,12 @@ struct DashboardView: View {
         let dateRange = selectedTimeframe.dateRange(now: now, calendar: calendar)
 
         // ⚡ Bolt: Pre-compute dictionary of max allowed days to avoid O(N) lookup per country
-        let configDict = Dictionary(countryConfigs.map { ($0.countryCode, $0.maxAllowedDays) }, uniquingKeysWith: { first, _ in first })
+        // Use reduce(into:) to eliminate intermediate array allocations from .map
+        let configDict = countryConfigs.reduce(into: [String: Int](minimumCapacity: countryConfigs.count)) { dict, config in
+            if dict[config.countryCode] == nil {
+                dict[config.countryCode] = config.maxAllowedDays
+            }
+        }
 
         for day in presenceDays {
             // presenceDays is sorted reverse-chronologically (newest first).

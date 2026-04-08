@@ -197,8 +197,12 @@ enum CountryOptions {
     }()
 
     // ⚡ Bolt: Precomputed lookup dictionary reducing O(M) linear array scans into O(1) fetches.
-    // Safe initialization with `uniquingKeysWith` to prevent potential runtime duplicate crashes.
-    static let byCode: [String: CountryOption] = Dictionary(all.map { ($0.code, $0) }, uniquingKeysWith: { first, _ in first })
+    // Safe initialization with `reduce(into:)` avoids intermediate array allocations and prevents potential runtime duplicate crashes.
+    static let byCode: [String: CountryOption] = all.reduce(into: [String: CountryOption](minimumCapacity: all.count)) { dict, option in
+        if dict[option.code] == nil {
+            dict[option.code] = option
+        }
+    }
 }
 
 #Preview {
