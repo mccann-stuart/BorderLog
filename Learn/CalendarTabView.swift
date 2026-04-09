@@ -312,7 +312,8 @@ struct NativeCalendarView: UIViewRepresentable {
 
         @available(*, unavailable)
         required init?(coder: NSCoder) {
-            fatalError("init(coder:) has not been implemented")
+            Self.logger.error("init(coder:) called but not implemented.")
+            fatalError("App interface initialization failed. Please restart the application.")
         }
     }
 
