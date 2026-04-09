@@ -384,3 +384,18 @@ This efficiently constructs the dictionary in a single pass while explicitly han
 ## Verification
 - **Time Complexity**: Remains O(N), but the constant factors are reduced significantly by removing the intermediate `.map` array allocation step.
 - **Space Complexity**: Memory footprint dropped by avoiding the intermediate heap allocation of `[Tuple]`, providing `O(1)` memory overhead beyond the target dictionary.
+
+# Performance Optimization Rationale: Top-K Extraction
+
+## Current State
+When resolving the best candidate flight or signal in `CalendarEvidenceResolver.boundedSignals`, the code fetched the top element by sorting the entire array of `candidates` via `sortedDeduplicated` which internally does an O(N log N) `Array.sorted` call, and then called `.prefix(limit)` on it. Often, `limit` is just 1 (e.g. from `max(calendarCount, 1)` where `calendarCount` is often 1).
+
+## Problem
+Sorting an entire array and doing deduplication passes simply to extract the absolute maximum or minimum value is extremely inefficient. It incurs an unnecessary O(N log N) processing cost and extra memory allocations. Inside main processing loops, this causes performance degradation and unnecessary ARC overhead when we only needed the top item.
+
+## Optimization
+Implemented a fast-path in `boundedSignals` specifically for the `limit == 1` case. It uses `.min(by:)` to perform a single O(N) iteration over the array with O(1) auxiliary space complexity. It evaluates the exact same multi-property comparator (`timestamp` and `eventIdentifier`) to extract the correct priority item directly, skipping the `Set` deduplication completely since selecting the single absolute minimum intrinsically deduplicates.
+
+## Verification
+- Validated via Python scripting to verify algorithmic correctness, ensuring equivalent evaluation behavior (returning identical optimal elements).
+- Requested AI code review to ensure safety (the patch removes the O(N * K) scaling regressions caused by Swift `Array.insert` shifting that an earlier attempt introduced).
