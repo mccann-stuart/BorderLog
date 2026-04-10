@@ -649,8 +649,8 @@ actor DebugDataStoreExportService {
             }
         }
 
-        let presenceByDayKey = records.presenceDays.reduce(into: [String: PresenceDay](minimumCapacity: records.presenceDays.count)) { $0[$1.dayKey] = $1 }
-        let overridesByDayKey = records.dayOverrides.reduce(into: [String: DayOverride](minimumCapacity: records.dayOverrides.count)) { $0[$1.dayKey] = $1 }
+        let presenceByDayKey = records.presenceDays.reduce(into: [String: DebugExportPresenceDayRecord](minimumCapacity: records.presenceDays.count)) { $0[$1.dayKey] = $1 }
+        let overridesByDayKey = records.dayOverrides.reduce(into: [String: DebugExportDayOverrideRecord](minimumCapacity: records.dayOverrides.count)) { $0[$1.dayKey] = $1 }
         let locationsByDayKey = Dictionary(grouping: records.locationSamples, by: \.dayKey)
         let photosByDayKey = Dictionary(grouping: records.photoSignals, by: \.dayKey)
         let calendarSignalsByDayKey = Dictionary(grouping: records.calendarSignals, by: \.dayKey)

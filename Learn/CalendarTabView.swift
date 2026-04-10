@@ -292,6 +292,7 @@ struct NativeCalendarView: UIViewRepresentable {
     }
 
     final class CalendarContainerView: UIView {
+        private static let logger = Logger(subsystem: "com.MCCANN.Border", category: "CalendarContainerView")
         let calendarView = UICalendarView()
 
         init(horizontalInset: CGFloat) {

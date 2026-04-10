@@ -531,16 +531,26 @@ private struct PresenceResultCompiler {
         let margin = max(0, winningShare - runnerUpShare)
 
         // ⚡ Bolt: Use a single compactMap pass to generate allocations above the floor without O(N) intermediate filtering
-        let allocations: [PresenceCountryAllocation] = dayState.countryScores.compactMap { key, score in
-            guard let country = dayState.countries[key] else { return nil }
+        let allocationFloor = config.allocationFloor
+        let countries = dayState.countries
+        let unsortedAllocations: [PresenceCountryAllocation] = dayState.countryScores.compactMap { key, score in
+            guard let country = countries[key] else { return nil }
             let normalizedShare = score / totalScore
-            guard normalizedShare >= config.allocationFloor else { return nil }
+            guard normalizedShare >= allocationFloor else { return nil }
             return PresenceCountryAllocation(
                 countryCode: country.code,
                 countryName: country.name,
                 normalizedShare: normalizedShare
             )
-        }.sorted { $0.normalizedShare > $1.normalizedShare || ($0.normalizedShare == $1.normalizedShare && $0.countryCode < $1.countryCode) }
+        }
+        let allocations = unsortedAllocations.sorted { lhs, rhs in
+            if lhs.normalizedShare == rhs.normalizedShare {
+                let lhsCode = lhs.countryCode ?? ""
+                let rhsCode = rhs.countryCode ?? ""
+                return lhsCode < rhsCode
+            }
+            return lhs.normalizedShare > rhs.normalizedShare
+        }
 
         return PresenceDayResult(
             dayKey: dayKey,
