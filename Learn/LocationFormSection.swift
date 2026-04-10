@@ -42,7 +42,8 @@ struct LocationFormSection: View {
 
     // ⚡ Bolt: Fast O(1) lookups for the ledger summary options, improving UI picker render times.
     private var ledgerOptions: [CountryOption] {
-        let suggestedSet = Set(suggestedCodes.map { $0.uppercased() })
+        // ⚡ Bolt: Avoid intermediate array allocations by using .lazy.map when converting to a Set.
+        let suggestedSet = Set(suggestedCodes.lazy.map { $0.uppercased() })
         return ledgerCountryCounts.compactMap { item in
             let code = item.code.uppercased()
             guard !suggestedSet.contains(code) else { return nil }
@@ -51,10 +52,10 @@ struct LocationFormSection: View {
     }
 
     private var regionGroupedOptions: [(region: GeoRegion, countries: [CountryOption])] {
-        let usedCodes = Set(
-            suggestedCodes.map { $0.uppercased() } +
-            ledgerCountryCounts.map { $0.code.uppercased() }
-        )
+        // ⚡ Bolt: Avoid intermediate array allocations by using lazy evaluations
+        let mappedSuggested = suggestedCodes.lazy.map { $0.uppercased() }
+        let mappedLedger = ledgerCountryCounts.lazy.map { $0.code.uppercased() }
+        let usedCodes = Set(mappedSuggested).union(mappedLedger)
 
         let remaining = allCountryOptions.filter { !usedCodes.contains($0.code) }
 

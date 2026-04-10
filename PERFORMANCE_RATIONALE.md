@@ -399,3 +399,19 @@ Implemented a fast-path in `boundedSignals` specifically for the `limit == 1` ca
 ## Verification
 - Validated via Python scripting to verify algorithmic correctness, ensuring equivalent evaluation behavior (returning identical optimal elements).
 - Requested AI code review to ensure safety (the patch removes the O(N * K) scaling regressions caused by Swift `Array.insert` shifting that an earlier attempt introduced).
+
+# Performance Optimization Rationale: Lazy Set Initialization
+
+## Current State
+Throughout the application, sets were initialized from mapped properties using a standard map, such as `Set(days.map { $0.dayKey })`.
+
+## Problem
+1. **O(N) Intermediate Allocation**: Standard `.map` allocates an entirely new intermediate array in memory just to hold the mapped values. When the `Set` finishes initializing, this intermediate array is immediately discarded.
+2. **Memory/ARC Pressure**: This redundant allocation creates unnecessary GC/ARC thrashing during repetitive operations, especially when initializing large sets from database fetches or processing high-frequency data structures.
+
+## Optimization
+Appended `.lazy` before `.map` to use a lazy sequence generator: `Set(days.lazy.map { $0.dayKey })`. This allows the `Set` to iterate and pull values sequentially through the generator without creating an intermediate array.
+
+## Verification
+- **Time Complexity**: Remains `O(N)`, but with a significantly faster execution due to eliminating array memory allocations and buffer copying overhead.
+- **Space Complexity**: Memory footprint reduced from `O(N)` transient memory allocation (allocating the intermediate array) to strictly `O(1)` memory overhead beyond the final `Set` itself.

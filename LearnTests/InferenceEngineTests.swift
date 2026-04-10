@@ -216,7 +216,7 @@ final class InferenceEngineTests: XCTestCase {
     func testBridgesSevenDayVoidWhenCanonicalCountriesMatch() {
         let start = day(2026, 2, 1)
         let end = day(2026, 2, 9)
-        let dayKeys = Set((1...9).map { day in
+        let dayKeys = Set((1...9).lazy.map { day in
             DayKey.make(from: self.day(2026, 2, day), timeZone: calendar.timeZone)
         })
         let spainName = localizedCountryName("ES")
@@ -263,7 +263,7 @@ final class InferenceEngineTests: XCTestCase {
     func testDoesNotBridgeEightDayVoidWhenCountriesMatch() {
         let start = day(2026, 2, 1)
         let end = day(2026, 2, 10)
-        let dayKeys = Set((1...10).map { day in
+        let dayKeys = Set((1...10).lazy.map { day in
             DayKey.make(from: self.day(2026, 2, day), timeZone: calendar.timeZone)
         })
         let spainName = localizedCountryName("ES")
@@ -523,7 +523,7 @@ final class InferenceEngineTests: XCTestCase {
     }
 
     func testTravelBackedTransitionInfillPromotesMarch2026GapsAndKeepsSuggestions() {
-        let dayKeys = Set((6...15).map { day in
+        let dayKeys = Set((6...15).lazy.map { day in
             DayKey.make(from: self.day(2026, 3, day), timeZone: calendar.timeZone)
         })
 
@@ -597,7 +597,7 @@ final class InferenceEngineTests: XCTestCase {
     }
 
     func testDifferentCountryGapWithoutTravelEvidenceRemainsSuggestionOnly() {
-        let dayKeys = Set((6...10).map { day in
+        let dayKeys = Set((6...10).lazy.map { day in
             DayKey.make(from: self.day(2026, 3, day), timeZone: calendar.timeZone)
         })
 

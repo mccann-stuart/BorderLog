@@ -72,3 +72,7 @@
 ## 2026-06-15 - Dictionary Mapping Allocations
 **Learning:** Using `Dictionary(uniqueKeysWithValues: array.map { ... })` creates an intermediate array of tuples, consuming O(N) memory and causing unnecessary ARC overhead. It also risks runtime crashes if the source array contains duplicate elements.
 **Action:** Replace this pattern with `array.reduce(into: [Key: Value](minimumCapacity: array.count)) { $0[key] = value }` to eliminate the intermediate heap allocation, provide safe handling for potential duplicate keys, and drop memory overhead strictly to O(1) beyond the resulting dictionary.
+
+## 2026-06-20 - Lazy Evaluation for Set Initialization
+**Learning:** Using `Set(array.map { ... })` allocates an intermediate array of elements only to immediately discard it after the `Set` is populated. In data-heavy operations, this leads to unnecessary memory pressure and garbage collection overhead.
+**Action:** Always use a lazy sequence generator by appending `.lazy` before `.map` (e.g., `Set(array.lazy.map { ... })`) to avoid generating O(N) intermediate arrays during `Set` initialization, preserving O(1) auxiliary memory overhead.

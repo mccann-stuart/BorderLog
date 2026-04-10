@@ -137,7 +137,7 @@ final class LedgerRecomputeServiceTests: XCTestCase {
 
         XCTAssertEqual(days.count, expectedKeys.count)
 
-        let actualKeys = Set(days.map { $0.dayKey })
+        let actualKeys = Set(days.lazy.map { $0.dayKey })
         XCTAssertEqual(actualKeys, Set(expectedKeys))
 
         let sortedActual = actualKeys.sorted()
