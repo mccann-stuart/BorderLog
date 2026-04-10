@@ -122,6 +122,21 @@ struct CalendarEvidenceResolver {
             candidates = signals
         }
 
+        // ⚡ Bolt: Avoid O(N log N) sorting cost when we only need the top candidate.
+        // We use .min(by:) which performs a single O(N) pass and O(1) memory, avoiding
+        // the need for deduplication entirely since we only extract the absolute minimum.
+        if limit == 1 {
+            if let best = candidates.min(by: { lhs, rhs in
+                if lhs.timestamp == rhs.timestamp {
+                    return lhs.eventIdentifier < rhs.eventIdentifier
+                }
+                return lhs.timestamp < rhs.timestamp
+            }) {
+                return [best]
+            }
+            return []
+        }
+
         return Array(sortedDeduplicated(signals: candidates).prefix(limit))
     }
 }
