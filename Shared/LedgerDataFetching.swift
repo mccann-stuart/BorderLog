@@ -155,7 +155,8 @@ struct RealLedgerDataFetcher: LedgerDataFetching {
             }
         )
         let days = try modelContext.fetch(descriptor)
-        return Set(days.map { $0.dayKey })
+        // ⚡ Bolt: Use .lazy.map to avoid O(N) intermediate array allocation when initializing a Set.
+        return Set(days.lazy.map { $0.dayKey })
     }
 
     func fetchNearestKnownPresenceDay(before date: Date) throws -> PresenceDay? {
