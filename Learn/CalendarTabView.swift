@@ -323,7 +323,12 @@ struct NativeCalendarView: UIViewRepresentable {
         var snapshot: CalendarTabSnapshot? {
             didSet {
                 if let summaries = snapshot?.daySummaries {
-                    summaryDict = Dictionary(summaries.map { ($0.dayKey, $0) }, uniquingKeysWith: { first, _ in first })
+                    // ⚡ Bolt: Prevent intermediate array allocation by using `reduce(into:)` instead of `map` + `Dictionary(uniquingKeysWith:)`.
+                    summaryDict = summaries.reduce(into: [String: CalendarDaySummary](minimumCapacity: summaries.count)) { dict, summary in
+                        if dict[summary.dayKey] == nil {
+                            dict[summary.dayKey] = summary
+                        }
+                    }
                 } else {
                     summaryDict = [:]
                 }

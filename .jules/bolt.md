@@ -72,3 +72,6 @@
 ## 2026-06-15 - Dictionary Mapping Allocations
 **Learning:** Using `Dictionary(uniqueKeysWithValues: array.map { ... })` creates an intermediate array of tuples, consuming O(N) memory and causing unnecessary ARC overhead. It also risks runtime crashes if the source array contains duplicate elements.
 **Action:** Replace this pattern with `array.reduce(into: [Key: Value](minimumCapacity: array.count)) { $0[key] = value }` to eliminate the intermediate heap allocation, provide safe handling for potential duplicate keys, and drop memory overhead strictly to O(1) beyond the resulting dictionary.
+## 2024-11-20 - Fast Dictionary Initialization without map overhead
+**Learning:** Initializing a Dictionary via `Dictionary(uniqueKeysWithValues: collection.map { ... })` incurs an unnecessary `O(N)` heap allocation to store the intermediate array of tuples before the dictionary is constructed.
+**Action:** When creating a dictionary from an existing collection, replace the `.map` chain with `collection.reduce(into: [Key: Value](minimumCapacity: collection.count)) { $0[key] = value }` to perform the transformation directly into the pre-sized buffer. Preserve uniqueness logic (e.g. `uniquingKeysWith: { first, _ in first }`) by explicitly checking `if dict[key] == nil` inside the closure.
