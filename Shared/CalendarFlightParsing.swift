@@ -39,6 +39,34 @@ enum CalendarEventIngestability: Sendable {
 }
 
 enum CalendarFlightParsing {
+
+    // MARK: - Regex Patterns
+
+    private nonisolated static let patternFromTo = try! NSRegularExpression(pattern: "(?:from\\s+(.+?)\\s+to\\s+(.+))", options: [.caseInsensitive])
+    private nonisolated static let patternTo = try! NSRegularExpression(pattern: "(?:flight|train|ferry|bus)\\s+to\\s+(.+)", options: [.caseInsensitive])
+    private nonisolated static let patternHotel = try! NSRegularExpression(pattern: "hotel\\s+(?:in|at)\\s+(.+)", options: [.caseInsensitive])
+    private nonisolated static let patternFlightNumberRoute = try! NSRegularExpression(
+        pattern: "flight\\s*[:\\-]?\\s*[A-Z]{1,3}\\s*\\d{1,4}\\s+(.+?)\\s+to\\s+(.+)",
+        options: [.caseInsensitive]
+    )
+    private nonisolated static let patternLineRoute = try! NSRegularExpression(
+        pattern: "^\\s*([\\p{L}][\\p{L}\\p{M} .'-]{1,80}?)\\s+to\\s+([\\p{L}][\\p{L}\\p{M} .'-]{1,80}?)\\s*$",
+        options: [.caseInsensitive, .anchorsMatchLines]
+    )
+    private nonisolated static let patternPlane = try! NSRegularExpression(pattern: "(.+?)\\s*✈\\s*(.+)", options: [])
+    private nonisolated static let patternPlaneEmoji = try! NSRegularExpression(pattern: "(.+?)\\s*✈️\\s*(.+)", options: [])
+    private nonisolated static let patternCodes = try! NSRegularExpression(pattern: "\\b([A-Z]{3})\\s*(?:[-/→]|->)\\s*([A-Z]{3})\\b", options: [])
+
+    private nonisolated static let patternWhitespace = try! NSRegularExpression(pattern: "\\s+", options: [])
+    private nonisolated static let patternFlightSuffix = try! NSRegularExpression(
+        pattern: "\\s*\\([A-Z]{1,3}\\s*\\d{1,4}\\)\\s*$",
+        options: [.caseInsensitive]
+    )
+    private nonisolated static let patternWeekdaySuffix = try! NSRegularExpression(
+        pattern: "\\s+(?:Mon(?:day)?|Tue(?:sday)?|Wed(?:nesday)?|Thu(?:rsday)?|Fri(?:day)?|Sat(?:urday)?|Sun(?:day)?)\\b.*$",
+        options: [.caseInsensitive]
+    )
+
     nonisolated static func classify(event: CalendarEventTextSnapshot) -> CalendarEventIngestability {
         let candidates = [
             event.title,
@@ -78,21 +106,6 @@ enum CalendarFlightParsing {
             event.notes ?? ""
         ]
 
-        let patternFromTo = try? NSRegularExpression(pattern: "(?:from\\s+(.+?)\\s+to\\s+(.+))", options: [.caseInsensitive])
-        let patternTo = try? NSRegularExpression(pattern: "(?:flight|train|ferry|bus)\\s+to\\s+(.+)", options: [.caseInsensitive])
-        let patternHotel = try? NSRegularExpression(pattern: "hotel\\s+(?:in|at)\\s+(.+)", options: [.caseInsensitive])
-        let patternFlightNumberRoute = try? NSRegularExpression(
-            pattern: "flight\\s*[:\\-]?\\s*[A-Z]{1,3}\\s*\\d{1,4}\\s+(.+?)\\s+to\\s+(.+)",
-            options: [.caseInsensitive]
-        )
-        let patternLineRoute = try? NSRegularExpression(
-            pattern: "^\\s*([\\p{L}][\\p{L}\\p{M} .'-]{1,80}?)\\s+to\\s+([\\p{L}][\\p{L}\\p{M} .'-]{1,80}?)\\s*$",
-            options: [.caseInsensitive, .anchorsMatchLines]
-        )
-        let patternPlane = try? NSRegularExpression(pattern: "(.+?)\\s*✈\\s*(.+)", options: [])
-        let patternPlaneEmoji = try? NSRegularExpression(pattern: "(.+?)\\s*✈️\\s*(.+)", options: [])
-        let patternCodes = try? NSRegularExpression(pattern: "\\b([A-Z]{3})\\s*(?:[-/→]|->)\\s*([A-Z]{3})\\b", options: [])
-
         let bestFrom: String? = nil
         var bestTo: String? = nil
 
@@ -104,36 +117,35 @@ enum CalendarFlightParsing {
             let nsString = text as NSString
             let range = NSRange(location: 0, length: nsString.length)
 
-            if let p = patternCodes, let match = p.firstMatch(in: text, options: [], range: range), match.numberOfRanges >= 3 {
+            if let match = patternCodes.firstMatch(in: text, options: [], range: range), match.numberOfRanges >= 3 {
                 return (
                     nsString.substring(with: match.range(at: 1)),
                     nsString.substring(with: match.range(at: 2))
                 )
             }
 
-            if let p = patternPlane, let match = p.firstMatch(in: text, options: [], range: range), match.numberOfRanges >= 3 {
+            if let match = patternPlane.firstMatch(in: text, options: [], range: range), match.numberOfRanges >= 3 {
                 return (
                     normalizeLocationToken(nsString.substring(with: match.range(at: 1))),
                     normalizeLocationToken(nsString.substring(with: match.range(at: 2)))
                 )
             }
 
-            if let p = patternPlaneEmoji, let match = p.firstMatch(in: text, options: [], range: range), match.numberOfRanges >= 3 {
+            if let match = patternPlaneEmoji.firstMatch(in: text, options: [], range: range), match.numberOfRanges >= 3 {
                 return (
                     normalizeLocationToken(nsString.substring(with: match.range(at: 1))),
                     normalizeLocationToken(nsString.substring(with: match.range(at: 2)))
                 )
             }
 
-            if let p = patternFromTo, let match = p.firstMatch(in: text, options: [], range: range), match.numberOfRanges >= 3 {
+            if let match = patternFromTo.firstMatch(in: text, options: [], range: range), match.numberOfRanges >= 3 {
                 return (
                     normalizeLocationToken(nsString.substring(with: match.range(at: 1))),
                     normalizeLocationToken(nsString.substring(with: match.range(at: 2)))
                 )
             }
 
-            if let p = patternFlightNumberRoute,
-               let match = p.firstMatch(in: text, options: [], range: range),
+            if let match = patternFlightNumberRoute.firstMatch(in: text, options: [], range: range),
                match.numberOfRanges >= 3 {
                 return (
                     normalizeLocationToken(nsString.substring(with: match.range(at: 1))),
@@ -141,10 +153,10 @@ enum CalendarFlightParsing {
                 )
             }
 
-            if let p = patternLineRoute {
+            do {
                 let preprocessedNSString = preprocessedText as NSString
                 let preprocessedRange = NSRange(location: 0, length: preprocessedNSString.length)
-                if let match = p.firstMatch(in: preprocessedText, options: [], range: preprocessedRange),
+                if let match = patternLineRoute.firstMatch(in: preprocessedText, options: [], range: preprocessedRange),
                    match.numberOfRanges >= 3 {
                     return (
                         normalizeLocationToken(preprocessedNSString.substring(with: match.range(at: 1))),
@@ -154,15 +166,13 @@ enum CalendarFlightParsing {
             }
 
             if bestTo == nil,
-               let p = patternTo,
-               let match = p.firstMatch(in: text, options: [], range: range),
+               let match = patternTo.firstMatch(in: text, options: [], range: range),
                match.numberOfRanges >= 2 {
                 bestTo = normalizeLocationToken(nsString.substring(with: match.range(at: 1)))
             }
 
             if bestTo == nil,
-               let p = patternHotel,
-               let match = p.firstMatch(in: text, options: [], range: range),
+               let match = patternHotel.firstMatch(in: text, options: [], range: range),
                match.numberOfRanges >= 2 {
                 bestTo = normalizeLocationToken(nsString.substring(with: match.range(at: 1)))
             }
@@ -199,12 +209,12 @@ enum CalendarFlightParsing {
                 return scalar
             }
         }
-        return String(scalars.map { Character($0) })
+        return String(String.UnicodeScalarView(scalars))
     }
 
     private nonisolated static func collapseWhitespace(_ raw: String) -> String {
-        raw
-            .replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
+        let range = NSRange(location: 0, length: (raw as NSString).length)
+        return patternWhitespace.stringByReplacingMatches(in: raw, options: [], range: range, withTemplate: " ")
             .trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
@@ -212,28 +222,24 @@ enum CalendarFlightParsing {
         var value = raw.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !value.isEmpty else { return nil }
 
-        if let flightSuffix = try? NSRegularExpression(
-            pattern: "\\s*\\([A-Z]{1,3}\\s*\\d{1,4}\\)\\s*$",
-            options: [.caseInsensitive]
-        ) {
-            let range = NSRange(location: 0, length: (value as NSString).length)
-            value = flightSuffix.stringByReplacingMatches(in: value, options: [], range: range, withTemplate: "")
-        }
+        let range1 = NSRange(location: 0, length: (value as NSString).length)
+        value = patternFlightSuffix.stringByReplacingMatches(in: value, options: [], range: range1, withTemplate: "")
 
-        if let weekdaySuffix = try? NSRegularExpression(
-            pattern: "\\s+(?:Mon(?:day)?|Tue(?:sday)?|Wed(?:nesday)?|Thu(?:rsday)?|Fri(?:day)?|Sat(?:urday)?|Sun(?:day)?)\\b.*$",
-            options: [.caseInsensitive]
-        ) {
-            let range = NSRange(location: 0, length: (value as NSString).length)
-            value = weekdaySuffix.stringByReplacingMatches(in: value, options: [], range: range, withTemplate: "")
-        }
+        let range2 = NSRange(location: 0, length: (value as NSString).length)
+        value = patternWeekdaySuffix.stringByReplacingMatches(in: value, options: [], range: range2, withTemplate: "")
 
-        value = value.replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
+        let range3 = NSRange(location: 0, length: (value as NSString).length)
+        value = patternWhitespace.stringByReplacingMatches(in: value, options: [], range: range3, withTemplate: " ")
         value = value.trimmingCharacters(in: .whitespacesAndNewlines)
 
-        while let scalar = value.unicodeScalars.last,
-              CharacterSet(charactersIn: ".,;:!?)").contains(scalar) {
-            value.removeLast()
+        var shouldContinue = true
+        while shouldContinue, let scalar = value.unicodeScalars.last {
+            switch scalar.value {
+            case 46, 44, 59, 58, 33, 63, 41: // ".,;:!?)"
+                value.unicodeScalars.removeLast()
+            default:
+                shouldContinue = false
+            }
         }
 
         value = value.trimmingCharacters(in: .whitespacesAndNewlines)
