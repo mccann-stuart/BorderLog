@@ -16,68 +16,52 @@ struct UserAccountView: View {
     var body: some View {
         NavigationStack {
             Form {
-                if AuthenticationManager.isAppleSignInEnabled {
-                    Section("Account") {
-                        HStack {
-                            Image(systemName: "person.circle.fill")
-                                .font(.system(size: 50))
-                                .foregroundStyle(.blue)
+                Section("Account") {
+                    HStack {
+                        Image(systemName: "person.circle.fill")
+                            .font(.system(size: 50))
+                            .foregroundStyle(.blue)
                             
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text("Signed in with Apple")
-                                    .font(.headline)
+                    VStack(alignment: .leading, spacing: 4) {
+                            Text("Signed in with Apple")
+                            .font(.headline)
                                 
-                                Text(maskedUserId)
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            }
+                            Text(maskedUserId)
+                            .font(.caption)
+                                .foregroundStyle(.secondary)
                         }
-                        .padding(.vertical, 8)
+                    }
+                    .padding(.vertical, 8)
                     }
                     
-                    Section("Authentication") {
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text("Sign in with Apple")
-                                .font(.headline)
-                            Text("Your Apple ID is used for authentication. BorderLog does not have access to your email or personal information.")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
+                Section("Authentication") {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Sign in with Apple")
+                            .font(.headline)
+                        Text("Your Apple ID is used for authentication. BorderLog does not have access to your email or personal information.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
                     }
-                } else {
-                    Section("Account") {
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text("Use without an account")
-                                .font(.headline)
-                            Text("Sign in is disabled. Your travel data stays on this device.")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                        .padding(.vertical, 8)
                     }
-                }
                 
                 Section("Data Sync") {
                     VStack(alignment: .leading, spacing: 8) {
-                        HStack {
+                    HStack {
                             Text("iCloud Sync")
-                                .font(.headline)
+                            .font(.headline)
                             Spacer()
                             Text("Not Configured")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
                         Text("Enable iCloud to sync your travel data across devices. Configure in a future milestone.")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
                 }
-                
-                if AuthenticationManager.isAppleSignInEnabled {
-                    Section {
-                        Button("Sign Out", role: .destructive) {
-                            isConfirmingSignOut = true
-                        }
+                Section {
+                    Button("Sign Out", role: .destructive) {
+                        isConfirmingSignOut = true
                     }
                 }
             }
