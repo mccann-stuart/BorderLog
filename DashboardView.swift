@@ -110,7 +110,7 @@ struct DashboardView: View {
     
     var body: some View {
         let visitedSummary = visitedCountriesSummaryData
-        let visitedCountryCodes = Set(visitedSummary.countries.compactMap(\.countryCode))
+        let visitedCountryCodes = Set(visitedSummary.countries.lazy.compactMap(\.countryCode))
 
         ScrollView {
             VStack(spacing: 20) {
