@@ -66,38 +66,15 @@ struct WelcomeView: View {
             
             // Authentication
             VStack(spacing: 16) {
-                if AuthenticationManager.isAppleSignInEnabled {
-                    SignInWithAppleButton(.signIn) { request in
-                        request.requestedScopes = [] // We only need the user ID
-                    } onCompletion: { result in
-                        handleAppleSignIn(result: result)
-                    }
-                    .signInWithAppleButtonStyle(.black)
-                    .frame(height: 50)
-                    .cornerRadius(8)
-                    .padding(.horizontal, 32)
-                } else {
-                    Button {
-                        // In local-only mode, any ID will do to bypass auth
-                        authManager.signIn(userId: "local_user_\(UUID().uuidString)")
-                        withAnimation {
-                            currentStep = 1
-                        }
-                    } label: {
-                        Text("Continue without an account")
-                            .font(.headline)
-                            .foregroundStyle(.white)
-                            .frame(maxWidth: .infinity)
-                            .frame(height: 50)
-                            .background(Color.blue)
-                            .cornerRadius(12)
-                    }
-                    .padding(.horizontal, 32)
-                    
-                    Text("Sign in with Apple is currently disabled.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                SignInWithAppleButton(.signIn) { request in
+                    request.requestedScopes = [] // We only need the user ID
+                } onCompletion: { result in
+                    handleAppleSignIn(result: result)
                 }
+                .signInWithAppleButtonStyle(.black)
+                .frame(height: 50)
+                .cornerRadius(8)
+                .padding(.horizontal, 32)
             }
             .padding(.bottom, 40)
         }
