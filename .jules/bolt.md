@@ -82,3 +82,7 @@
 ## 2026-03-01 - Optimizing Frequent Regex Parsing
 **Learning:** Instantiating `NSRegularExpression` repeatedly inside functions forces the regex engine to compile the pattern on every invocation, causing significant overhead in frequent text parsing operations like Calendar ingest loops. Additionally, creating Swift `CharacterSet` instances and checking them in tight loops introduces hidden bridging and object allocation costs.
 **Action:** Always hoist `NSRegularExpression` initializations to `private nonisolated static let` constants. Replace `CharacterSet` membership checks in scalar loops with fast integer `switch` statements on `scalar.value`. Use `String(String.UnicodeScalarView(scalars))` instead of `.map { Character($0) }` to stream mapped scalars directly into a string, bypassing intermediate array allocations.
+
+## 2026-06-25 - Fast-Path String Evaluation in Dispatch Loops
+**Learning:** Using `String.lowercased()` to normalize strings for comparison inside high-frequency dispatch loops (like updating inference pipeline evidence counts) introduces severe O(N) heap allocation overhead. When the loop executes thousands of times per transaction, this creates intense CPU and ARC pressure.
+**Action:** Always implement a fast-path switch statement for exact string matches of known constants, and use `hasPrefix` or similar non-allocating bounds checks for dynamic formats, before falling back to allocating methods like `.lowercased()`.
