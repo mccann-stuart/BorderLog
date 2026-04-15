@@ -185,6 +185,33 @@ struct InferencePipelineState: Sendable {
     }
 
     private mutating func incrementCount(for processorID: String, counts: inout InferenceSourceCounts) {
+        // ⚡ Bolt: Fast paths for known static strings to avoid O(N) allocation of `.lowercased()`
+        switch processorID {
+        case "stay":
+            counts.stayCount += 1
+            return
+        case "photo":
+            counts.photoCount += 1
+            return
+        case "location":
+            counts.locationCount += 1
+            return
+        case "calendar", "calendar.origin":
+            counts.calendarCount += 1
+            return
+        case "override", "GapBridgingContext":
+            return
+        default:
+            break
+        }
+
+        // Fast path for dynamic promotion IDs which mostly start with Calendar
+        if processorID.hasPrefix("Calendar") || processorID.hasPrefix("calendar") {
+            counts.calendarCount += 1
+            return
+        }
+
+        // Fallback for any unknown IDs
         let normalized = processorID.lowercased()
         if normalized.contains("stay") {
             counts.stayCount += 1
