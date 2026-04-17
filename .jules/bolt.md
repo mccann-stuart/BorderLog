@@ -82,3 +82,6 @@
 ## 2026-03-01 - Optimizing Frequent Regex Parsing
 **Learning:** Instantiating `NSRegularExpression` repeatedly inside functions forces the regex engine to compile the pattern on every invocation, causing significant overhead in frequent text parsing operations like Calendar ingest loops. Additionally, creating Swift `CharacterSet` instances and checking them in tight loops introduces hidden bridging and object allocation costs.
 **Action:** Always hoist `NSRegularExpression` initializations to `private nonisolated static let` constants. Replace `CharacterSet` membership checks in scalar loops with fast integer `switch` statements on `scalar.value`. Use `String(String.UnicodeScalarView(scalars))` instead of `.map { Character($0) }` to stream mapped scalars directly into a string, bypassing intermediate array allocations.
+## 2026-06-21 - Replace Map and Filter with CompactMap
+**Learning:** Chaining `.map { ... }.filter { ... }` generates an intermediate array containing the mapped results before it is filtered, causing unnecessary `O(N)` heap allocations and memory pressure.
+**Action:** Replace sequential `.map` and `.filter` with a single `.compactMap { ... }` that both maps the element and returns `nil` when the filter condition fails. This combines the operations into a single pass and entirely eliminates the intermediate array.

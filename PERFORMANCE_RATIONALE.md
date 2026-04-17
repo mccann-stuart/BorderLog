@@ -415,3 +415,19 @@ Appended `.lazy` before `.map` to use a lazy sequence generator: `Set(days.lazy.
 ## Verification
 - **Time Complexity**: Remains `O(N)`, but with a significantly faster execution due to eliminating array memory allocations and buffer copying overhead.
 - **Space Complexity**: Memory footprint reduced from `O(N)` transient memory allocation (allocating the intermediate array) to strictly `O(1)` memory overhead beyond the final `Set` itself.
+
+# Performance Optimization Rationale: Lazy Map and Filter Merging
+
+## Current State
+When initializing `Set` structures from arrays (`CalendarTabView` and `PhotoSignalIngestor`), the code used a standard `.map { ... }` which produces a fully allocated intermediate Array before feeding it to the Set initializer. Additionally, in `CloudKitDataResetService`, an array was transformed using `.map().filter()`.
+
+## Problem
+Standard array operations like `.map` and `.filter` are eager in Swift. They compute and allocate memory for intermediate results immediately. This results in heavy memory allocation and immediate deallocation overhead (ARC thrashing), especially for large datasets.
+
+## Optimization
+1. Replaced the intermediate array generation with lazy generators by appending `.lazy` (e.g., `Set(array.lazy.map { ... })`). This streams values directly into the Set.
+2. Replaced sequential `.map().filter()` with a single pass `.compactMap()` that merges the mapping and logic checking into one operation without an intermediate heap allocation.
+
+## Verification
+- **Time Complexity**: Remains O(N), but the constant factors are significantly reduced.
+- **Space Complexity**: Memory footprint drops by eliminating the intermediate heap allocation, providing O(1) memory overhead during Set generation.
