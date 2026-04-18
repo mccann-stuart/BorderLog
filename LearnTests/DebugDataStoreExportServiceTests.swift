@@ -47,7 +47,6 @@ final class DebugDataStoreExportServiceTests: XCTestCase {
                 currentTimeZoneId: utc.identifier,
                 appVariantFlags: DebugExportAppVariantFlags(
                     cloudKitFeatureEnabled: false,
-                    appleSignInEnabled: false,
                     appGroupAvailable: true
                 )
             ),
