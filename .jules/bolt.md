@@ -82,3 +82,7 @@
 ## 2026-03-01 - Optimizing Frequent Regex Parsing
 **Learning:** Instantiating `NSRegularExpression` repeatedly inside functions forces the regex engine to compile the pattern on every invocation, causing significant overhead in frequent text parsing operations like Calendar ingest loops. Additionally, creating Swift `CharacterSet` instances and checking them in tight loops introduces hidden bridging and object allocation costs.
 **Action:** Always hoist `NSRegularExpression` initializations to `private nonisolated static let` constants. Replace `CharacterSet` membership checks in scalar loops with fast integer `switch` statements on `scalar.value`. Use `String(String.UnicodeScalarView(scalars))` instead of `.map { Character($0) }` to stream mapped scalars directly into a string, bypassing intermediate array allocations.
+
+## 2026-06-25 - Avoid array allocation when initializing Sets
+**Learning:** Using `Set(array.map { ... })` allocates an intermediate array of elements only to immediately discard it after the `Set` is populated. In data-heavy operations, this leads to unnecessary memory pressure and garbage collection overhead.
+**Action:** Always use a lazy sequence generator by appending `.lazy` before `.map` (e.g., `Set(array.lazy.map { ... })`) to avoid generating O(N) intermediate arrays during `Set` initialization, preserving O(1) auxiliary memory overhead.
