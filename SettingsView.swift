@@ -735,7 +735,6 @@ struct SettingsView: View {
             currentTimeZoneId: TimeZone.current.identifier,
             appVariantFlags: DebugExportAppVariantFlags(
                 cloudKitFeatureEnabled: AppConfig.isCloudKitFeatureEnabled,
-                appleSignInEnabled: AuthenticationManager.isAppleSignInEnabled,
                 appGroupAvailable: AppConfig.isAppGroupAvailable
             )
         )
@@ -765,8 +764,7 @@ struct SettingsView: View {
         let userData = DebugExportUserData(
             passportNationality: readKeychainString(account: "userPassportNationality"),
             homeCountry: readKeychainString(account: "userHomeCountry"),
-            appleUserId: readKeychainString(account: "appleUserId"),
-            appleSignInEnabled: AuthenticationManager.isAppleSignInEnabled
+            appleUserId: readKeychainString(account: "appleUserId")
         )
 
         return DebugExportRuntimeContext(
