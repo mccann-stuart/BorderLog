@@ -415,3 +415,21 @@ Appended `.lazy` before `.map` to use a lazy sequence generator: `Set(days.lazy.
 ## Verification
 - **Time Complexity**: Remains `O(N)`, but with a significantly faster execution due to eliminating array memory allocations and buffer copying overhead.
 - **Space Complexity**: Memory footprint reduced from `O(N)` transient memory allocation (allocating the intermediate array) to strictly `O(1)` memory overhead beyond the final `Set` itself.
+
+# Performance Optimization Rationale: Prevent Intermediate Array Allocations in Sequence Transformations
+
+## Current State
+Across the codebase, functions commonly transformed and filtered sequences using chained operations that implicitly generate intermediate `Array` allocations. For example:
+- `Learn/CalendarTabView.swift`: `Set(snapshot.daySummaries.map(\.dayKey))`
+- `Shared/PhotoSignalIngestor.swift`: `Set(try modelContext.fetch(descriptor).map(\.assetIdHash))`
+- `Shared/CloudKitDataResetService.swift`: `zones.map(\.zoneID).filter { $0 != defaultZoneID }`
+
+## Problem
+In Swift, methods like `.map` or sequentially chaining `.map` and `.filter` force the evaluation of the entire array at each step, eagerly allocating intermediate heap memory. For sets of data that can scale into the thousands (e.g., photo hashes or day keys), this causes unnecessary ARC thrashing, bloats memory pressure, and introduces latency during collection initialization.
+
+## Optimization
+- Changed array-to-Set initialization pipelines to use a `LazyMapSequence` (e.g., `.lazy.map { ... }`), enabling values to be computed and inserted into the `Set` on demand without generating an intermediate array.
+- Merged chained `map().filter()` calls into a single `compactMap` pass, preventing a full intermediate array allocation while fulfilling both transformation and exclusion in O(N) time and O(1) auxiliary memory space.
+
+## Verification
+Python simulation script verified that standard map/filter and lazy/compactMap equivalents generate perfectly matching outcomes, confirming the changes preserve original logic while sidestepping memory allocations.
