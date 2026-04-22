@@ -16,7 +16,7 @@ enum CloudKitDataResetService {
         let database = container.privateCloudDatabase
         let zones = try await fetchAllZones(in: database)
         let defaultZoneID = CKRecordZone.default().zoneID
-        let zoneIDsToDelete = zones.map(\.zoneID).filter { $0 != defaultZoneID }
+        let zoneIDsToDelete = zones.compactMap { $0.zoneID == defaultZoneID ? nil : $0.zoneID }
 
         guard !zoneIDsToDelete.isEmpty else {
             logger.info("No custom CloudKit record zones to delete.")
