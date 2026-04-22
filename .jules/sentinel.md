@@ -7,3 +7,8 @@
 **Vulnerability:** Implementing custom fallback logic when `context.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, ...)` fails can still permanently lock out users if `canEvaluatePolicy` succeeds but `evaluatePolicy` fails (e.g. broken FaceID sensor or repeated face mismatches without fallback to passcode).
 **Learning:** `LAContext` native `.deviceOwnerAuthentication` policy securely and automatically handles falling back to device passcode when biometric authentication is unavailable or fails. The passcode remains a valid root of trust on the device.
 **Prevention:** Always use `.deviceOwnerAuthentication` instead of `.deviceOwnerAuthenticationWithBiometrics` as the primary authentication policy when requiring user verification to unlock sensitive data in iOS apps, to ensure a seamless and reliable fallback to passcode.
+
+## $(date +%Y-%m-%d) - Enforce Apple Sign-In
+**Vulnerability:** A static boolean toggle `isAppleSignInEnabled` could bypass mandatory authentication, allowing login via mock UUIDs (`local_user_...`).
+**Learning:** Hardcoded authentication bypass logic in production code is a critical vulnerability that bypasses access control mechanisms.
+**Prevention:** Hardcode required authentications and completely remove development bypass mechanisms from production-bound code. Do not use dynamic toggles for authentication logic.
