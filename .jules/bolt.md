@@ -82,3 +82,8 @@
 ## 2026-03-01 - Optimizing Frequent Regex Parsing
 **Learning:** Instantiating `NSRegularExpression` repeatedly inside functions forces the regex engine to compile the pattern on every invocation, causing significant overhead in frequent text parsing operations like Calendar ingest loops. Additionally, creating Swift `CharacterSet` instances and checking them in tight loops introduces hidden bridging and object allocation costs.
 **Action:** Always hoist `NSRegularExpression` initializations to `private nonisolated static let` constants. Replace `CharacterSet` membership checks in scalar loops with fast integer `switch` statements on `scalar.value`. Use `String(String.UnicodeScalarView(scalars))` instead of `.map { Character($0) }` to stream mapped scalars directly into a string, bypassing intermediate array allocations.
+## 2026-04-14 - Lazy Collection Iteration for Arrays
+
+**Learning:** When applying multiple functional transformations (e.g., `.filter` followed by `.map`) and passing the result into a consumer that iterates sequentially like `append(contentsOf:)`, using eager array operations generates multiple intermediate heap allocations that are immediately discarded. In high-frequency render paths (like calendar decorations), this causes excessive ARC and GC strain.
+
+**Action:** Append `.lazy` to `.filter` and `.map` when the result is immediately consumed sequentially (e.g. `append(contentsOf: sequence.lazy.filter { ... }.map { ... })`). This evaluates the transformations dynamically on demand, completely eliminating intermediate array allocations and reducing transient memory complexity from O(N) to O(1).

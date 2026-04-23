@@ -415,3 +415,53 @@ Appended `.lazy` before `.map` to use a lazy sequence generator: `Set(days.lazy.
 ## Verification
 - **Time Complexity**: Remains `O(N)`, but with a significantly faster execution due to eliminating array memory allocations and buffer copying overhead.
 - **Space Complexity**: Memory footprint reduced from `O(N)` transient memory allocation (allocating the intermediate array) to strictly `O(1)` memory overhead beyond the final `Set` itself.
+
+# Performance Optimization Rationale: Lazy Collection Iteration for Arrays
+
+## Current State
+In `Learn/CalendarTabView.swift`, `calendarDayDecorationTokens` was iterating over `summary.countries` to conditionally extract countries based on an ID check and map them to emojis:
+```swift
+let extraCountries = summary.countries.filter { country in
+    country.id != flightOriginID && country.id != flightDestinationID
+}
+// ... later ...
+tokens.append(contentsOf: extraCountries.map { emoji(for: $0) })
+```
+
+## Problem
+1. **Unnecessary O(N) Reallocation**: The standard `.filter` generates an entirely new array on the heap.
+2. **Double Intermediate Allocations**: Standard `.map` called subsequently generates a *second* new array of mapped string objects simply to append its contents to `tokens`.
+These intermediate arrays are immediately discarded, producing unnecessary ARC overhead and memory allocations inside a method called for every single visible calendar day on rendering.
+
+## Optimization
+Appended `.lazy` before `.filter` and `.map` to use a lazy sequence generator:
+```swift
+let extraCountries = summary.countries.lazy.filter { country in
+    country.id != flightOriginID && country.id != flightDestinationID
+}
+// ... later ...
+tokens.append(contentsOf: extraCountries.lazy.map { emoji(for: $0) })
+```
+
+## Verification
+- **Time Complexity**: Remains `O(N)`, but with a significantly faster execution due to eliminating array memory allocations and buffer copying overhead.
+- **Space Complexity**: Memory footprint reduced from multiple `O(N)` transient memory allocations (allocating intermediate arrays) to strictly `O(1)` overhead, as elements are dynamically filtered and mapped directly into the target `tokens` array.
+
+# Performance Optimization Rationale: Lazy Set Initialization in CalendarTabView
+
+## Current State
+In `Learn/CalendarTabView.swift`, `summaryPresenceDayKeys` initialized a Set using an eager map:
+```swift
+let visibleMonthKeys = Set(snapshot.daySummaries.map(\.dayKey))
+```
+
+## Problem
+1. **O(N) Intermediate Allocation**: Standard `.map` allocates an entirely new intermediate array in memory just to hold the mapped values. When the `Set` finishes initializing, this intermediate array is immediately discarded.
+2. **Memory/ARC Pressure**: This redundant allocation creates unnecessary GC/ARC thrashing during repetitive operations, especially when initializing large sets from database fetches or processing high-frequency data structures.
+
+## Optimization
+Appended `.lazy` before `.map` to use a lazy sequence generator: `Set(snapshot.daySummaries.lazy.map(\.dayKey))`. This allows the `Set` to iterate and pull values sequentially through the generator without creating an intermediate array.
+
+## Verification
+- **Time Complexity**: Remains `O(N)`, but with a significantly faster execution due to eliminating array memory allocations and buffer copying overhead.
+- **Space Complexity**: Memory footprint reduced from `O(N)` transient memory allocation (allocating the intermediate array) to strictly `O(1)` memory overhead beyond the final `Set` itself.

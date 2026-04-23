@@ -172,7 +172,8 @@ struct CalendarTabView: View {
     }
 
     private func summaryPresenceDayKeys(from snapshot: CalendarTabSnapshot) -> [String] {
-        let visibleMonthKeys = Set(snapshot.daySummaries.map(\.dayKey))
+        // ⚡ Bolt: Use .lazy.map to avoid allocating an intermediate array of strings before initializing the Set.
+        let visibleMonthKeys = Set(snapshot.daySummaries.lazy.map(\.dayKey))
         return Array(visibleMonthKeys.union(snapshot.summaryUnknownDayKeys)).sorted()
     }
 
@@ -209,7 +210,9 @@ func calendarDayDecorationTokens(for summary: CalendarDaySummary) -> [String] {
 
     let flightOriginID = summary.flightOriginCountry?.id
     let flightDestinationID = summary.flightDestinationCountry?.id
-    let extraCountries = summary.countries.filter { country in
+    // ⚡ Bolt: Use .lazy.filter to prevent O(N) array allocation.
+    // ⚡ Bolt: By using a lazy sequence, we avoid creating an intermediate array before iterating it.
+    let extraCountries = summary.countries.lazy.filter { country in
         country.id != flightOriginID && country.id != flightDestinationID
     }
 
@@ -227,7 +230,8 @@ func calendarDayDecorationTokens(for summary: CalendarDaySummary) -> [String] {
             tokens.append(emoji(for: destination))
         }
 
-        tokens.append(contentsOf: extraCountries.map { emoji(for: $0) })
+        // ⚡ Bolt: Use .lazy.map so that we iterate the sequence dynamically during append(contentsOf:) without allocating a temporary mapped array.
+        tokens.append(contentsOf: extraCountries.lazy.map { emoji(for: $0) })
         return tokens
     }
 
