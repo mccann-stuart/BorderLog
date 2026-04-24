@@ -231,10 +231,10 @@ final class CalendarTabDataServiceTests: XCTestCase {
             now: makeDate(2026, 3, 19)
         )
 
-        XCTAssertEqual(Set(snapshot.countrySummaries.map(\.id)), Set(["US", "CA"]))
+        XCTAssertEqual(Set(snapshot.countrySummaries.lazy.map(\.id)), Set(["US", "CA"]))
         XCTAssertFalse(snapshot.countrySummaries.map(\.id).contains("MX"))
 
-        let visibleMonthCountryIDs = Set(snapshot.daySummaries.flatMap(\.countries).map(\.id))
+        let visibleMonthCountryIDs = Set(snapshot.daySummaries.flatMap(\.countries).lazy.map(\.id))
         XCTAssertEqual(visibleMonthCountryIDs, Set(["US"]))
     }
 

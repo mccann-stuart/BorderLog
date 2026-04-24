@@ -415,3 +415,19 @@ Appended `.lazy` before `.map` to use a lazy sequence generator: `Set(days.lazy.
 ## Verification
 - **Time Complexity**: Remains `O(N)`, but with a significantly faster execution due to eliminating array memory allocations and buffer copying overhead.
 - **Space Complexity**: Memory footprint reduced from `O(N)` transient memory allocation (allocating the intermediate array) to strictly `O(1)` memory overhead beyond the final `Set` itself.
+
+# Performance Optimization Rationale: Lazy Map Set Initialization
+
+## Current State
+Several areas of the codebase initialized `Set`s from arrays using `.map { ... }`, such as:
+`Set(snapshot.daySummaries.map(\.dayKey))`
+`Set(try modelContext.fetch(descriptor).map(\.assetIdHash))`
+
+## Problem
+Standard `.map` allocates an entirely new array in memory to hold the mapped values. When the `Set` finishes initializing from this array, the intermediate array is immediately discarded. This wastes CPU cycles copying data and increases heap allocations and ARC thrashing.
+
+## Optimization
+Appended `.lazy` before `.map` to use a lazy sequence generator: `Set(days.lazy.map { $0.dayKey })`. This allows the `Set` to iterate and pull values sequentially through the generator on demand, without ever creating the intermediate array in memory. This reduces the auxiliary memory overhead from O(N) to O(1).
+
+## Verification
+Tests were not run since the Swift toolchain is unavailable in this environment. However, since the mappings used pure operations (KeyPaths), the optimization is demonstrably safe and does not alter program behavior.
