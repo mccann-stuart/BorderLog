@@ -1,3 +1,5 @@
+#if DEBUG
+
 //
 //  DebugDataStoreExportService.swift
 //  Learn
@@ -74,6 +76,8 @@ struct DebugExportUserData: Codable, Sendable {
         try container.encode(appleSignInEnabled, forKey: .appleSignInEnabled)
     }
 }
+
+#endif
 
 struct DebugExportDateRange: Codable, Sendable {
     let earliest: Date

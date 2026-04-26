@@ -14,6 +14,7 @@ struct CountryDetailView: View {
     @Environment(\.modelContext) private var modelContext
     @Query(sort: [SortDescriptor(\PresenceDay.date, order: .reverse)]) private var allPresenceDays: [PresenceDay]
     @Query private var allCountryConfigs: [CountryConfig]
+    @AppStorage(CountryDayCountingMode.storageKey, store: AppConfig.sharedDefaults) private var countryDayCountingModeRaw = CountryDayCountingMode.defaultMode.rawValue
 
     @State private var maxAllowedDaysText: String = ""
     @State private var showAllDays: Bool = false
@@ -23,6 +24,10 @@ struct CountryDetailView: View {
         case timeframe = "Timeframe"
         case allTime = "All time"
         var id: String { rawValue }
+    }
+
+    private var countryDayCountingMode: CountryDayCountingMode {
+        CountryDayCountingMode.storedMode(from: countryDayCountingModeRaw)
     }
 
     // ⚡ Bolt: Single-pass iteration to filter country and timeframe simultaneously,
@@ -49,19 +54,11 @@ struct CountryDetailView: View {
                 break // Early exit: we have evaluated everything inside our window
             }
 
-            let normalizedDay = CountryCodeNormalizer.canonicalCode(
-                countryCode: day.countryCode,
-                countryName: day.countryName
-            )
-            let matchesCountry: Bool
-            if let target = normalizedTarget, let code = normalizedDay {
-                matchesCountry = (target == code)
-            } else {
-                let canonicalDayName = CountryCodeNormalizer.canonicalName(
-                    countryCode: day.countryCode,
-                    countryName: day.countryName
-                ) ?? ""
-                matchesCountry = (canonicalDayName == canonicalTargetName)
+            let matchesCountry = day.countedCountries(for: countryDayCountingMode).contains { country in
+                if let target = normalizedTarget, let code = country.countryCode {
+                    return target == code
+                }
+                return country.countryName == canonicalTargetName
             }
 
             if matchesCountry {

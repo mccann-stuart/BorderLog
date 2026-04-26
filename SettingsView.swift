@@ -31,11 +31,13 @@ struct SettingsView: View {
     @State private var ingestionError: String?
     @State private var locationService = LocationSampleService()
     @State private var widgetLastWriteDate: Date?
+#if DEBUG
     @State private var isPreparingDebugExport = false
     @State private var isPresentingDebugExport = false
     @State private var debugExportError: String?
     @State private var debugExportDocument = DebugDataStoreExportDocument(data: Data())
     @State private var debugExportDefaultFilename = "borderlog-debug-export"
+#endif
     @AppStorage("didBootstrapInference") private var didBootstrapInference = false
     @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
     @AppStorage("hasPromptedLocation") private var hasPromptedLocation = false
@@ -43,6 +45,7 @@ struct SettingsView: View {
     @AppStorage("hasPromptedCalendar") private var hasPromptedCalendar = false
     @AppStorage("usePolygonMapView") private var usePolygonMapView = true
     @AppStorage("showSchengenDashboardSection") private var showSchengenDashboardSection = true
+    @AppStorage(CountryDayCountingMode.storageKey, store: AppConfig.sharedDefaults) private var countryDayCountingModeRaw = CountryDayCountingMode.defaultMode.rawValue
     @AppStorage("cloudKitSyncEnabled", store: AppConfig.sharedDefaults) private var cloudKitSyncEnabled = false
     @AppStorage("requireBiometrics") private var requireBiometrics = false
 
@@ -240,6 +243,9 @@ struct SettingsView: View {
                 Section {
                     Button {
                         hasCompletedOnboarding = false
+                        hasPromptedLocation = false
+                        hasPromptedPhotos = false
+                        hasPromptedCalendar = false
                     } label: {
                         Label("Re-Launch Setup", systemImage: "arrow.clockwise")
                     }
@@ -255,9 +261,10 @@ struct SettingsView: View {
                 } header: {
                     Text("Data Management")
                 } footer: {
-                    Text("Permanently deletes all stays, day overrides, and location samples stored on this device.")
+                    Text("Permanently deletes local travel data, profile values, and pending widget samples stored on this device.")
                 }
 
+#if DEBUG
                 Section {
                     Button {
                         exportDebugDataStore()
@@ -279,6 +286,7 @@ struct SettingsView: View {
                 } footer: {
                     Text("Exports a full-fidelity JSON snapshot for internal debugging, including raw coordinates, event identifiers, titles, asset hashes, and local user identifiers.")
                 }
+#endif
 
                 // MARK: – App Info
                 Section {
@@ -313,13 +321,19 @@ struct SettingsView: View {
 
                 // MARK: – Configuration
                 Section {
+                    Picker("Day Counting", selection: $countryDayCountingModeRaw) {
+                        ForEach(CountryDayCountingMode.allCases) { mode in
+                            Text(mode.label).tag(mode.rawValue)
+                        }
+                    }
+
                     Toggle(isOn: $showSchengenDashboardSection) {
                         Label("Schengen Zone", systemImage: "map")
                     }
                 } header: {
                     Text("Configuration")
                 } footer: {
-                    Text("Schengen country list is built-in and updates automatically. This toggle controls visibility of the 'Schengen 90 stays valid for a rolling 180 days' card on Dashboard.")
+                    Text("Double Count Days counts every resolved country for travel days where immigration-style rules count both entry and exit dates. Schengen country list is built-in and updates automatically.")
                 }
             }
             .scrollContentBackground(.hidden)
@@ -339,7 +353,7 @@ struct SettingsView: View {
             .confirmationDialog("Delete all local data?", isPresented: $isConfirmingReset) {
                 Button("Delete All", role: .destructive) { resetAllData() }
             } message: {
-                Text("This will remove all stays and day overrides from this device. This cannot be undone.")
+                Text("This will remove local travel data, profile values, and pending widget samples from this device. This cannot be undone.")
             }
             .confirmationDialog("Delete iCloud data?", isPresented: $isConfirmingCloudKitDelete) {
                 Button("Delete iCloud Data", role: .destructive) { deleteCloudKitData() }
@@ -361,6 +375,7 @@ struct SettingsView: View {
             } message: {
                 Text(ingestionError ?? "Unknown error.")
             }
+#if DEBUG
             .alert("Unable to export debug data", isPresented: debugExportErrorPresented) {
                 Button("OK", role: .cancel) {}
             } message: {
@@ -377,6 +392,7 @@ struct SettingsView: View {
                     debugExportError = "Failed to hand off the debug export file. Please try again."
                 }
             }
+#endif
             .onAppear {
                 refreshPermissions()
                 refreshWidgetLastWriteDate()
@@ -549,6 +565,7 @@ struct SettingsView: View {
         }
     }
 
+#if DEBUG
     private func exportDebugDataStore() {
         isPreparingDebugExport = true
         debugExportError = nil
@@ -576,6 +593,7 @@ struct SettingsView: View {
             }
         }
     }
+#endif
 
     private func openAppSettings() {
         if let url = URL(string: UIApplication.openSettingsURLString) {
@@ -703,6 +721,7 @@ struct SettingsView: View {
         }
     }
 
+#if DEBUG
     private func makeDebugExportContext(exportedAt: Date) -> DebugExportRuntimeContext {
         let currentLocationStatus = CLLocationManager().authorizationStatus
         let currentPhotoStatus = PHPhotoLibrary.authorizationStatus(for: .readWrite)
@@ -827,6 +846,7 @@ struct SettingsView: View {
         formatter.dateFormat = "yyyy-MM-dd-HHmmss"
         return "borderlog-debug-export-\(formatter.string(from: date))"
     }
+#endif
 
     private var cloudKitDeleteErrorPresented: Binding<Bool> {
         Binding(
@@ -842,12 +862,14 @@ struct SettingsView: View {
         )
     }
 
+#if DEBUG
     private var debugExportErrorPresented: Binding<Bool> {
         Binding(
             get: { debugExportError != nil },
             set: { if !$0 { debugExportError = nil } }
         )
     }
+#endif
 
     private func locationStatusLabel(for status: CLAuthorizationStatus) -> String {
         switch status {

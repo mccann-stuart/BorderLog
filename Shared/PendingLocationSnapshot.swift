@@ -36,4 +36,8 @@ struct PendingLocationSnapshot: Codable, Equatable {
         }
         return queue
     }
+
+    static func removeAll(from defaults: UserDefaults) {
+        defaults.removeObject(forKey: defaultsKey)
+    }
 }

@@ -49,106 +49,99 @@ struct ProfileSetupView: View {
     }
 
     var body: some View {
-        VStack(spacing: 32) {
-            Spacer()
-            
-            // Header Image
-            Image(systemName: "person.crop.circle.badge.plus")
-                .font(.system(size: 80))
-                .foregroundStyle(.blue)
-            
-            // Text
-            VStack(spacing: 8) {
-                Text("Your Profile")
-                    .font(.largeTitle)
-                    .fontWeight(.bold)
-                    .multilineTextAlignment(.center)
+        ScrollView {
+            VStack(spacing: 32) {
+                Image(systemName: "person.crop.circle.badge.plus")
+                    .font(.system(size: 80))
+                    .foregroundStyle(.blue)
                 
-                Text("This information is optional and stays on your device. It helps BorderLog personalize your tracking")
-                    .font(.body)
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal, 32)
-            }
-            
-            // Form Elements
-            VStack(spacing: 20) {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Passport Nationality")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
+                VStack(spacing: 8) {
+                    Text("Your Profile")
+                        .font(.largeTitle)
+                        .fontWeight(.bold)
+                        .multilineTextAlignment(.center)
                     
-                    Menu {
-                        Button("Clear Selection") {
-                            passportNationality = ""
-                        }
+                    Text("This information is optional and stays on your device. It helps BorderLog personalize your tracking")
+                        .font(.body)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 32)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                
+                VStack(spacing: 20) {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Passport Nationality")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
                         
-                        ForEach(GeoRegion.allCases) { region in
-                            Menu(region.displayName) {
-                                ForEach(region.countryCodes, id: \.self) { code in
-                                    Button(countryLabel(for: code)) {
-                                        passportNationality = code
+                        Menu {
+                            Button("Clear Selection") {
+                                passportNationality = ""
+                            }
+                            
+                            ForEach(GeoRegion.allCases) { region in
+                                Menu(region.displayName) {
+                                    ForEach(region.countryCodes, id: \.self) { code in
+                                        Button(countryLabel(for: code)) {
+                                            passportNationality = code
+                                        }
                                     }
                                 }
                             }
+                        } label: {
+                            HStack {
+                                Text(selectedCountryLabel(for: passportNationality))
+                                    .foregroundStyle(passportNationality.isEmpty ? .secondary : .primary)
+                                Spacer()
+                                Image(systemName: "chevron.down")
+                                    .foregroundStyle(.secondary)
+                            }
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 10)
+                            .frame(maxWidth: .infinity)
+                            .background(Color(.secondarySystemBackground))
+                            .cornerRadius(8)
                         }
-                    } label: {
-                        HStack {
-                            Text(selectedCountryLabel(for: passportNationality))
-                                .foregroundStyle(passportNationality.isEmpty ? .secondary : .primary)
-                            Spacer()
-                            Image(systemName: "chevron.down")
-                                .foregroundStyle(.secondary)
-                        }
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 10)
-                        .frame(maxWidth: .infinity)
-                        .background(Color(.secondarySystemBackground))
-                        .cornerRadius(8)
                     }
-                }
-                
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Home Country")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                    
-                    Menu {
-                        Button("Clear Selection") {
-                            homeCountry = ""
-                        }
                         
-                        ForEach(GeoRegion.allCases) { region in
-                            Menu(region.displayName) {
-                                ForEach(region.countryCodes, id: \.self) { code in
-                                    Button(countryLabel(for: code)) {
-                                        homeCountry = code
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Home Country")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                        
+                        Menu {
+                            Button("Clear Selection") {
+                                homeCountry = ""
+                            }
+                            
+                            ForEach(GeoRegion.allCases) { region in
+                                Menu(region.displayName) {
+                                    ForEach(region.countryCodes, id: \.self) { code in
+                                        Button(countryLabel(for: code)) {
+                                            homeCountry = code
+                                        }
                                     }
                                 }
                             }
+                        } label: {
+                            HStack {
+                                Text(selectedCountryLabel(for: homeCountry))
+                                    .foregroundStyle(homeCountry.isEmpty ? .secondary : .primary)
+                                Spacer()
+                                Image(systemName: "chevron.down")
+                                    .foregroundStyle(.secondary)
+                            }
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 10)
+                            .frame(maxWidth: .infinity)
+                            .background(Color(.secondarySystemBackground))
+                            .cornerRadius(8)
                         }
-                    } label: {
-                        HStack {
-                            Text(selectedCountryLabel(for: homeCountry))
-                                .foregroundStyle(homeCountry.isEmpty ? .secondary : .primary)
-                            Spacer()
-                            Image(systemName: "chevron.down")
-                                .foregroundStyle(.secondary)
-                        }
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 10)
-                        .frame(maxWidth: .infinity)
-                        .background(Color(.secondarySystemBackground))
-                        .cornerRadius(8)
                     }
                 }
-            }
-            .padding(.horizontal, 32)
-            
-            Spacer()
-            
-            // Navigation
-            VStack(spacing: 16) {
+                .padding(.horizontal, 32)
+                
                 Button {
                     withAnimation {
                         currentStep = 2
@@ -162,6 +155,7 @@ struct ProfileSetupView: View {
                         .background(Color.blue)
                         .cornerRadius(12)
                 }
+                .padding(.horizontal, 32)
                 
                 Button {
                     // Skip just moves to the next step without requiring input
@@ -174,8 +168,8 @@ struct ProfileSetupView: View {
                         .foregroundStyle(.secondary)
                 }
             }
-            .padding(.horizontal, 32)
-            .padding(.bottom, 40)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 32)
         }
         .onAppear {
             loadFromKeychain()

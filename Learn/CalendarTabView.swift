@@ -21,6 +21,7 @@ struct CalendarTabView: View {
     @State private var presenceDaysByKey: [String: PresenceDay] = [:]
     @State private var isLoading = false
     @State private var loadError: String?
+    @AppStorage(CountryDayCountingMode.storageKey, store: AppConfig.sharedDefaults) private var countryDayCountingModeRaw = CountryDayCountingMode.defaultMode.rawValue
 
     @State private var selectedDayKey: String? // for programmatic navigation
 
@@ -33,6 +34,10 @@ struct CalendarTabView: View {
 
     private var calendar: Calendar {
         Calendar.current
+    }
+
+    private var countryDayCountingMode: CountryDayCountingMode {
+        CountryDayCountingMode.storedMode(from: countryDayCountingModeRaw)
     }
 
     private var countryRows: [CountryDaysInfo] {
@@ -90,7 +95,7 @@ struct CalendarTabView: View {
             } header: {
                 Text("Travel Summary")
             } footer: {
-                Text("Totals use the day's resolved Summary location, including inferred bridge days.")
+                Text(countryDayCountingMode == .doubleCountDays ? "Totals count every resolved country for a day, including inferred transition days." : "Totals use the day's resolved Summary location, including inferred bridge days.")
             }
 
             Section {
@@ -130,6 +135,9 @@ struct CalendarTabView: View {
         .onChange(of: summaryRange) { _, _ in
             Task { await refreshSnapshot() }
         }
+        .onChange(of: countryDayCountingModeRaw) { _, _ in
+            Task { await refreshSnapshot() }
+        }
         .onChange(of: scenePhase) { _, newPhase in
             guard newPhase == .active else { return }
             Task { await refreshSnapshot() }
@@ -145,6 +153,7 @@ struct CalendarTabView: View {
     private func refreshSnapshot() async {
         let requestedMonth = visibleMonthStart
         let requestedRange = summaryRange
+        let requestedCountingMode = countryDayCountingMode
         let service = CalendarTabDataService(modelContainer: modelContext.container)
 
         isLoading = true
@@ -153,20 +162,27 @@ struct CalendarTabView: View {
         do {
             let loadedSnapshot = try await service.snapshot(
                 visibleMonthStart: requestedMonth,
-                summaryRange: requestedRange
+                summaryRange: requestedRange,
+                countingMode: requestedCountingMode
             )
-            guard requestedMonth == visibleMonthStart, requestedRange == summaryRange else { return }
+            guard requestedMonth == visibleMonthStart,
+                  requestedRange == summaryRange,
+                  requestedCountingMode == countryDayCountingMode else { return }
 
             snapshot = loadedSnapshot
             loadPresenceDays(for: summaryPresenceDayKeys(from: loadedSnapshot))
         } catch {
-            guard requestedMonth == visibleMonthStart, requestedRange == summaryRange else { return }
+            guard requestedMonth == visibleMonthStart,
+                  requestedRange == summaryRange,
+                  requestedCountingMode == countryDayCountingMode else { return }
             Self.logger.error("Failed to load calendar snapshot: \(error, privacy: .private)")
             loadError = "Failed to load calendar data. Please try again."
             loadPresenceDays(for: summaryPresenceDayKeys(from: snapshot))
         }
 
-        if requestedMonth == visibleMonthStart, requestedRange == summaryRange {
+        if requestedMonth == visibleMonthStart,
+           requestedRange == summaryRange,
+           requestedCountingMode == countryDayCountingMode {
             isLoading = false
         }
     }

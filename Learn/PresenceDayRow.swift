@@ -8,6 +8,11 @@ import Foundation
 
 struct PresenceDayRow: View {
     let day: PresenceDay
+    @AppStorage(CountryDayCountingMode.storageKey, store: AppConfig.sharedDefaults) private var countryDayCountingModeRaw = CountryDayCountingMode.defaultMode.rawValue
+
+    private var countryDayCountingMode: CountryDayCountingMode {
+        CountryDayCountingMode.storedMode(from: countryDayCountingModeRaw)
+    }
 
     private var dayTimeZone: TimeZone {
         if let id = day.timeZoneId, let tz = TimeZone(identifier: id) {
@@ -25,8 +30,9 @@ struct PresenceDayRow: View {
     }
 
     private var countryText: String {
-        if let name = day.countryName ?? day.countryCode {
-            return name
+        let countries = day.countedCountries(for: countryDayCountingMode)
+        if !countries.isEmpty {
+            return countries.map(\.countryName).joined(separator: ", ")
         }
         return "Unknown"
     }

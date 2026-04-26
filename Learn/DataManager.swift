@@ -30,7 +30,10 @@ struct DataManager {
     }
 
     /// Resets all data by deleting all entities.
-    func resetAllData() throws {
+    func resetAllData(
+        keychain: KeychainHelperProtocol = KeychainHelper.standard,
+        defaults: UserDefaults = AppConfig.sharedDefaults
+    ) throws {
         try modelContext.delete(model: Stay.self)
         try modelContext.delete(model: DayOverride.self)
         try modelContext.delete(model: LocationSample.self)
@@ -42,6 +45,10 @@ struct DataManager {
         if modelContext.hasChanges {
             try modelContext.save()
         }
+        for account in ["appleUserId", "userPassportNationality", "userHomeCountry"] {
+            keychain.delete(service: "com.MCCANN.Border", account: account)
+        }
+        PendingLocationSnapshot.removeAll(from: defaults)
         Self.logger.info("All data reset.")
     }
 

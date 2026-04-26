@@ -90,6 +90,30 @@ final class CalendarTabDataServiceTests: XCTestCase {
         )
     }
 
+    private func makeAllocatedPresenceDay(
+        dayKey: String,
+        date: Date,
+        timeZoneId: String,
+        countries: [ContributedCountry]
+    ) -> PresenceDay {
+        PresenceDay(
+            dayKey: dayKey,
+            date: date,
+            timeZoneId: timeZoneId,
+            contributedCountries: countries,
+            zoneOverlays: [],
+            evidence: [],
+            confidence: countries.first?.probability ?? 0,
+            confidenceLabel: countries.isEmpty ? .low : .medium,
+            sources: .location,
+            isOverride: false,
+            stayCount: 0,
+            photoCount: 0,
+            locationCount: 1,
+            calendarCount: 0
+        )
+    }
+
     func testSnapshotDedupesCountriesPerDayAndMarksFlights() async throws {
         let container = try makeContainer()
         let context = container.mainContext
@@ -387,6 +411,72 @@ final class CalendarTabDataServiceTests: XCTestCase {
 
         let march16 = try XCTUnwrap(snapshot.daySummaries.first { $0.dayKey == "2026-03-16" })
         XCTAssertEqual(march16.countries.map(\.id), ["ES"])
+    }
+
+    func testSnapshotUsesPrimaryResolvedCountryByDefaultForMultiCountryDay() async throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let dayKey = "2026-03-15"
+
+        context.insert(
+            makeAllocatedPresenceDay(
+                dayKey: dayKey,
+                date: normalizedDate(for: dayKey),
+                timeZoneId: TimeZone.current.identifier,
+                countries: [
+                    ContributedCountry(countryCode: "GB", countryName: localizedCountryName("GB"), probability: 0.51),
+                    ContributedCountry(countryCode: "FR", countryName: localizedCountryName("FR"), probability: 0.49)
+                ]
+            )
+        )
+        try context.save()
+
+        let service = CalendarTabDataService(modelContainer: container)
+        let snapshot = try await service.snapshot(
+            visibleMonthStart: makeDate(2026, 3, 1),
+            summaryRange: .visibleMonth,
+            now: makeDate(2026, 3, 19)
+        )
+
+        let march15 = try XCTUnwrap(snapshot.daySummaries.first { $0.dayKey == dayKey })
+        XCTAssertEqual(march15.countries.map(\.id), ["GB"])
+
+        let totals = Dictionary(uniqueKeysWithValues: snapshot.countrySummaries.map { ($0.id, $0.totalDays) })
+        XCTAssertEqual(totals, ["GB": 1])
+    }
+
+    func testSnapshotDoubleCountsResolvedCountriesForSummariesAndDecorations() async throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let dayKey = "2026-03-15"
+
+        context.insert(
+            makeAllocatedPresenceDay(
+                dayKey: dayKey,
+                date: normalizedDate(for: dayKey),
+                timeZoneId: TimeZone.current.identifier,
+                countries: [
+                    ContributedCountry(countryCode: "GB", countryName: localizedCountryName("GB"), probability: 0.51),
+                    ContributedCountry(countryCode: "FR", countryName: localizedCountryName("FR"), probability: 0.49)
+                ]
+            )
+        )
+        try context.save()
+
+        let service = CalendarTabDataService(modelContainer: container)
+        let snapshot = try await service.snapshot(
+            visibleMonthStart: makeDate(2026, 3, 1),
+            summaryRange: .visibleMonth,
+            now: makeDate(2026, 3, 19),
+            countingMode: .doubleCountDays
+        )
+
+        let march15 = try XCTUnwrap(snapshot.daySummaries.first { $0.dayKey == dayKey })
+        XCTAssertEqual(march15.countries.map(\.id), ["GB", "FR"])
+
+        let totals = Dictionary(uniqueKeysWithValues: snapshot.countrySummaries.map { ($0.id, $0.totalDays) })
+        XCTAssertEqual(totals["GB"], 1)
+        XCTAssertEqual(totals["FR"], 1)
     }
 
     func testSnapshotTracksUnknownSummaryDaysForSelectedRange() async throws {

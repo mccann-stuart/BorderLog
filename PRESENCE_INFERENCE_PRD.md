@@ -1,7 +1,7 @@
 # Presence Inference PRD
 
 - Status: Draft
-- Last updated: March 21, 2026
+- Last updated: April 20, 2026
 - Scope: BorderLog daily country inference driven by stays, day overrides, calendar events, photos, and location samples
 - Primary implementation references:
   - `Shared/PresenceInferenceEngine.swift`
@@ -29,6 +29,7 @@ The system produces one `PresenceDay` record per calendar day. Each record conta
 - source counts by type
 - dispute metadata when the day is contested
 - suggestion metadata for unresolved days
+- adjacent-day evidence resolution for days promoted from neighboring calendar travel signals
 
 The ledger is used downstream for:
 
@@ -51,6 +52,7 @@ The ledger is used downstream for:
 - day-key and timezone normalization
 - impacted-range recomputation and persistence
 - confidence labeling, dispute detection, gap filling, and adjacent-flight promotion
+- unresolved-day summary bucketing and drill-down support
 
 ### Out of scope
 
@@ -144,6 +146,13 @@ The ledger is used downstream for:
 - Name normalization is case-insensitive, diacritic-insensitive, and width-insensitive.
 - Known aliases are normalized, including `UK -> GB` and `USA -> US`.
 - If no code can be derived but a non-empty country name exists, the name still becomes a usable identity key.
+- MapKit and calendar-search results that provide only a country name are normalized into canonical country identity before being treated as `Unknown`.
+
+### 6.2.1 Unknown handling
+
+- A day with no winning country remains a first-class `Unknown` result rather than being dropped from summaries.
+- Unknown days are counted in dashboard and calendar-range summaries.
+- Unknown summary rows preserve the same date-range scope and drill-down behavior as named-country rows.
 
 ### 6.3 Timezone identity
 
@@ -187,6 +196,7 @@ This padding is required because:
 
 - gap bridging can reach across unknown runs
 - adjacent flight promotion can affect the previous day
+- adjacent travel evidence can be shown on a promoted day even when the supporting calendar signal lives on the neighboring day key
 - edits near the edge of a known run can change neighboring results
 
 ### 7.3 High-level pipeline

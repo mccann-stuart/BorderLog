@@ -1,3 +1,5 @@
+#if DEBUG
+
 //
 //  DebugDataStoreExportServiceTests.swift
 //  LearnTests
@@ -318,7 +320,7 @@ final class DebugDataStoreExportServiceTests: XCTestCase {
         XCTAssertEqual(march1.presenceSummary?.suggestedCountryCode1, "ES")
         XCTAssertEqual(march1.presenceSummary?.suggestedCountryCode2, "BE")
         XCTAssertEqual(march1.presenceSummary?.sourceLabels, ["stay", "photo"])
-        XCTAssertEqual(march1.presenceSummary?.confidence, 0.91, accuracy: 0.0001)
+        XCTAssertEqual(march1.presenceSummary?.confidence ?? 0, 0.91, accuracy: 0.0001)
         XCTAssertEqual(march1.presenceSummary?.confidenceLabelRaw, "high")
         XCTAssertEqual(march1.presenceSummary?.isDisputed, true)
         XCTAssertEqual(march1.presenceSummary?.isManuallyModified, true)
@@ -345,7 +347,7 @@ final class DebugDataStoreExportServiceTests: XCTestCase {
         XCTAssertEqual(march4.calendarSignals.first?.eventIdentifier, "evt-flight-1")
         XCTAssertEqual(march4.calendarSignals.first?.title, "BA 123 LHR")
         XCTAssertEqual(march4.photos.first?.assetIdHash, "asset-raw-1")
-        XCTAssertEqual(march4.locations.first?.latitude, 51.5074, accuracy: 0.0001)
+        XCTAssertEqual(march4.locations.first?.latitude ?? 0, 51.5074, accuracy: 0.0001)
         XCTAssertEqual(march4.sourceCounts.calendarSignals, 1)
         XCTAssertTrue(march4.hasAnyRawEvidence)
     }
@@ -394,3 +396,5 @@ final class DebugDataStoreExportServiceTests: XCTestCase {
         XCTAssertEqual(presenceSummary["confidenceLabelRaw"] as? String, "high")
     }
 }
+
+#endif

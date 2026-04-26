@@ -10,6 +10,7 @@ protocol KeychainHelperProtocol {
 
 final class KeychainHelper: KeychainHelperProtocol {
     static let standard = KeychainHelper()
+    static let defaultAccessibility = kSecAttrAccessibleWhenUnlockedThisDeviceOnly
     private static let logger = Logger(subsystem: "com.MCCANN.Border", category: "Keychain")
 
     private init() {}
@@ -31,7 +32,7 @@ final class KeychainHelper: KeychainHelperProtocol {
             kSecClass: kSecClassGenericPassword,
             kSecAttrService: service,
             kSecAttrAccount: account,
-            kSecAttrAccessible: kSecAttrAccessibleWhenUnlocked
+            kSecAttrAccessible: Self.defaultAccessibility
         ] as CFDictionary
 
         // Add new item

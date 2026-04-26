@@ -24,7 +24,8 @@ enum SchengenLedgerCalculator {
         for days: [PresenceDay],
         asOf referenceDate: Date = Date(),
         calendar: Calendar = .current,
-        isReverseSorted: Bool = false
+        isReverseSorted: Bool = false,
+        countingMode: CountryDayCountingMode = .resolvedCountry
     ) -> SchengenLedgerSummary {
         let windowEnd = calendar.startOfDay(for: referenceDate)
         let windowStart = calendar.date(byAdding: .day, value: -(windowSize - 1), to: windowEnd) ?? windowEnd
@@ -43,12 +44,10 @@ enum SchengenLedgerCalculator {
             }
 
             if day.date >= windowStart && day.date <= windowEnd {
-                if day.countryCode != nil || day.countryName != nil {
+                let countedCountries = day.countedCountries(for: countingMode)
+                if !countedCountries.isEmpty {
                     knownDays += 1
-                    if let code = CountryCodeNormalizer.canonicalCode(
-                        countryCode: day.countryCode,
-                        countryName: day.countryName
-                    ), SchengenMembers.isMember(code) {
+                    if countedCountries.contains(where: \.isSchengen) {
                         schengenDays += 1
                     }
                 }

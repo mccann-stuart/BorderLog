@@ -1,4 +1,12 @@
-# Performance Optimization Rationale: Redundant Sorting in StayValidation
+# Performance Optimization Rationale
+
+- Status: Living rationale for merged and in-progress performance hardening.
+- Last updated: 20 Apr 2026.
+- Scope: SwiftData fetch bounds, hot-loop allocation reduction, calendar/photo/location inference paths, and UI list rendering.
+- Security note: performance changes must not weaken privacy behavior. Debug export optimizations apply only to `DEBUG` builds; release builds do not expose the full-fidelity debug export surface.
+- Verification note: each optimization should be backed by unit tests, code review, a simulator build, or a benchmark script under `tasks/`.
+
+# Redundant Sorting in StayValidation
 
 ## Current State
 The `overlapCount` and `gapDays` functions in `StayValidation.swift` both sort the `stays` array by `enteredOn` in ascending order:
@@ -415,3 +423,11 @@ Appended `.lazy` before `.map` to use a lazy sequence generator: `Set(days.lazy.
 ## Verification
 - **Time Complexity**: Remains `O(N)`, but with a significantly faster execution due to eliminating array memory allocations and buffer copying overhead.
 - **Space Complexity**: Memory footprint reduced from `O(N)` transient memory allocation (allocating the intermediate array) to strictly `O(1)` memory overhead beyond the final `Set` itself.
+
+# Current Verification Anchors
+
+- `LearnTests/InferenceEngineTests.swift` covers scoring, gap bridging, travel-backed transitions, origin-flight promotion, and disputed-day behavior.
+- `LearnTests/CalendarTabDataServiceTests.swift` covers calendar summary aggregation, unknown-day coverage, name-only country merging, and flight-origin/destination decoration behavior.
+- `LearnTests/DebugDataStoreExportServiceTests.swift` covers debug export determinism in debug builds only.
+- `LearnTests/DataManagerTests.swift` covers SwiftData reset coverage and sensitive non-SwiftData cleanup.
+- `LearnTests/AuthenticationManagerTests.swift` covers local auth keychain persistence and the device-bound keychain accessibility constant.

@@ -13,11 +13,21 @@ struct DashboardView: View {
     @Query private var countryConfigs: [CountryConfig]
     @ObservedObject private var inferenceActivity = InferenceActivity.shared
     @AppStorage("showSchengenDashboardSection") private var showSchengenDashboardSection = true
+    @AppStorage(CountryDayCountingMode.storageKey, store: AppConfig.sharedDefaults) private var countryDayCountingModeRaw = CountryDayCountingMode.defaultMode.rawValue
     
     @State private var selectedTimeframe: VisitedCountriesTimeframe = .last12Months
+
+    private var countryDayCountingMode: CountryDayCountingMode {
+        CountryDayCountingMode.storedMode(from: countryDayCountingModeRaw)
+    }
     
     private var schengenSummary: SchengenLedgerSummary {
-        SchengenLedgerCalculator.summary(for: presenceDays, asOf: Date(), isReverseSorted: true)
+        SchengenLedgerCalculator.summary(
+            for: presenceDays,
+            asOf: Date(),
+            isReverseSorted: true,
+            countingMode: countryDayCountingMode
+        )
     }
     
     private var unknownSchengenDays: [PresenceDay] {
@@ -29,7 +39,7 @@ struct DashboardView: View {
         for day in presenceDays {
             if day.date > end { continue }
             if day.date < start { break }
-            if day.countryCode == nil && day.countryName == nil {
+            if day.countedCountries(for: countryDayCountingMode).isEmpty {
                 unknownDays.append(day)
             }
         }
@@ -70,35 +80,26 @@ struct DashboardView: View {
                 continue
             }
 
-            if day.countryCode == nil && day.countryName == nil {
+            let countedCountries = day.countedCountries(for: countryDayCountingMode)
+            if countedCountries.isEmpty {
                 unknownDays.append(day)
                 continue
             }
 
-            let normalizedCode = CountryCodeNormalizer.canonicalCode(
-                countryCode: day.countryCode,
-                countryName: day.countryName
-            )
-            guard let countryName = CountryCodeNormalizer.canonicalName(
-                countryCode: normalizedCode,
-                countryName: day.countryName
-            ) ?? normalizedCode else {
-                continue
-            }
-            let key = normalizedCode ?? countryName
-
-            if countryDict[key] != nil {
-                // ⚡ Bolt: Mutate the struct in-place to avoid reallocating new IDs and structs during aggregation
-                countryDict[key]?.totalDays += 1
-            } else {
-                let maxDays = configDict[normalizedCode ?? ""] ?? nil
-                countryDict[key] = CountryDaysInfo(
-                    countryName: countryName,
-                    countryCode: normalizedCode,
-                    totalDays: 1,
-                    region: normalizedCode.flatMap { SchengenMembers.isMember($0) ? .schengen : .nonSchengen } ?? .other,
-                    maxAllowedDays: maxDays
-                )
+            for country in countedCountries {
+                if countryDict[country.id] != nil {
+                    // ⚡ Bolt: Mutate the struct in-place to avoid reallocating new IDs and structs during aggregation
+                    countryDict[country.id]?.totalDays += 1
+                } else {
+                    let maxDays = configDict[country.countryCode ?? ""] ?? nil
+                    countryDict[country.id] = CountryDaysInfo(
+                        countryName: country.countryName,
+                        countryCode: country.countryCode,
+                        totalDays: 1,
+                        region: Region(rawValue: country.regionRaw) ?? .other,
+                        maxAllowedDays: maxDays
+                    )
+                }
             }
         }
 

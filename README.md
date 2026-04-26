@@ -2,13 +2,61 @@ Product Requirements Document (PRD)
 
 BorderLog (Working Title) — Local‑first Country Presence + Schengen Tracker for Expats
 
-Document status: Draft v0.2
-Last updated: 15 Feb 2026
+Document status: Draft v0.3, living PRD plus weekly changelog
+Last updated: 20 Apr 2026
 Platforms: iOS (primary), iPadOS (nice-to-have)
 Distribution: App Store
 Pricing: Free (no subscriptions, no paid tiers)
 
+Current implementation notes:
+- Sign in with Apple is currently feature-flagged off for local-only development; onboarding uses a local session ID until production authentication is re-enabled.
+- CloudKit sync is implemented behind `AppConfig.isCloudKitFeatureEnabled == false`; local SwiftData/App Group storage is the active persistence path.
+- Debug data export is compiled and surfaced only in `DEBUG` builds because it intentionally contains full-fidelity diagnostics.
+- Reset All Data clears SwiftData models, keychain-backed local profile/session values, and pending widget location snapshots.
+- Keychain profile/session values use device-bound `kSecAttrAccessibleWhenUnlockedThisDeviceOnly` accessibility.
+
 Weekly Changelog
+
+Week of Apr 13-19, 2026
+
+Highlights:
+- Continued calendar-ingestion hot-path work by hoisting `NSRegularExpression` compilation out of repeated parsing flows.
+- Reduced string-processing overhead in `CalendarFlightParsing` by switching to lower-allocation Unicode-scalar handling.
+- Tightened character classification in calendar-flight preprocessing with direct scalar-value checks instead of repeated Foundation set lookups.
+
+Key PRs:
+- [#173](https://github.com/mccann-stuart/BorderLog/pull/173) Hoist `NSRegularExpression` and optimize string scalars in `CalendarFlightParsing`.
+
+⸻
+
+Week of Apr 6-12, 2026
+
+Highlights:
+- Reduced intermediate allocation overhead in dictionary-heavy paths by replacing repeated mapping patterns with `reduce(into:)`.
+- Continued inference hot-path work by replacing another sort-based top-K selection path with O(N) extraction loops.
+- Added explicit Keychain access group configuration so the app and its extensions can share sensitive data through the intended signed namespace.
+
+Key PRs:
+- [#166](https://github.com/mccann-stuart/BorderLog/pull/166) Replace O(N log N) Array Sorting with O(N) Top-K Selection.
+- [#165](https://github.com/mccann-stuart/BorderLog/pull/165) Optimize Dictionary Mapping Allocations.
+- [#163](https://github.com/mccann-stuart/BorderLog/pull/163) Add Keychain access group configuration.
+- [#162](https://github.com/mccann-stuart/BorderLog/pull/162) Optimize Dictionary mapping allocations.
+
+⸻
+
+Week of Mar 30-Apr 5, 2026
+
+Highlights:
+- Hardened `GeoRegion` input handling by trimming country-code whitespace before normalization to avoid unintended fallback behavior.
+- Optimized `SchengenMembers` membership checks with a fast-path string-normalization path in a hot lookup flow.
+- Replaced sort-heavy top-K selection in `PresenceInferenceEngine` with O(N) loops and a safer single-pass allocation build.
+
+Key PRs:
+- [#148](https://github.com/mccann-stuart/BorderLog/pull/148) Optimize O(N log N) Top-K element selection into O(N) loops.
+- [#147](https://github.com/mccann-stuart/BorderLog/pull/147) Fast-Path string normalization in `SchengenMembers`.
+- [#146](https://github.com/mccann-stuart/BorderLog/pull/146) Improve input sanitization in `GeoRegion`.
+
+⸻
 
 Week of Mar 23-29, 2026
 
@@ -167,7 +215,7 @@ Existing solutions often require heavy manual entry. People also have fragmented
 
 Journey A — First Launch & Setup
 	1.	Welcome → value prop + privacy stance
-	2.	Sign in with Apple (required)
+	2.	Sign in with Apple in production; local-only development builds currently continue without an account
 	3.	Optional profile setup (passport nationality, home country, etc.)
 	4.	Permission requests (optional, staged):
 	•	Location permissions (for widget + app inference)
@@ -204,8 +252,9 @@ Journey D — Export / Audit
 
 6.1 Authentication & Identity
 
-FR-Auth-1 — Required Apple Sign-in
-	•	App requires Sign in with Apple at first run and after sign-out.
+FR-Auth-1 — Production Apple Sign-in
+	•	Production builds require Sign in with Apple at first run and after sign-out.
+	•	Current local-only development builds keep this flow disabled behind `AuthenticationManager.isAppleSignInEnabled`.
 	•	Only Apple authentication is supported (no email/password, no Google).
 	•	Store Apple user identifier locally for session continuity; do not create a server-side user record.
 
@@ -417,6 +466,11 @@ FR-Export-2 — PDF summary
 FR-Export-3 — Data provenance
 	•	Export optionally includes “Evidence counts” (e.g., 4 photos, 2 location samples) without exposing coordinates unless user opts-in.
 
+FR-Export-4 — Internal debug export
+	•	Debug builds may include a full-fidelity JSON export for developer diagnostics.
+	•	This export is not compiled into release builds and must not be treated as a user-facing audit export.
+	•	Release audit exports should prefer summarized evidence and avoid raw coordinates, calendar identifiers/titles, photo asset hashes, and local user identifiers unless the user explicitly opts in.
+
 ⸻
 
 7. Data Storage & Sync Requirements
@@ -425,9 +479,12 @@ FR-Export-3 — Data provenance
 
 NFR-Data-1 — SwiftData persistence
 	•	All user travel data is stored locally via SwiftData.
+	•	Reset All Data removes SwiftData records, pending widget snapshots in shared defaults, and local keychain profile/session values.
+	•	Keychain profile/session values are device-bound and accessible only while the device is unlocked.
 
 NFR-Data-2 — CloudKit sync for user’s own devices
 	•	Enable CloudKit-backed sync so SwiftData can keep model data consistent across the user’s devices when iCloud is enabled. SwiftData’s container can automatically handle syncing if CloudKit entitlements are enabled.  ￼
+	•	Current development builds keep this feature disabled until provisioning and release policy are confirmed.
 
 7.2 Shared storage for app + widget
 
@@ -478,7 +535,7 @@ No User entity. Identity is an auth/session concern, not a persisted “account.
 Client stack
 	•	SwiftUI UI layer
 	•	SwiftData persistence layer (App Group store)
-	•	CloudKit sync enabled via SwiftData configuration (iCloud private database)  ￼
+	•	CloudKit sync is implemented via SwiftData configuration (iCloud private database) and remains feature-gated off in current development builds.  ￼
 	•	WidgetKit extension
 	•	Core Location for location samples (with explicit permission flow)  ￼
 	•	PhotoKit for photo metadata ingestion  ￼

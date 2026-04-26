@@ -180,25 +180,22 @@ struct TopCountriesWidgetProvider: TimelineProvider {
             }
 
             let presenceDays = (try? modelContext.fetch(descriptor)) ?? []
+            let countingMode = CountryDayCountingMode.load()
 
             var countryDict: [String: WidgetCountryDaysInfo] = [:]
             for day in presenceDays {
-                let primaryCountry = day.contributedCountries.first
-                let countryName = primaryCountry?.countryName ?? day.suggestedCountryName1 ?? day.suggestedCountryCode1
-                guard let resolvedName = countryName else { continue }
-                let normalizedCode = CountryCodeNormalizer.normalize(primaryCountry?.countryCode ?? day.suggestedCountryCode1)
-                let key = normalizedCode ?? resolvedName
-                
-                if countryDict[key] != nil {
-                    // ⚡ Bolt: Mutate struct directly to avoid intermediate allocations
-                    countryDict[key]?.totalDays += 1
-                } else {
-                    countryDict[key] = WidgetCountryDaysInfo(
-                        countryName: resolvedName,
-                        countryCode: normalizedCode,
-                        totalDays: 1,
-                        region: normalizedCode.flatMap { SchengenMembers.isMember($0) ? .schengen : .nonSchengen } ?? .other
-                    )
+                for country in day.countedCountries(for: countingMode) {
+                    if countryDict[country.id] != nil {
+                        // ⚡ Bolt: Mutate struct directly to avoid intermediate allocations
+                        countryDict[country.id]?.totalDays += 1
+                    } else {
+                        countryDict[country.id] = WidgetCountryDaysInfo(
+                            countryName: country.countryName,
+                            countryCode: country.countryCode,
+                            totalDays: 1,
+                            region: Region(rawValue: country.regionRaw) ?? .other
+                        )
+                    }
                 }
             }
 
@@ -339,7 +336,11 @@ struct SchengenWidgetProvider: TimelineProvider {
             }
             
             let days = (try? modelContext.fetch(descriptor)) ?? []
-            let summary = SchengenLedgerCalculator.summary(for: days, asOf: now)
+            let summary = SchengenLedgerCalculator.summary(
+                for: days,
+                asOf: now,
+                countingMode: CountryDayCountingMode.load()
+            )
             
             let entry = SchengenEntry(date: now, summary: summary)
             let nextUpdate = Calendar.current.date(byAdding: .hour, value: 3, to: now) ?? now.addingTimeInterval(10800)

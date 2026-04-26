@@ -93,8 +93,33 @@ final class DataManagerTests: XCTestCase {
         context.insert(countryConfig)
         try context.save()
 
+        let mockKeychain = MockKeychainHelper()
+        for account in ["appleUserId", "userPassportNationality", "userHomeCountry"] {
+            mockKeychain.save(Data(account.utf8), service: "com.MCCANN.Border", account: account)
+        }
+
+        let suiteName = "DataManagerTests.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        defer {
+            defaults.removePersistentDomain(forName: suiteName)
+        }
+        PendingLocationSnapshot.enqueue(
+            PendingLocationSnapshot(
+                timestamp: Date(),
+                latitude: 48.8566,
+                longitude: 2.3522,
+                accuracyMeters: 20,
+                sourceRaw: LocationSampleSource.widget.rawValue,
+                timeZoneId: TimeZone.current.identifier,
+                dayKey: calendarDay,
+                countryCode: "FR",
+                countryName: "France"
+            ),
+            in: defaults
+        )
+
         // Reset
-        try dataManager.resetAllData()
+        try dataManager.resetAllData(keychain: mockKeychain, defaults: defaults)
 
         // Verify empty
         let staysCountAfter = try context.fetchCount(stayDescriptor)
@@ -114,6 +139,10 @@ final class DataManagerTests: XCTestCase {
         XCTAssertTrue(presenceCountAfter == 0)
         XCTAssertTrue(ingestStateCountAfter == 0)
         XCTAssertTrue(countryConfigCountAfter == 0)
+        XCTAssertNil(mockKeychain.read(service: "com.MCCANN.Border", account: "appleUserId"))
+        XCTAssertNil(mockKeychain.read(service: "com.MCCANN.Border", account: "userPassportNationality"))
+        XCTAssertNil(mockKeychain.read(service: "com.MCCANN.Border", account: "userHomeCountry"))
+        XCTAssertTrue(PendingLocationSnapshot.dequeueAll(from: defaults, clearAfter: false).isEmpty)
     }
 
     func testDeleteRemovesSpecificModel() async throws {

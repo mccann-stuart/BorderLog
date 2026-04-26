@@ -104,7 +104,10 @@ final class InferenceEngineTests: XCTestCase {
             calendar: calendar
         )
 
-        let evidence = try XCTUnwrap(results.first?.evidence.first)
+        guard let evidence = results.first?.evidence.first else {
+            XCTFail("Expected calibrated location evidence")
+            return
+        }
         XCTAssertEqual(evidence.source, "location")
         XCTAssertEqual(evidence.phase, .base)
         XCTAssertEqual(evidence.rawWeight, 3.0, accuracy: 0.001)
@@ -443,21 +446,27 @@ final class InferenceEngineTests: XCTestCase {
             calendar: calendar
         )
 
-        let before = results.first { $0.dayKey == dayBeforeDepartureKey }
-        XCTAssertEqual(before?.contributedCountries.first?.countryCode, "GB")
-        XCTAssertEqual(before?.confidence, 0.85, accuracy: 0.001)
-        XCTAssertEqual(before?.confidenceLabel, .high)
-        XCTAssertTrue(before?.sources.contains(.calendar) == true)
-        XCTAssertEqual(before?.calendarCount, 1)
-        XCTAssertTrue(before?.evidence.contains(where: { $0.source == "CalendarTravelBeforePromotion" }) == true)
+        guard let before = results.first(where: { $0.dayKey == dayBeforeDepartureKey }) else {
+            XCTFail("Expected day before departure to be promoted")
+            return
+        }
+        XCTAssertEqual(before.contributedCountries.first?.countryCode, "GB")
+        XCTAssertEqual(before.confidence, 0.85, accuracy: 0.001)
+        XCTAssertEqual(before.confidenceLabel, .high)
+        XCTAssertTrue(before.sources.contains(.calendar))
+        XCTAssertEqual(before.calendarCount, 1)
+        XCTAssertTrue(before.evidence.contains(where: { $0.source == "CalendarTravelBeforePromotion" }))
 
-        let after = results.first { $0.dayKey == dayAfterArrivalKey }
-        XCTAssertEqual(after?.contributedCountries.first?.countryCode, "DE")
-        XCTAssertEqual(after?.confidence, 0.85, accuracy: 0.001)
-        XCTAssertEqual(after?.confidenceLabel, .high)
-        XCTAssertTrue(after?.sources.contains(.calendar) == true)
-        XCTAssertEqual(after?.calendarCount, 1)
-        XCTAssertTrue(after?.evidence.contains(where: { $0.source == "CalendarTravelAfterPromotion" }) == true)
+        guard let after = results.first(where: { $0.dayKey == dayAfterArrivalKey }) else {
+            XCTFail("Expected day after arrival to be promoted")
+            return
+        }
+        XCTAssertEqual(after.contributedCountries.first?.countryCode, "DE")
+        XCTAssertEqual(after.confidence, 0.85, accuracy: 0.001)
+        XCTAssertEqual(after.confidenceLabel, .high)
+        XCTAssertTrue(after.sources.contains(.calendar))
+        XCTAssertEqual(after.calendarCount, 1)
+        XCTAssertTrue(after.evidence.contains(where: { $0.source == "CalendarTravelAfterPromotion" }))
     }
 
     func testTravelEventDoesNotReplaceOverrideOrResolvedNonCalendarDay() {
@@ -568,31 +577,37 @@ final class InferenceEngineTests: XCTestCase {
         )
 
         for travelGapDay in [7, 8, 9] {
-            let result = results.first {
+            guard let result = results.first(where: {
                 $0.dayKey == DayKey.make(from: self.day(2026, 3, travelGapDay), timeZone: self.calendar.timeZone)
+            }) else {
+                XCTFail("Expected transition-infilled result for day \(travelGapDay)")
+                continue
             }
-            XCTAssertEqual(result?.contributedCountries.map { $0.countryCode ?? "" }, ["GB", "DE"])
-            XCTAssertEqual(result?.contributedCountries.first?.probability, 0.51, accuracy: 0.001)
-            XCTAssertEqual(result?.contributedCountries.dropFirst().first?.probability, 0.49, accuracy: 0.001)
-            XCTAssertEqual(result?.suggestedCountryCode1, "GB")
-            XCTAssertEqual(result?.suggestedCountryCode2, "DE")
-            XCTAssertTrue(result?.isDisputed == true)
-            XCTAssertEqual(result?.confidence, 0.51, accuracy: 0.001)
-            XCTAssertEqual(result?.confidenceLabel, .medium)
-            XCTAssertNotEqual(result?.confidenceLabel, .high)
-            XCTAssertTrue(result?.evidence.contains(where: { $0.source == "CalendarTransitionInfill" }) == true)
+            XCTAssertEqual(result.contributedCountries.map { $0.countryCode ?? "" }, ["GB", "DE"])
+            XCTAssertEqual(result.contributedCountries.first?.probability ?? 0, 0.51, accuracy: 0.001)
+            XCTAssertEqual(result.contributedCountries.dropFirst().first?.probability ?? 0, 0.49, accuracy: 0.001)
+            XCTAssertEqual(result.suggestedCountryCode1, "GB")
+            XCTAssertEqual(result.suggestedCountryCode2, "DE")
+            XCTAssertTrue(result.isDisputed)
+            XCTAssertEqual(result.confidence, 0.51, accuracy: 0.001)
+            XCTAssertEqual(result.confidenceLabel, .medium)
+            XCTAssertNotEqual(result.confidenceLabel, .high)
+            XCTAssertTrue(result.evidence.contains(where: { $0.source == "CalendarTransitionInfill" }))
         }
 
         for travelGapDay in [13, 14] {
-            let result = results.first {
+            guard let result = results.first(where: {
                 $0.dayKey == DayKey.make(from: self.day(2026, 3, travelGapDay), timeZone: self.calendar.timeZone)
+            }) else {
+                XCTFail("Expected transition-infilled result for day \(travelGapDay)")
+                continue
             }
-            XCTAssertEqual(result?.contributedCountries.map { $0.countryCode ?? "" }, ["GB", "US"])
-            XCTAssertEqual(result?.suggestedCountryCode1, "GB")
-            XCTAssertEqual(result?.suggestedCountryCode2, "US")
-            XCTAssertTrue(result?.isDisputed == true)
-            XCTAssertEqual(result?.confidenceLabel, .medium)
-            XCTAssertTrue(result?.evidence.contains(where: { $0.source == "CalendarTransitionInfill" }) == true)
+            XCTAssertEqual(result.contributedCountries.map { $0.countryCode ?? "" }, ["GB", "US"])
+            XCTAssertEqual(result.suggestedCountryCode1, "GB")
+            XCTAssertEqual(result.suggestedCountryCode2, "US")
+            XCTAssertTrue(result.isDisputed)
+            XCTAssertEqual(result.confidenceLabel, .medium)
+            XCTAssertTrue(result.evidence.contains(where: { $0.source == "CalendarTransitionInfill" }))
         }
     }
 

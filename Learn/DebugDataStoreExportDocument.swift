@@ -1,3 +1,5 @@
+#if DEBUG
+
 //
 //  DebugDataStoreExportDocument.swift
 //  Learn
@@ -25,3 +27,5 @@ struct DebugDataStoreExportDocument: FileDocument {
         FileWrapper(regularFileWithContents: data)
     }
 }
+
+#endif

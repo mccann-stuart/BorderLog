@@ -120,7 +120,8 @@ struct CalendarTabSnapshot: Sendable {
             accumulators: [:],
             presenceDays: [],
             calendar: calendar,
-            now: now
+            now: now,
+            countingMode: .resolvedCountry
         )
         return CalendarTabSnapshot(
             visibleMonthStart: normalizedMonthStart,
@@ -158,7 +159,8 @@ actor CalendarTabDataService {
     func snapshot(
         visibleMonthStart: Date,
         summaryRange: CalendarCountrySummaryRange,
-        now: Date = Date()
+        now: Date = Date(),
+        countingMode: CountryDayCountingMode = .resolvedCountry
     ) throws -> CalendarTabSnapshot {
         let calendar = Calendar.current
         let normalizedVisibleMonth = Self.monthStart(for: visibleMonthStart, calendar: calendar)
@@ -238,7 +240,8 @@ actor CalendarTabDataService {
             accumulators: accumulators,
             presenceDays: presenceDays,
             calendar: calendar,
-            now: now
+            now: now,
+            countingMode: countingMode
         )
         let countrySummaries = makeCountrySummaries(
             from: accumulators,
@@ -248,7 +251,8 @@ actor CalendarTabDataService {
             visibleMonthStart: normalizedVisibleMonth,
             configByID: configByID,
             now: now,
-            calendar: calendar
+            calendar: calendar,
+            countingMode: countingMode
         )
         let summaryUnknownDayKeys = makeSummaryUnknownDayKeys(
             presenceDays: presenceDays,
@@ -256,7 +260,8 @@ actor CalendarTabDataService {
             summaryRange: summaryRange,
             visibleMonthStart: normalizedVisibleMonth,
             now: now,
-            calendar: calendar
+            calendar: calendar,
+            countingMode: countingMode
         )
 
         let earliestMonth = try fetchEarliestAvailableMonth(fallback: normalizedVisibleMonth, calendar: calendar)
@@ -497,6 +502,15 @@ actor CalendarTabDataService {
         )
     }
 
+    private nonisolated static func calendarCountry(from countedCountry: CountedPresenceCountry) -> CalendarDayCountry {
+        CalendarDayCountry(
+            id: countedCountry.id,
+            countryName: countedCountry.countryName,
+            countryCode: countedCountry.countryCode,
+            regionRaw: countedCountry.regionRaw
+        )
+    }
+
     private func makeCountrySummaries(
         from accumulators: [String: DayAccumulator],
         presenceDays: [PresenceDay],
@@ -505,7 +519,8 @@ actor CalendarTabDataService {
         visibleMonthStart: Date,
         configByID: [String: Int?],
         now: Date,
-        calendar: Calendar
+        calendar: Calendar,
+        countingMode: CountryDayCountingMode
     ) -> [CalendarCountryDaysSummary] {
         var counts: [String: (country: CalendarDayCountry, totalDays: Int)] = [:]
         let resolvedDayMap = presenceDays.reduce(into: [String: PresenceDay](minimumCapacity: presenceDays.count)) { $0[$1.dayKey] = $1 }
@@ -516,14 +531,14 @@ actor CalendarTabDataService {
             }
 
             if let resolvedDay = resolvedDayMap[dayKey] {
-                guard let country = Self.normalizedCountry(
-                    countryCode: resolvedDay.countryCode,
-                    countryName: resolvedDay.countryName
-                ) else {
+                let countedCountries = resolvedDay.countedCountries(for: countingMode)
+                guard !countedCountries.isEmpty else {
                     continue
                 }
-                let current = counts[country.id] ?? (country, 0)
-                counts[country.id] = (country: current.country, totalDays: current.totalDays + 1)
+                for country in countedCountries.map({ Self.calendarCountry(from: $0) }) {
+                    let current = counts[country.id] ?? (country, 0)
+                    counts[country.id] = (country: current.country, totalDays: current.totalDays + 1)
+                }
                 continue
             }
 
@@ -559,7 +574,8 @@ actor CalendarTabDataService {
         summaryRange: CalendarCountrySummaryRange,
         visibleMonthStart: Date,
         now: Date,
-        calendar: Calendar
+        calendar: Calendar,
+        countingMode: CountryDayCountingMode
     ) -> [String] {
         let resolvedDayMap = presenceDays.reduce(into: [String: PresenceDay](minimumCapacity: presenceDays.count)) { $0[$1.dayKey] = $1 }
         var unknownDayKeys: [String] = []
@@ -570,10 +586,7 @@ actor CalendarTabDataService {
                 continue
             }
 
-            if Self.normalizedCountry(
-                countryCode: resolvedDay.countryCode,
-                countryName: resolvedDay.countryName
-            ) == nil {
+            if resolvedDay.countedCountries(for: countingMode).isEmpty {
                 unknownDayKeys.append(dayKey)
             }
         }
@@ -644,7 +657,8 @@ actor CalendarTabDataService {
         accumulators: [String: DayAccumulator],
         presenceDays: [PresenceDay],
         calendar: Calendar,
-        now: Date
+        now: Date,
+        countingMode: CountryDayCountingMode = .resolvedCountry
     ) -> [CalendarDaySummary] {
         let monthRange = makeMonthRange(for: visibleMonthStart, calendar: calendar)
         let todayKey = DayKey.make(from: now, timeZone: calendar.timeZone)
@@ -654,12 +668,8 @@ actor CalendarTabDataService {
             guard let date = DayKey.date(for: dayKey, timeZone: calendar.timeZone) else { return nil }
             let accumulator = accumulators[dayKey]
             let resolvedDay = resolvedDayMap[dayKey]
-            let resolvedCountry = resolvedDay.flatMap {
-                Self.normalizedCountry(
-                    countryCode: $0.countryCode,
-                    countryName: $0.countryName
-                )
-            }
+            let resolvedCountries = resolvedDay?.countedCountries(for: countingMode).map { Self.calendarCountry(from: $0) } ?? []
+            let resolvedCountry = resolvedCountries.first
             let flightOriginCountry = accumulator.flatMap {
                 preferredFlightCountry(
                     from: $0.flightOriginCandidates,
@@ -679,12 +689,12 @@ actor CalendarTabDataService {
             if let accumulator, accumulator.hasFlight {
                 countries = makeFlightDecorationCountries(
                     accumulator: accumulator,
-                    resolvedCountry: resolvedCountry,
+                    resolvedCountries: resolvedCountries,
                     flightOriginCountry: flightOriginCountry,
                     flightDestinationCountry: flightDestinationCountry
                 )
-            } else if let resolvedCountry {
-                countries = [resolvedCountry]
+            } else if !resolvedCountries.isEmpty {
+                countries = resolvedCountries
             } else if let accumulator, !accumulator.countriesByID.isEmpty {
                 countries = sortedCountries(accumulator.countriesByID.values)
             } else {
@@ -707,7 +717,7 @@ actor CalendarTabDataService {
 
     nonisolated fileprivate static func makeFlightDecorationCountries(
         accumulator: DayAccumulator,
-        resolvedCountry: CalendarDayCountry?,
+        resolvedCountries: [CalendarDayCountry],
         flightOriginCountry: CalendarDayCountry?,
         flightDestinationCountry: CalendarDayCountry?
     ) -> [CalendarDayCountry] {
@@ -721,7 +731,9 @@ actor CalendarTabDataService {
 
         append(flightOriginCountry)
         append(flightDestinationCountry)
-        append(resolvedCountry)
+        for country in resolvedCountries {
+            append(country)
+        }
 
         for country in sortedCountries(accumulator.countriesByID.values) {
             append(country)

@@ -1,5 +1,6 @@
 import XCTest
 @testable import Learn
+import Security
 
 // Mock KeychainHelper
 class MockKeychainHelper: KeychainHelperProtocol {
@@ -23,6 +24,12 @@ class MockKeychainHelper: KeychainHelperProtocol {
 
 @MainActor
 final class AuthenticationManagerTests: XCTestCase {
+    func testKeychainUsesDeviceBoundAccessibility() {
+        XCTAssertEqual(
+            KeychainHelper.defaultAccessibility as String,
+            kSecAttrAccessibleWhenUnlockedThisDeviceOnly as String
+        )
+    }
 
     func testSignInSavesToKeychain() {
         let mockKeychain = MockKeychainHelper()

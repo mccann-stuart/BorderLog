@@ -1,5 +1,17 @@
 # Self-Improvement Lessons
 
+## Documentation Drift
+- **Pattern**: Root `README.md`, `Learn/README.md`, and implementation PRDs diverged on current auth, CloudKit, debug-export, and inference behavior.
+- **Lesson**: Keep repo-root `README.md` as the product/changelog source of truth, keep `Learn/README.md` limited to app-target notes, and update implementation PRDs whenever behavior changes in code.
+
+## Full Reset Privacy Scope
+- **Pattern**: Reset paths cleared SwiftData models but left keychain-backed profile/session values and pending widget snapshots in shared defaults.
+- **Lesson**: Treat user-visible reset as a privacy operation, not only a database operation; clear SwiftData, keychain accounts, shared defaults queues, and any ingestion checkpoint state that can recreate sensitive records.
+
+## Debug Export Release Gating
+- **Pattern**: A full-fidelity debug export was reachable from normal Settings UI even though it includes raw coordinates, event identifiers/titles, photo asset hashes, and local user identifiers.
+- **Lesson**: Full-fidelity diagnostics must be compiled and surfaced only in debug/developer builds; release-facing export flows should default to summarized or explicitly opted-in data.
+
 ## SwiftData UI Freezing
 - **Pattern**: Running heavy SwiftData synchronous fetches (`modelContext.fetch`) inside loops, combined with other tasks (geocoding) on the `@MainActor`.
 - **Lesson**: Never run large datastore tasks on the main thread in Swift. Always use a background `ModelContext` (e.g. via `@ModelActor` or by initializing a new `ModelContext` on a background thread) for operations like batch ingestion or ledger recomputation.
