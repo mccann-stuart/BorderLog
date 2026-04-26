@@ -32,7 +32,8 @@ struct DataManager {
     /// Resets all data by deleting all entities.
     func resetAllData(
         keychain: KeychainHelperProtocol = KeychainHelper.standard,
-        defaults: UserDefaults = AppConfig.sharedDefaults
+        defaults: UserDefaults = AppConfig.sharedDefaults,
+        pendingLocationQueueDirectoryURL: URL? = nil
     ) throws {
         try modelContext.delete(model: Stay.self)
         try modelContext.delete(model: DayOverride.self)
@@ -48,7 +49,7 @@ struct DataManager {
         for account in ["appleUserId", "userPassportNationality", "userHomeCountry"] {
             keychain.delete(service: "com.MCCANN.Border", account: account)
         }
-        PendingLocationSnapshot.removeAll(from: defaults)
+        PendingLocationSnapshot.removeAll(from: defaults, queueDirectoryURL: pendingLocationQueueDirectoryURL)
         Self.logger.info("All data reset.")
     }
 
@@ -139,8 +140,10 @@ struct DataManager {
 
         let container = modelContext.container
         Task {
-            let recomputeService = LedgerRecomputeService(modelContainer: container)
-            await recomputeService.recomputeAll()
+            await LedgerRefreshCoordinator.shared.run {
+                let recomputeService = LedgerRecomputeService(modelContainer: container)
+                await recomputeService.recomputeAll()
+            }
         }
 
         Self.logger.info("Sample data seeded.")

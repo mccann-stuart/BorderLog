@@ -46,11 +46,20 @@
 
 # Debug Export Remediation Plan
 
-- [ ] Replace the pending widget location queue with a file-backed app-group queue that dedupes deterministic snapshot IDs and deletes only after a successful ingest save.
-- [ ] Restrict widget-triggered location capture to the current-location widget so read-only widgets stop creating extra snapshots.
-- [ ] Add a shared ledger refresh coordinator and route launch, scene activation, manual scans, pending-widget ingest, and debug export consistency through it.
-- [ ] Update photo ingest checkpoint semantics so the creation-date checkpoint reflects the max scanned asset date.
-- [ ] Add debug export diagnostics for snapshot consistency, inferred-day derivation, evidence phase counts, and weak location samples.
-- [ ] Add focused unit tests for pending queue behavior, failed ingest retry safety, photo checkpoint semantics, and debug export diagnostics.
-- [ ] Run targeted tests and the requested simulator suite.
-- [ ] Add a review section summarizing the changes, verification, and residual risks.
+- [x] Replace the pending widget location queue with a file-backed app-group queue that dedupes deterministic snapshot IDs and deletes only after a successful ingest save.
+- [x] Restrict widget-triggered location capture to the current-location widget so read-only widgets stop creating extra snapshots.
+- [x] Add a shared ledger refresh coordinator and route launch, scene activation, manual scans, pending-widget ingest, and debug export consistency through it.
+- [x] Update photo ingest checkpoint semantics so the creation-date checkpoint reflects the max scanned asset date.
+- [x] Add debug export diagnostics for snapshot consistency, inferred-day derivation, evidence phase counts, and weak location samples.
+- [x] Add focused unit tests for pending queue behavior, failed ingest retry safety, photo checkpoint semantics, and debug export diagnostics.
+- [x] Run targeted tests and the requested simulator suite.
+- [x] Add a review section summarizing the changes, verification, and residual risks.
+
+## Debug Export Remediation Review
+
+- Implemented or verified the file-backed pending-location queue, retry-safe pending ingest, current-location-only widget capture, serialized refresh coordination, max-scanned photo checkpoint semantics, and debug export metadata for snapshot consistency, inferred-day derivation, evidence phase counts, weak location samples, and full-fidelity privacy warning.
+- Added focused coverage for concurrent pending snapshot enqueue dedupe, pending snapshot retry safety, burst-capture concurrency, photo checkpoint advancement for duplicate/non-geotagged/sequenced scans, and debug export derivation/accuracy diagnostics.
+- Verification passed: `xcodebuild test -project Learn.xcodeproj -scheme Learn -destination 'platform=iOS Simulator,name=iPhone 17' -derivedDataPath /tmp/BorderLogDebugRemediationTests -only-testing:LearnTests/PendingLocationSnapshotTests -only-testing:LearnTests/DebugDataStoreExportServiceTests -only-testing:LearnTests/PhotoSignalIngestorCoreTests -only-testing:LearnTests/LocationConcurrencyTests`.
+- Verification failed outside the focused remediation slice: the full `xcodebuild test -project Learn.xcodeproj -scheme Learn -destination 'platform=iOS Simulator,name=iPhone 17' -derivedDataPath /tmp/BorderLogDebugRemediationFullTests` run executed 179 tests with 13 failures in existing calendar ordering/parsing, Schengen window, stay duration, inference, ledger recompute, and real fetcher boundary tests. The remediation-focused tests passed inside the full run.
+- Build iOS Apps plugin verification passed: `build_sim` succeeded for scheme `Learn`, the app installed on iPhone 17, launched with bundle id `com.MCCANN.BorderLog`, and `snapshot_ui` showed the BorderLog onboarding screen.
+- Residual risk: the build still emits existing Swift 6 actor-isolation warnings across shared SwiftData/model actor code; those warnings are not introduced by this remediation but should be retired before enabling Swift 6 language mode.

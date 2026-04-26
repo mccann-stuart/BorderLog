@@ -243,11 +243,13 @@ struct PendingLocationSnapshot: Codable, Equatable, Sendable {
     }
 
     private static func legacySnapshots(from defaults: UserDefaults) -> [PendingLocationSnapshot] {
-        guard let data = defaults.data(forKey: legacyDefaultsKey),
-              let queue = try? JSONDecoder.pendingSnapshotDecoder.decode([PendingLocationSnapshot].self, from: data) else {
+        guard let data = defaults.data(forKey: legacyDefaultsKey) else {
             return []
         }
-        return queue
+        if let queue = try? JSONDecoder.pendingSnapshotDecoder.decode([PendingLocationSnapshot].self, from: data) {
+            return queue
+        }
+        return (try? JSONDecoder().decode([PendingLocationSnapshot].self, from: data)) ?? []
     }
 
     private static func removeLegacySnapshots(ids: Set<String>, from defaults: UserDefaults) {

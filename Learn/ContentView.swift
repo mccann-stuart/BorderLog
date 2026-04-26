@@ -246,8 +246,11 @@ struct ContentView: View {
     @MainActor
     private func refreshLedger() async {
         await schengenState.update(stays: stays, overrides: overrides)
-        let recomputeService = LedgerRecomputeService(modelContainer: modelContext.container)
-        await recomputeService.recomputeAll()
+        let container = modelContext.container
+        await LedgerRefreshCoordinator.shared.run {
+            let recomputeService = LedgerRecomputeService(modelContainer: container)
+            await recomputeService.recomputeAll()
+        }
     }
 
     private func seedSampleData() {

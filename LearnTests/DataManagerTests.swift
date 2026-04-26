@@ -100,8 +100,11 @@ final class DataManagerTests: XCTestCase {
 
         let suiteName = "DataManagerTests.\(UUID().uuidString)"
         let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        let pendingQueueURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("DataManagerTests.PendingQueue.\(UUID().uuidString)", isDirectory: true)
         defer {
             defaults.removePersistentDomain(forName: suiteName)
+            try? FileManager.default.removeItem(at: pendingQueueURL)
         }
         PendingLocationSnapshot.enqueue(
             PendingLocationSnapshot(
@@ -115,11 +118,16 @@ final class DataManagerTests: XCTestCase {
                 countryCode: "FR",
                 countryName: "France"
             ),
-            in: defaults
+            in: defaults,
+            queueDirectoryURL: pendingQueueURL
         )
 
         // Reset
-        try dataManager.resetAllData(keychain: mockKeychain, defaults: defaults)
+        try dataManager.resetAllData(
+            keychain: mockKeychain,
+            defaults: defaults,
+            pendingLocationQueueDirectoryURL: pendingQueueURL
+        )
 
         // Verify empty
         let staysCountAfter = try context.fetchCount(stayDescriptor)
@@ -142,7 +150,7 @@ final class DataManagerTests: XCTestCase {
         XCTAssertNil(mockKeychain.read(service: "com.MCCANN.Border", account: "appleUserId"))
         XCTAssertNil(mockKeychain.read(service: "com.MCCANN.Border", account: "userPassportNationality"))
         XCTAssertNil(mockKeychain.read(service: "com.MCCANN.Border", account: "userHomeCountry"))
-        XCTAssertTrue(PendingLocationSnapshot.dequeueAll(from: defaults, clearAfter: false).isEmpty)
+        XCTAssertTrue(PendingLocationSnapshot.dequeueAll(from: defaults, clearAfter: false, queueDirectoryURL: pendingQueueURL).isEmpty)
     }
 
     func testDeleteRemovesSpecificModel() async throws {

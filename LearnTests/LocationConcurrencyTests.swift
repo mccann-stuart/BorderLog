@@ -37,4 +37,17 @@ final class LocationConcurrencyTests: XCTestCase {
         // Success if we reached here
         XCTAssertTrue(true, "Concurrent requests completed without hanging")
     }
+
+    func testConcurrentBurstCaptureDoesNotHang() async throws {
+        let service = LocationSampleService()
+        let container = ModelContainerProvider.makeContainer()
+
+        async let result1: LocationSample? = try? await service.captureAndStoreBurst(source: .app, modelContext: container.mainContext)
+        async let result2: LocationSample? = try? await service.captureAndStoreBurst(source: .app, modelContext: container.mainContext)
+
+        let _ = await result1
+        let _ = await result2
+
+        XCTAssertTrue(true, "Concurrent burst requests completed without hanging")
+    }
 }

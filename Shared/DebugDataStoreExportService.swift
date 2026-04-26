@@ -844,6 +844,84 @@ actor DebugDataStoreExportService {
         return labels
     }
 
+    private static func evidencePhaseCounts(for evidence: [SignalImpact]) -> DebugExportEvidencePhaseCounts {
+        var base = 0
+        var contextual = 0
+        var override = 0
+        var normalization = 0
+
+        for entry in evidence {
+            switch entry.phase {
+            case .base:
+                base += 1
+            case .contextual:
+                contextual += 1
+            case .override:
+                override += 1
+            case .normalization:
+                normalization += 1
+            }
+        }
+
+        return DebugExportEvidencePhaseCounts(
+            base: base,
+            contextual: contextual,
+            override: override,
+            normalization: normalization
+        )
+    }
+
+    private static func derivationReason(
+        for day: PresenceDay,
+        evidencePhaseCounts: DebugExportEvidencePhaseCounts
+    ) -> String {
+        if day.isOverride {
+            return "manual-override"
+        }
+        if day.countryCode == nil && day.countryName == nil {
+            return day.evidence.isEmpty ? "unresolved-no-evidence" : "unresolved-below-threshold"
+        }
+        let contextualReasons = day.evidence
+            .filter { $0.phase == .contextual && $0.contributedToFinalResult }
+            .map(\.reason)
+        if !contextualReasons.isEmpty {
+            return "contextual:" + Array(Set(contextualReasons)).sorted().joined(separator: ",")
+        }
+        if evidencePhaseCounts.base > 0 {
+            return "raw-evidence"
+        }
+        if !day.confidenceBreakdown.calibrationSummary.isEmpty {
+            return "derived:" + day.confidenceBreakdown.calibrationSummary
+        }
+        return "derived-no-raw-evidence"
+    }
+
+    private static func locationAccuracyQuality(for accuracyMeters: Double) -> String {
+        if accuracyMeters <= 0 {
+            return "invalid"
+        }
+        if accuracyMeters > 1_000 {
+            return "veryWeak"
+        }
+        if accuracyMeters > 100 {
+            return "weak"
+        }
+        return "usable"
+    }
+
+    private static func locationQualityFlags(for accuracyMeters: Double) -> [String] {
+        switch locationAccuracyQuality(for: accuracyMeters) {
+        case "invalid":
+            return ["invalidAccuracy"]
+        case "veryWeak":
+            return ["weakAccuracy", "veryWeakAccuracy"]
+        case "weak":
+            return ["weakAccuracy"]
+        default:
+            return []
+        }
+    }
+
     private static func iso8601String(from date: Date) -> String {
         let formatter = ISO8601DateFormatter()
         formatter.timeZone = TimeZone(secondsFromGMT: 0)

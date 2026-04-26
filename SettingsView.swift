@@ -770,7 +770,8 @@ struct SettingsView: View {
                 cloudKitFeatureEnabled: AppConfig.isCloudKitFeatureEnabled,
                 appleSignInEnabled: AuthenticationManager.isAppleSignInEnabled,
                 appGroupAvailable: AppConfig.isAppGroupAvailable
-            )
+            ),
+            privacyWarning: "Full-fidelity developer export: includes raw coordinates, calendar titles and identifiers, photo asset hashes, profile values, and local identifiers."
         )
 
         let appState = DebugExportAppState(

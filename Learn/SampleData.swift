@@ -80,8 +80,10 @@ struct SampleData {
 
         Task {
             let container = context.container
-            let recomputeService = LedgerRecomputeService(modelContainer: container)
-            await recomputeService.recomputeAll()
+            await LedgerRefreshCoordinator.shared.run {
+                let recomputeService = LedgerRecomputeService(modelContainer: container)
+                await recomputeService.recomputeAll()
+            }
         }
     }
 }

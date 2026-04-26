@@ -51,7 +51,8 @@ final class DebugDataStoreExportServiceTests: XCTestCase {
                     cloudKitFeatureEnabled: false,
                     appleSignInEnabled: false,
                     appGroupAvailable: true
-                )
+                ),
+                privacyWarning: "test-warning"
             ),
             appState: DebugExportAppState(
                 hasCompletedOnboarding: true,
@@ -80,8 +81,10 @@ final class DebugDataStoreExportServiceTests: XCTestCase {
                 appleUserId: nil,
                 appleSignInEnabled: false
             ),
+            snapshotConsistency: "quiescent",
             pendingLocationSnapshots: [
                 DebugExportPendingLocationSnapshot(
+                    id: "pending-fr-1",
                     timestamp: makeDate(2026, 3, 7, hour: 9, minute: 15),
                     latitude: 48.8566,
                     longitude: 2.3522,
@@ -260,6 +263,7 @@ final class DebugDataStoreExportServiceTests: XCTestCase {
         XCTAssertEqual(payload.metadata.deviceModelCategory, "phone")
         XCTAssertEqual(payload.appState.dataStoreMode, "local")
         XCTAssertEqual(payload.appState.pendingWidgetSnapshotCount, 1)
+        XCTAssertEqual(payload.snapshotConsistency, "quiescent")
         XCTAssertEqual(payload.userData.passportNationality, "GB")
         XCTAssertNil(payload.userData.appleUserId)
 
@@ -273,8 +277,8 @@ final class DebugDataStoreExportServiceTests: XCTestCase {
         XCTAssertEqual(payload.summary.recordCounts.photoIngestStates, 1)
         XCTAssertEqual(payload.summary.recordCounts.pendingLocationSnapshots, 1)
 
-        XCTAssertEqual(payload.summary.dateBounds.stays?.earliest, makeDate(2026, 3, 1))
-        XCTAssertEqual(payload.summary.dateBounds.stays?.latest, makeDate(2026, 3, 1))
+        XCTAssertEqual(payload.summary.dateBounds.stays?.earliest, makeDate(2026, 3, 1, hour: 0))
+        XCTAssertEqual(payload.summary.dateBounds.stays?.latest, makeDate(2026, 3, 1, hour: 0))
         XCTAssertEqual(payload.summary.dateBounds.locationSamples?.earliest, makeDate(2026, 3, 4, hour: 8))
         XCTAssertEqual(payload.summary.dateBounds.locationSamples?.latest, makeDate(2026, 3, 8, hour: 18))
         XCTAssertEqual(payload.summary.dateBounds.photoIngestActivity?.earliest, makeDate(2026, 3, 4, hour: 12))
@@ -324,6 +328,8 @@ final class DebugDataStoreExportServiceTests: XCTestCase {
         XCTAssertEqual(march1.presenceSummary?.confidenceLabelRaw, "high")
         XCTAssertEqual(march1.presenceSummary?.isDisputed, true)
         XCTAssertEqual(march1.presenceSummary?.isManuallyModified, true)
+        XCTAssertEqual(march1.presenceSummary?.derivationReason, "raw-evidence")
+        XCTAssertEqual(march1.presenceSummary?.evidencePhaseCounts.base, 2)
         XCTAssertEqual(march1.staysCoveringDay.count, 1)
         XCTAssertTrue(march1.hasAnyRawEvidence)
 
@@ -348,8 +354,71 @@ final class DebugDataStoreExportServiceTests: XCTestCase {
         XCTAssertEqual(march4.calendarSignals.first?.title, "BA 123 LHR")
         XCTAssertEqual(march4.photos.first?.assetIdHash, "asset-raw-1")
         XCTAssertEqual(march4.locations.first?.latitude ?? 0, 51.5074, accuracy: 0.0001)
+        XCTAssertEqual(march4.locations.first?.accuracyQualityRaw, "usable")
+        XCTAssertEqual(march4.locations.first?.qualityFlags, [])
         XCTAssertEqual(march4.sourceCounts.calendarSignals, 1)
         XCTAssertTrue(march4.hasAnyRawEvidence)
+    }
+
+    func testBuildPayloadMarksContextualDerivedDaysAndWeakLocations() async throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        context.insert(
+            LocationSample(
+                timestamp: makeDate(2026, 3, 9, hour: 10),
+                latitude: 51.5,
+                longitude: -0.12,
+                accuracyMeters: 1_250,
+                source: .app,
+                timeZoneId: utc.identifier,
+                dayKey: "2026-03-09",
+                countryCode: "GB",
+                countryName: "United Kingdom"
+            )
+        )
+        context.insert(
+            PresenceDay(
+                dayKey: "2026-03-09",
+                date: makeDate(2026, 3, 9),
+                timeZoneId: utc.identifier,
+                contributedCountries: [
+                    ContributedCountry(countryCode: "GB", countryName: "United Kingdom", probability: 1)
+                ],
+                zoneOverlays: [],
+                evidence: [
+                    SignalImpact(
+                        dayKey: "2026-03-09",
+                        processorID: "GapBridgingContext",
+                        countryCode: "GB",
+                        countryName: "United Kingdom",
+                        rawWeight: 0.5,
+                        calibratedWeight: 0.5,
+                        phase: .contextual,
+                        reason: "GapBridgingContext",
+                        contributedToFinalResult: true,
+                        timeZoneId: utc.identifier
+                    )
+                ],
+                confidence: 0.5,
+                confidenceLabel: .medium,
+                sources: .none,
+                isOverride: false,
+                stayCount: 0,
+                photoCount: 0,
+                locationCount: 0
+            )
+        )
+        try context.save()
+
+        let service = DebugDataStoreExportService(modelContainer: container)
+        let payload = try await service.buildPayload(context: makeRuntimeContext(exportedAt: makeDate(2026, 3, 10)))
+
+        let day = try XCTUnwrap(payload.days.first { $0.dayKey == "2026-03-09" })
+        XCTAssertEqual(day.presenceSummary?.derivationReason, "contextual:GapBridgingContext")
+        XCTAssertEqual(day.presenceSummary?.isContextualInference, true)
+        XCTAssertEqual(day.presenceSummary?.evidencePhaseCounts.contextual, 1)
+        XCTAssertEqual(day.locations.first?.accuracyQualityRaw, "veryWeak")
+        XCTAssertEqual(day.locations.first?.qualityFlags, ["weakAccuracy", "veryWeakAccuracy"])
     }
 
     func testExportJSONProducesValidJsonAndKeepsFullFidelityFields() async throws {
@@ -362,10 +431,12 @@ final class DebugDataStoreExportServiceTests: XCTestCase {
         let data = try await service.exportJSON(context: runtimeContext)
 
         let jsonObject = try XCTUnwrap(try JSONSerialization.jsonObject(with: data) as? [String: Any])
-        XCTAssertEqual(Set(jsonObject.keys), Set(["appState", "days", "metadata", "records", "summary", "userData"]))
+        XCTAssertEqual(Set(jsonObject.keys), Set(["appState", "days", "metadata", "records", "snapshotConsistency", "summary", "userData"]))
 
         let metadata = try XCTUnwrap(jsonObject["metadata"] as? [String: Any])
         XCTAssertEqual(metadata["exportedAt"] as? String, "2026-03-10T09:30:00.000Z")
+        XCTAssertEqual(metadata["privacyWarning"] as? String, "test-warning")
+        XCTAssertEqual(jsonObject["snapshotConsistency"] as? String, "quiescent")
 
         let records = try XCTUnwrap(jsonObject["records"] as? [String: Any])
         let calendarSignals = try XCTUnwrap(records["calendarSignals"] as? [[String: Any]])

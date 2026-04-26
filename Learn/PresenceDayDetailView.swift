@@ -273,10 +273,12 @@ struct PresenceDayDetailView: View {
     private func recomputeImpactedDay(_ dayKey: String) {
         let container = modelContext.container
         Task {
-            // Need a slight delay to ensure SwiftData propagation to the background context
-            try? await Task.sleep(nanoseconds: 150_000_000)
-            let service = LedgerRecomputeService(modelContainer: container)
-            await service.recompute(dayKeys: [dayKey])
+            await LedgerRefreshCoordinator.shared.run {
+                // Need a slight delay to ensure SwiftData propagation to the background context
+                try? await Task.sleep(nanoseconds: 150_000_000)
+                let service = LedgerRecomputeService(modelContainer: container)
+                await service.recompute(dayKeys: [dayKey])
+            }
         }
     }
 }

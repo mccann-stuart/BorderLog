@@ -84,7 +84,6 @@ actor PhotoSignalIngestor {
         var touchedDayKeys: Set<String> = []
         let saveEvery = 25
         let progressUpdateEvery = 25
-        var didSetSequencedCheckpoint = false
 
         if assetCount > 0 {
             for index in 0..<assetCount {
@@ -95,20 +94,19 @@ actor PhotoSignalIngestor {
                         InferenceActivity.shared.updatePhotoScanProgress(scannedAssets: scannedAssets)
                     }
                 }
-                guard let creationDate = asset.creationDate,
-                      let location = asset.location else {
+                guard let creationDate = asset.creationDate else {
                     continue
                 }
 
                 let assetIdHash = Self.hashAssetId(asset.localIdentifier)
-                if existingAssetHashes.contains(assetIdHash) {
+                Self.applyScannedAssetCheckpoint(state: state, creationDate: creationDate)
+
+                guard let location = asset.location else {
                     continue
                 }
 
-                if mode == .sequenced, !didSetSequencedCheckpoint {
-                    state.lastAssetCreationDate = creationDate
-                    state.lastAssetIdHash = assetIdHash
-                    didSetSequencedCheckpoint = true
+                if existingAssetHashes.contains(assetIdHash) {
+                    continue
                 }
 
                 let activeResolver: CountryResolving
@@ -137,15 +135,11 @@ actor PhotoSignalIngestor {
                 existingAssetHashes.insert(assetIdHash)
                 touchedDayKeys.insert(dayKey)
 
-                if mode != .sequenced {
-                    state.lastAssetCreationDate = creationDate
-                    state.lastAssetIdHash = assetIdHash
-                }
-                state.lastIngestedAt = Date()
-                if mode == .manualFullScan {
-                    state.fullScanCompleted = true
-                    state.lastFullScanAt = Date()
-                }
+                Self.applyImportedAssetCheckpoint(
+                    state: state,
+                    assetIdHash: assetIdHash,
+                    importedAt: Date()
+                )
                 processed += 1
 
                 if processed % saveEvery == 0, modelContext.hasChanges {
@@ -154,7 +148,7 @@ actor PhotoSignalIngestor {
             }
         }
 
-        if mode == .sequenced {
+        if mode == .sequenced || mode == .manualFullScan {
             state.fullScanCompleted = true
             state.lastFullScanAt = now
         }
@@ -230,6 +224,25 @@ actor PhotoSignalIngestor {
         } else {
             try modelContext.save()
         }
+    }
+
+    nonisolated static func applyScannedAssetCheckpoint(
+        state: PhotoIngestState,
+        creationDate: Date
+    ) {
+        if let existingDate = state.lastAssetCreationDate, existingDate >= creationDate {
+            return
+        }
+        state.lastAssetCreationDate = creationDate
+    }
+
+    nonisolated static func applyImportedAssetCheckpoint(
+        state: PhotoIngestState,
+        assetIdHash: String,
+        importedAt: Date = Date()
+    ) {
+        state.lastAssetIdHash = assetIdHash
+        state.lastIngestedAt = importedAt
     }
 
     internal func addTestSignal(assetIdHash: String, timestamp: Date = Date()) {
