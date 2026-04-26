@@ -24,8 +24,10 @@ struct BorderLogApp: App {
     init() {
         let container = sharedModelContainer
         Task {
-            let service = LedgerRecomputeService(modelContainer: container)
-            await service.fillMissingDays()
+            await LedgerRefreshCoordinator.shared.run {
+                let service = LedgerRecomputeService(modelContainer: container)
+                await service.fillMissingDays()
+            }
         }
     }
 
@@ -52,38 +54,69 @@ struct BorderLogApp: App {
     }
 
     private func ingestPendingLocations() {
-        let pending = PendingLocationSnapshot.dequeueAll(from: AppConfig.sharedDefaults)
-        guard !pending.isEmpty else { return }
-        
-        let context = ModelContext(sharedModelContainer)
-        var dayKeysToRecompute = Set<String>()
-        
-        for snapshot in pending {
-            let sample = LocationSample(
-                timestamp: snapshot.timestamp,
-                latitude: snapshot.latitude,
-                longitude: snapshot.longitude,
-                accuracyMeters: snapshot.accuracyMeters,
-                source: LocationSampleSource(rawValue: snapshot.sourceRaw) ?? .widget,
-                timeZoneId: snapshot.timeZoneId,
-                dayKey: snapshot.dayKey,
-                countryCode: snapshot.countryCode,
-                countryName: snapshot.countryName
-            )
-            context.insert(sample)
-            dayKeysToRecompute.insert(snapshot.dayKey)
-        }
-        
-        do {
-            try context.save()
-            if !dayKeysToRecompute.isEmpty {
-                Task {
-                    let recomputeService = LedgerRecomputeService(modelContainer: sharedModelContainer)
+        let container = sharedModelContainer
+        Task {
+            await LedgerRefreshCoordinator.shared.run {
+                let pending = PendingLocationSnapshot.all(from: AppConfig.sharedDefaults)
+                guard !pending.isEmpty else { return }
+
+                let context = ModelContext(container)
+                var dayKeysToRecompute = Set<String>()
+
+                do {
+                    for snapshot in pending {
+                        guard try !Self.hasStoredLocationSample(matching: snapshot, in: context) else {
+                            continue
+                        }
+                        let sample = LocationSample(
+                            timestamp: snapshot.timestamp,
+                            latitude: snapshot.latitude,
+                            longitude: snapshot.longitude,
+                            accuracyMeters: snapshot.accuracyMeters,
+                            source: LocationSampleSource(rawValue: snapshot.sourceRaw) ?? .widget,
+                            timeZoneId: snapshot.timeZoneId,
+                            dayKey: snapshot.dayKey,
+                            countryCode: snapshot.countryCode,
+                            countryName: snapshot.countryName
+                        )
+                        context.insert(sample)
+                        dayKeysToRecompute.insert(snapshot.dayKey)
+                    }
+
+                    if context.hasChanges {
+                        try context.save()
+                    }
+                    try PendingLocationSnapshot.remove(pending, from: AppConfig.sharedDefaults)
+
+                    guard !dayKeysToRecompute.isEmpty else { return }
+                    let recomputeService = LedgerRecomputeService(modelContainer: container)
                     await recomputeService.recompute(dayKeys: Array(dayKeysToRecompute))
+                } catch {
+                    Self.logger.error("Failed to save ingested pending locations: \(error, privacy: .private)")
                 }
             }
-        } catch {
-            Self.logger.error("Failed to save ingested pending locations: \(error, privacy: .private)")
         }
+    }
+
+    private static func hasStoredLocationSample(
+        matching snapshot: PendingLocationSnapshot,
+        in context: ModelContext
+    ) throws -> Bool {
+        let timestamp = snapshot.timestamp
+        let latitude = snapshot.latitude
+        let longitude = snapshot.longitude
+        let accuracyMeters = snapshot.accuracyMeters
+        let sourceRaw = snapshot.sourceRaw
+        var descriptor = FetchDescriptor<LocationSample>(
+            predicate: #Predicate { sample in
+                sample.timestamp == timestamp &&
+                sample.latitude == latitude &&
+                sample.longitude == longitude &&
+                sample.accuracyMeters == accuracyMeters &&
+                sample.sourceRaw == sourceRaw
+            }
+        )
+        descriptor.fetchLimit = 1
+        return try !context.fetch(descriptor).isEmpty
     }
 }

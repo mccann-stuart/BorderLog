@@ -453,7 +453,7 @@ For adjacent-day flight inference specifically:
 ## 13. Explicit Non-Goals and Guardrails
 
 - Do not infer city, airport terminal, or exact route from these signals.
-- Do not split one day across multiple countries.
+- Do not split the ledger's resolved winner for a day across multiple countries; downstream counters may opt into counting every resolved `PresenceDay` allocation for compliance-style whole-day rules.
 - Do not silently upgrade weak evidence into a known country below the `1.0` winner threshold.
 - Do not let origin-flight context compete directly with destination-day scoring in the base pass.
 - Do not rely on server-side inference or third-party travel-history storage.

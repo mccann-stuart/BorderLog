@@ -163,8 +163,6 @@ struct TopCountriesWidgetProvider: TimelineProvider {
             let container = ModelContainerProvider.makeContainer()
             let modelContext = ModelContext(container)
 
-            await captureWidgetLocationIfAuthorized(modelContext: modelContext)
-
             var descriptor = FetchDescriptor<PresenceDay>()
             let now = Date()
             guard let startOfYear = Calendar.current.dateInterval(of: .year, for: now)?.start else {
@@ -324,8 +322,6 @@ struct SchengenWidgetProvider: TimelineProvider {
         Task { @MainActor in
             let container = ModelContainerProvider.makeContainer()
             let modelContext = ModelContext(container)
-            
-            await captureWidgetLocationIfAuthorized(modelContext: modelContext)
 
             let now = Date()
             let windowStart = Calendar.current.date(byAdding: .day, value: -180, to: now) ?? now.addingTimeInterval(-180 * 24 * 3600)

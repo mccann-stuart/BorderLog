@@ -75,20 +75,28 @@ struct MainNavigationView: View {
                 .environmentObject(authManager)
         }
         .task(id: hasCompletedOnboarding) {
-            await captureTodayLocationIfNeeded()
+            await LedgerRefreshCoordinator.shared.run {
+                await performCaptureTodayLocationIfNeeded()
+            }
         }
         .task(id: hasCompletedOnboarding) {
-            await bootstrapInferenceIfNeeded()
+            await LedgerRefreshCoordinator.shared.run {
+                await performBootstrapInferenceIfNeeded()
+            }
         }
         .onChange(of: scenePhase) { _, newPhase in
             guard newPhase == .active else { return }
-            Task { await bootstrapPhotoScanIfNeeded() }
+            Task {
+                await LedgerRefreshCoordinator.shared.run {
+                    await performBootstrapPhotoScanIfNeeded()
+                }
+            }
         }
     }
     
 
     @MainActor
-    private func captureTodayLocationIfNeeded() async {
+    private func performCaptureTodayLocationIfNeeded() async {
         guard hasCompletedOnboarding else { return }
         guard !didAttemptLaunchLocationCapture else { return }
         didAttemptLaunchLocationCapture = true
@@ -122,7 +130,7 @@ struct MainNavigationView: View {
     }
 
     @MainActor
-    private func bootstrapInferenceIfNeeded() async {
+    private func performBootstrapInferenceIfNeeded() async {
         guard hasCompletedOnboarding else { return }
         guard !isBootstrappingInference else { return }
 
@@ -135,7 +143,7 @@ struct MainNavigationView: View {
             let recomputeService = LedgerRecomputeService(modelContainer: container)
             await recomputeService.recomputeAll()
 
-            await bootstrapPhotoScanIfNeeded()
+            await performBootstrapPhotoScanIfNeeded()
 
             let calendarIngestor = CalendarSignalIngestor(modelContainer: container, resolver: CLGeocoderCountryResolver())
             do {
@@ -147,7 +155,7 @@ struct MainNavigationView: View {
             return
         }
 
-        await bootstrapPhotoScanIfNeeded()
+        await performBootstrapPhotoScanIfNeeded()
 
         let calendarIngestor = CalendarSignalIngestor(modelContainer: container, resolver: CLGeocoderCountryResolver())
         do {
@@ -158,7 +166,7 @@ struct MainNavigationView: View {
     }
 
     @MainActor
-    private func bootstrapPhotoScanIfNeeded() async {
+    private func performBootstrapPhotoScanIfNeeded() async {
         guard hasCompletedOnboarding else { return }
         guard !isBootstrappingPhotoScan else { return }
 

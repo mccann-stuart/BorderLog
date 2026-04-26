@@ -284,7 +284,7 @@ struct SettingsView: View {
                 } header: {
                     Text("Debug Export")
                 } footer: {
-                    Text("Exports a full-fidelity JSON snapshot for internal debugging, including raw coordinates, event identifiers, titles, asset hashes, and local user identifiers.")
+                    Text("Exports a full-fidelity JSON snapshot for internal debugging, including raw coordinates, event identifiers, titles, asset hashes, and local user identifiers. Do not share this file externally unless you have reviewed it.")
                 }
 #endif
 
@@ -541,8 +541,10 @@ struct SettingsView: View {
         Task { @MainActor in
             defer { isIngestingPhotos = false }
             do {
-                let ingestor = PhotoSignalIngestor(modelContainer: container, resolver: CLGeocoderCountryResolver())
-                _ = try await ingestor.ingest(mode: .sequenced)
+                try await LedgerRefreshCoordinator.shared.run {
+                    let ingestor = PhotoSignalIngestor(modelContainer: container, resolver: CLGeocoderCountryResolver())
+                    _ = try await ingestor.ingest(mode: .sequenced)
+                }
             } catch {
                 Self.logger.error("Failed to ingest photos: \(error, privacy: .private)")
                 ingestionError = "Failed to scan photos. Please try again."
@@ -556,8 +558,10 @@ struct SettingsView: View {
         Task { @MainActor in
             defer { isIngestingCalendar = false }
             do {
-                let ingestor = CalendarSignalIngestor(modelContainer: container, resolver: CLGeocoderCountryResolver())
-                _ = try await ingestor.ingest(mode: .manualFullScan)
+                try await LedgerRefreshCoordinator.shared.run {
+                    let ingestor = CalendarSignalIngestor(modelContainer: container, resolver: CLGeocoderCountryResolver())
+                    _ = try await ingestor.ingest(mode: .manualFullScan)
+                }
             } catch {
                 Self.logger.error("Failed to ingest calendar: \(error, privacy: .private)")
                 ingestionError = "Failed to scan calendar. Please try again."
@@ -571,11 +575,17 @@ struct SettingsView: View {
         debugExportError = nil
 
         let exportedAt = Date()
-        let runtimeContext = makeDebugExportContext(exportedAt: exportedAt)
         let container = modelContext.container
 
         Task {
             do {
+                let snapshotConsistency = await LedgerRefreshCoordinator.shared.snapshotConsistency()
+                let runtimeContext = await MainActor.run {
+                    makeDebugExportContext(
+                        exportedAt: exportedAt,
+                        snapshotConsistency: snapshotConsistency
+                    )
+                }
                 let service = DebugDataStoreExportService(modelContainer: container)
                 let data = try await service.exportJSON(context: runtimeContext)
                 await MainActor.run {
@@ -722,13 +732,17 @@ struct SettingsView: View {
     }
 
 #if DEBUG
-    private func makeDebugExportContext(exportedAt: Date) -> DebugExportRuntimeContext {
+    private func makeDebugExportContext(
+        exportedAt: Date,
+        snapshotConsistency: String
+    ) -> DebugExportRuntimeContext {
         let currentLocationStatus = CLLocationManager().authorizationStatus
         let currentPhotoStatus = PHPhotoLibrary.authorizationStatus(for: .readWrite)
         let currentCalendarStatus = EKEventStore.authorizationStatus(for: .event)
-        let pendingSnapshots = PendingLocationSnapshot.dequeueAll(from: AppConfig.sharedDefaults, clearAfter: false)
+        let pendingSnapshots = PendingLocationSnapshot.all(from: AppConfig.sharedDefaults)
             .map {
                 DebugExportPendingLocationSnapshot(
+                    id: $0.id,
                     timestamp: $0.timestamp,
                     latitude: $0.latitude,
                     longitude: $0.longitude,
@@ -792,6 +806,7 @@ struct SettingsView: View {
             metadata: metadata,
             appState: appState,
             userData: userData,
+            snapshotConsistency: snapshotConsistency,
             pendingLocationSnapshots: pendingSnapshots
         )
     }

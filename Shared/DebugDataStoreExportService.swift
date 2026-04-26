@@ -26,6 +26,7 @@ struct DebugExportMetadata: Codable, Sendable {
     let localeIdentifier: String
     let currentTimeZoneId: String
     let appVariantFlags: DebugExportAppVariantFlags
+    let privacyWarning: String
 }
 
 struct DebugExportPermissionStatus: Codable, Sendable {
@@ -173,6 +174,8 @@ struct DebugExportLocationSampleRecord: Codable, Sendable {
     let latitude: Double
     let longitude: Double
     let accuracyMeters: Double
+    let accuracyQualityRaw: String
+    let qualityFlags: [String]
     let sourceRaw: String
     let dayKey: String
     let timeZoneId: String?
@@ -229,6 +232,9 @@ struct DebugExportPresenceDayRecord: Codable, Sendable {
     let suggestedCountryName1: String?
     let suggestedCountryCode2: String?
     let suggestedCountryName2: String?
+    let derivationReason: String
+    let isContextualInference: Bool
+    let evidencePhaseCounts: DebugExportEvidencePhaseCounts
 }
 
 struct DebugExportCountryConfigRecord: Codable, Sendable {
@@ -244,7 +250,15 @@ struct DebugExportPhotoIngestStateRecord: Codable, Sendable {
     let lastFullScanAt: Date?
 }
 
+struct DebugExportEvidencePhaseCounts: Codable, Sendable {
+    let base: Int
+    let contextual: Int
+    let override: Int
+    let normalization: Int
+}
+
 struct DebugExportPendingLocationSnapshot: Codable, Sendable {
+    let id: String
     let timestamp: Date
     let latitude: Double
     let longitude: Double
@@ -289,6 +303,9 @@ struct DebugExportPresenceSummary: Codable, Sendable {
     let confidenceLabelRaw: String
     let isDisputed: Bool
     let isManuallyModified: Bool
+    let derivationReason: String
+    let isContextualInference: Bool
+    let evidencePhaseCounts: DebugExportEvidencePhaseCounts
 }
 
 struct DebugExportDaySnapshot: Codable, Sendable {
@@ -325,6 +342,7 @@ struct DebugDataStoreExportPayload: Codable, Sendable {
     let metadata: DebugExportMetadata
     let appState: DebugExportAppState
     let userData: DebugExportUserData
+    let snapshotConsistency: String
     let summary: DebugExportSummary
     let records: DebugExportRecords
     let days: [DebugExportDaySnapshot]
@@ -334,6 +352,7 @@ struct DebugExportRuntimeContext: Codable, Sendable {
     let metadata: DebugExportMetadata
     let appState: DebugExportAppState
     let userData: DebugExportUserData
+    let snapshotConsistency: String
     let pendingLocationSnapshots: [DebugExportPendingLocationSnapshot]
 }
 
@@ -394,6 +413,8 @@ actor DebugDataStoreExportService {
                     latitude: sample.latitude,
                     longitude: sample.longitude,
                     accuracyMeters: sample.accuracyMeters,
+                    accuracyQualityRaw: Self.locationAccuracyQuality(for: sample.accuracyMeters),
+                    qualityFlags: Self.locationQualityFlags(for: sample.accuracyMeters),
                     sourceRaw: sample.sourceRaw,
                     dayKey: sample.dayKey,
                     timeZoneId: sample.timeZoneId,
@@ -445,6 +466,7 @@ actor DebugDataStoreExportService {
         let presenceRecords = presenceDays
             .map { day in
                 let sourceMask = day.sources
+                let evidencePhaseCounts = Self.evidencePhaseCounts(for: day.evidence)
                 return DebugExportPresenceDayRecord(
                     dayKey: day.dayKey,
                     date: day.date,
@@ -468,7 +490,10 @@ actor DebugDataStoreExportService {
                     suggestedCountryCode1: day.suggestedCountryCode1,
                     suggestedCountryName1: day.suggestedCountryName1,
                     suggestedCountryCode2: day.suggestedCountryCode2,
-                    suggestedCountryName2: day.suggestedCountryName2
+                    suggestedCountryName2: day.suggestedCountryName2,
+                    derivationReason: Self.derivationReason(for: day, evidencePhaseCounts: evidencePhaseCounts),
+                    isContextualInference: evidencePhaseCounts.contextual > 0,
+                    evidencePhaseCounts: evidencePhaseCounts
                 )
             }
             .sorted {
@@ -530,6 +555,7 @@ actor DebugDataStoreExportService {
             metadata: context.metadata,
             appState: context.appState,
             userData: context.userData,
+            snapshotConsistency: context.snapshotConsistency,
             summary: summary,
             records: records,
             days: days
@@ -729,7 +755,10 @@ actor DebugDataStoreExportService {
             confidence: presence.confidence,
             confidenceLabelRaw: presence.confidenceLabelRaw,
             isDisputed: presence.isDisputed,
-            isManuallyModified: presence.isManuallyModified
+            isManuallyModified: presence.isManuallyModified,
+            derivationReason: presence.derivationReason,
+            isContextualInference: presence.isContextualInference,
+            evidencePhaseCounts: presence.evidencePhaseCounts
         )
     }
 

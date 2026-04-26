@@ -19,7 +19,7 @@ This directory contains the BorderLog iOS app target. The canonical product and 
 - `DashboardView.swift`: Schengen and country summaries.
 - `CalendarTabView.swift`: calendar evidence review and monthly country summaries.
 - `Learn/ContentView.swift`: daily ledger preview and manual stay entry.
-- `SettingsView.swift`: permissions, privacy controls, reset, feature toggles, and debug-only export.
+- `SettingsView.swift`: permissions, privacy controls, reset, feature toggles, shared day-counting mode, and debug-only export.
 - `WelcomeView.swift`, `ProfileSetupView.swift`, `PermissionsRequestView.swift`: onboarding pages.
 
 ## Verification
