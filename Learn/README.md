@@ -8,7 +8,6 @@ This directory contains the BorderLog iOS app target. The canonical product and 
 
 - Persistence is local-first through SwiftData, with the primary store in the configured App Group when available so the widget and app can share travel data.
 - CloudKit code paths remain feature-gated by `AppConfig.isCloudKitFeatureEnabled == false` until provisioning and release policy are confirmed.
-- Sign in with Apple is currently disabled by `AuthenticationManager.isAppleSignInEnabled == false`; onboarding uses a local-only session ID for development.
 - Debug data export is available only in `DEBUG` builds. It intentionally contains full-fidelity diagnostic data and is not a release audit/export feature.
 - Reset All Data clears SwiftData entities, keychain-backed local profile/session values, and pending widget location snapshots in shared defaults.
 - Keychain-backed profile/session values use device-bound accessibility while the device is unlocked.
