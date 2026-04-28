@@ -134,7 +134,7 @@ struct PresenceConfidenceBreakdown: Codable, Sendable, Equatable {
     }
 }
 
-struct SignalSourceMask: OptionSet, Codable, Sendable {
+nonisolated struct SignalSourceMask: OptionSet, Codable, Sendable {
     let rawValue: Int
 
     nonisolated static let override = SignalSourceMask(rawValue: 1 << 0)

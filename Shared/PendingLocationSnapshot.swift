@@ -6,7 +6,7 @@
 import Foundation
 import CryptoKit
 
-struct PendingLocationSnapshot: Codable, Equatable, Sendable {
+nonisolated struct PendingLocationSnapshot: Codable, Equatable, Sendable {
     var id: String
     var timestamp: Date
     var latitude: Double
@@ -95,7 +95,7 @@ struct PendingLocationSnapshot: Codable, Equatable, Sendable {
 
     static func enqueue(
         _ snapshot: PendingLocationSnapshot,
-        in defaults: UserDefaults = AppConfig.sharedDefaults,
+        in defaults: UserDefaults,
         fileManager: FileManager = .default,
         queueDirectoryURL: URL? = nil
     ) {
@@ -109,7 +109,7 @@ struct PendingLocationSnapshot: Codable, Equatable, Sendable {
 
     static func enqueueThrowing(
         _ snapshot: PendingLocationSnapshot,
-        in defaults: UserDefaults = AppConfig.sharedDefaults,
+        in defaults: UserDefaults,
         fileManager: FileManager = .default,
         queueDirectoryURL: URL? = nil
     ) throws {
@@ -125,7 +125,7 @@ struct PendingLocationSnapshot: Codable, Equatable, Sendable {
     }
 
     static func all(
-        from defaults: UserDefaults = AppConfig.sharedDefaults,
+        from defaults: UserDefaults,
         fileManager: FileManager = .default,
         queueDirectoryURL: URL? = nil
     ) -> [PendingLocationSnapshot] {
@@ -173,7 +173,7 @@ struct PendingLocationSnapshot: Codable, Equatable, Sendable {
 
     static func remove(
         _ snapshots: [PendingLocationSnapshot],
-        from defaults: UserDefaults = AppConfig.sharedDefaults,
+        from defaults: UserDefaults,
         fileManager: FileManager = .default,
         queueDirectoryURL: URL? = nil
     ) throws {
@@ -216,7 +216,7 @@ struct PendingLocationSnapshot: Codable, Equatable, Sendable {
         let directoryURL: URL
         if let overrideURL {
             directoryURL = overrideURL
-        } else if let appGroupURL = AppConfig.appGroupContainerURL {
+        } else if let appGroupURL = appGroupContainerURL(fileManager: fileManager) {
             directoryURL = appGroupURL.appendingPathComponent(queueDirectoryName, isDirectory: true)
         } else {
             let fallbackRoot = fileManager.urls(for: .cachesDirectory, in: .userDomainMask).first
@@ -232,6 +232,11 @@ struct PendingLocationSnapshot: Codable, Equatable, Sendable {
 
     private static func fileURL(for id: String, in directoryURL: URL) -> URL {
         directoryURL.appendingPathComponent(safeFileStem(for: id)).appendingPathExtension(fileExtension)
+    }
+
+    private static func appGroupContainerURL(fileManager: FileManager) -> URL? {
+        guard let appGroupId = AppConfig.appGroupId else { return nil }
+        return fileManager.containerURL(forSecurityApplicationGroupIdentifier: appGroupId)
     }
 
     private static func safeFileStem(for id: String) -> String {
@@ -305,7 +310,7 @@ struct PendingLocationSnapshot: Codable, Equatable, Sendable {
 }
 
 private extension JSONEncoder {
-    static var pendingSnapshotEncoder: JSONEncoder {
+    nonisolated static var pendingSnapshotEncoder: JSONEncoder {
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .iso8601
         encoder.outputFormatting = [.sortedKeys]
@@ -314,7 +319,7 @@ private extension JSONEncoder {
 }
 
 private extension JSONDecoder {
-    static var pendingSnapshotDecoder: JSONDecoder {
+    nonisolated static var pendingSnapshotDecoder: JSONDecoder {
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
         return decoder

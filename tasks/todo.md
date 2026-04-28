@@ -63,3 +63,13 @@
 - Verification failed outside the focused remediation slice: the full `xcodebuild test -project Learn.xcodeproj -scheme Learn -destination 'platform=iOS Simulator,name=iPhone 17' -derivedDataPath /tmp/BorderLogDebugRemediationFullTests` run executed 179 tests with 13 failures in existing calendar ordering/parsing, Schengen window, stay duration, inference, ledger recompute, and real fetcher boundary tests. The remediation-focused tests passed inside the full run.
 - Build iOS Apps plugin verification passed: `build_sim` succeeded for scheme `Learn`, the app installed on iPhone 17, launched with bundle id `com.MCCANN.BorderLog`, and `snapshot_ui` showed the BorderLog onboarding screen.
 - Residual risk: the build still emits existing Swift 6 actor-isolation warnings across shared SwiftData/model actor code; those warnings are not introduced by this remediation but should be retired before enabling Swift 6 language mode.
+
+# Basics And Race-Condition Hardening Plan
+
+- [ ] Fix the `LearnTests` compile blocker in `InferenceEngineTests`.
+- [ ] Refactor location capture continuation state so concurrent burst captures cannot replace each other.
+- [ ] Add deterministic location capture coordinator race tests.
+- [ ] Triage focused actor-isolation warnings for pure helper/value types touched by this work.
+- [ ] Run the planned generic simulator build and focused simulator tests.
+- [ ] Run a broader `LearnTests` pass if focused tests pass, and separate unrelated failures.
+- [ ] Add a review section summarizing implementation, verification, and residual risks.

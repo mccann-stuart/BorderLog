@@ -13,41 +13,97 @@ import SwiftData
 @MainActor
 final class LocationConcurrencyTests: XCTestCase {
 
-    func testConcurrentCaptureLocationDoesNotHang() async throws {
-        // This test verifies that calling captureAndStore (which calls captureLocation)
-        // concurrently does not cause a deadlock or continuation leak.
-        //
-        // Note: In a real test environment, we would need to mock CLLocationManager
-        // to return authorized status and simulate location updates.
-        // Without mocking, this test might return early due to missing permissions,
-        // but it still verifies that the method calls do not block indefinitely.
+    func testConcurrentBurstWaitersCompleteFromOneBatch() async throws {
+        let coordinator = LocationCaptureCoordinator()
+        let first = Task { await coordinator.captureLocations(maxSamples: 2, maxDuration: 30, maxSampleAge: 120) }
+        let second = Task { await coordinator.captureLocations(maxSamples: 2, maxDuration: 30, maxSampleAge: 120) }
 
-        let service = LocationSampleService()
-        let container = ModelContainerProvider.makeContainer()
+        await waitUntil { coordinator.pendingWaiterCount == 2 }
 
-        // Create concurrent tasks
-        async let result1: LocationSample? = try? await service.captureAndStore(source: .app, modelContext: container.mainContext)
-        async let result2: LocationSample? = try? await service.captureAndStore(source: .app, modelContext: container.mainContext)
+        let locations = [
+            makeLocation(latitude: 51.5, accuracy: 25),
+            makeLocation(latitude: 51.6, accuracy: 15)
+        ]
+        coordinator.receive(locations: locations)
 
-        // Await both results. If the race condition exists and causes a hang,
-        // this test will timeout (fail).
-        let _ = await result1
-        let _ = await result2
+        let firstResult = await first.value
+        let secondResult = await second.value
 
-        // Success if we reached here
-        XCTAssertTrue(true, "Concurrent requests completed without hanging")
+        XCTAssertEqual(firstResult.map(\.coordinate.latitude), locations.map(\.coordinate.latitude))
+        XCTAssertEqual(secondResult.map(\.coordinate.latitude), locations.map(\.coordinate.latitude))
+        XCTAssertEqual(coordinator.pendingWaiterCount, 0)
     }
 
-    func testConcurrentBurstCaptureDoesNotHang() async throws {
-        let service = LocationSampleService()
-        let container = ModelContainerProvider.makeContainer()
+    func testBurstFailureResumesEveryWaiter() async throws {
+        let coordinator = LocationCaptureCoordinator()
+        let first = Task { await coordinator.captureLocations(maxSamples: 2, maxDuration: 30, maxSampleAge: 120) }
+        let second = Task { await coordinator.captureLocations(maxSamples: 2, maxDuration: 30, maxSampleAge: 120) }
 
-        async let result1: LocationSample? = try? await service.captureAndStoreBurst(source: .app, modelContext: container.mainContext)
-        async let result2: LocationSample? = try? await service.captureAndStoreBurst(source: .app, modelContext: container.mainContext)
+        await waitUntil { coordinator.pendingWaiterCount == 2 }
+        coordinator.fail()
 
-        let _ = await result1
-        let _ = await result2
+        let firstResult = await first.value
+        let secondResult = await second.value
 
-        XCTAssertTrue(true, "Concurrent burst requests completed without hanging")
+        XCTAssertTrue(firstResult.isEmpty)
+        XCTAssertTrue(secondResult.isEmpty)
+        XCTAssertEqual(coordinator.pendingWaiterCount, 0)
+    }
+
+    func testSingleRequestDuringBatchUsesBatchResult() async throws {
+        let coordinator = LocationCaptureCoordinator()
+        let batch = Task { await coordinator.captureLocations(maxSamples: 1, maxDuration: 30, maxSampleAge: 120) }
+        let single = Task { await coordinator.captureLocation() }
+
+        await waitUntil { coordinator.pendingWaiterCount == 2 }
+
+        let location = makeLocation(latitude: 48.8566, accuracy: 12)
+        coordinator.receive(locations: [location])
+
+        let batchResult = await batch.value
+        let singleResult = await single.value
+
+        XCTAssertEqual(batchResult.first?.coordinate.latitude, location.coordinate.latitude)
+        XCTAssertEqual(singleResult?.coordinate.latitude, location.coordinate.latitude)
+        XCTAssertEqual(coordinator.pendingWaiterCount, 0)
+    }
+
+    func testBatchTimeoutResumesAndClearsWaiters() async throws {
+        let coordinator = LocationCaptureCoordinator()
+        let batch = Task { await coordinator.captureLocations(maxSamples: 1, maxDuration: 30, maxSampleAge: 120) }
+
+        await waitUntil { coordinator.pendingWaiterCount == 1 }
+        coordinator.expireBatchForTesting()
+
+        let batchResult = await batch.value
+
+        XCTAssertTrue(batchResult.isEmpty)
+        XCTAssertEqual(coordinator.pendingWaiterCount, 0)
+    }
+
+    private func makeLocation(latitude: Double, accuracy: CLLocationAccuracy) -> CLLocation {
+        CLLocation(
+            coordinate: CLLocationCoordinate2D(latitude: latitude, longitude: -0.12),
+            altitude: 0,
+            horizontalAccuracy: accuracy,
+            verticalAccuracy: 10,
+            timestamp: Date()
+        )
+    }
+
+    private func waitUntil(
+        timeout: TimeInterval = 1,
+        condition: @escaping @MainActor () -> Bool,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) async {
+        let deadline = Date().addingTimeInterval(timeout)
+        while Date() < deadline {
+            if condition() {
+                return
+            }
+            await Task.yield()
+        }
+        XCTFail("Timed out waiting for condition", file: file, line: line)
     }
 }

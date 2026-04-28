@@ -11,15 +11,177 @@ import SwiftData
 import os
 
 @MainActor
-final class LocationSampleService: NSObject, CLLocationManagerDelegate {
-    private let manager = CLLocationManager()
-    private static let logger = Logger(subsystem: "com.MCCANN.Border", category: "LocationSampleService")
-    private var continuations: [CheckedContinuation<CLLocation?, Never>] = []
-    private var batchContinuation: CheckedContinuation<[CLLocation], Never>?
+final class LocationCaptureCoordinator {
+    private var singleContinuations: [CheckedContinuation<CLLocation?, Never>] = []
+    private var batchContinuations: [CheckedContinuation<[CLLocation], Never>] = []
     private var batchLocations: [CLLocation] = []
     private var batchTargetCount: Int = 0
     private var batchMaxSampleAge: TimeInterval = 0
     private var batchTimeoutTask: Task<Void, Never>?
+
+    private let requestSingleLocation: () -> Void
+    private let startBatchLocationUpdates: () -> Void
+    private let stopBatchLocationUpdates: () -> Void
+    private let beginLocationBatchActivity: () -> Void
+    private let endLocationBatchActivity: () -> Void
+
+    init(
+        requestSingleLocation: @escaping () -> Void = {},
+        startBatchLocationUpdates: @escaping () -> Void = {},
+        stopBatchLocationUpdates: @escaping () -> Void = {},
+        beginLocationBatchActivity: @escaping () -> Void = {},
+        endLocationBatchActivity: @escaping () -> Void = {}
+    ) {
+        self.requestSingleLocation = requestSingleLocation
+        self.startBatchLocationUpdates = startBatchLocationUpdates
+        self.stopBatchLocationUpdates = stopBatchLocationUpdates
+        self.beginLocationBatchActivity = beginLocationBatchActivity
+        self.endLocationBatchActivity = endLocationBatchActivity
+    }
+
+    var pendingWaiterCount: Int {
+        singleContinuations.count + batchContinuations.count
+    }
+
+    var isBatchActive: Bool {
+        !batchContinuations.isEmpty
+    }
+
+    func captureLocation() async -> CLLocation? {
+        await withCheckedContinuation { continuation in
+            let shouldRequest = singleContinuations.isEmpty && !isBatchActive
+            singleContinuations.append(continuation)
+            if shouldRequest {
+                requestSingleLocation()
+            }
+        }
+    }
+
+    func captureLocations(
+        maxSamples: Int,
+        maxDuration: TimeInterval,
+        maxSampleAge: TimeInterval
+    ) async -> [CLLocation] {
+        await withCheckedContinuation { continuation in
+            let shouldStartBatch = !isBatchActive
+            batchContinuations.append(continuation)
+
+            if shouldStartBatch {
+                batchLocations = []
+                batchTargetCount = max(1, maxSamples)
+                batchMaxSampleAge = maxSampleAge
+                beginLocationBatchActivity()
+                startBatchLocationUpdates()
+                scheduleBatchTimeout(maxDuration: maxDuration)
+            } else {
+                batchTargetCount = max(batchTargetCount, max(1, maxSamples))
+                batchMaxSampleAge = min(batchMaxSampleAge, maxSampleAge)
+            }
+        }
+    }
+
+    func receive(locations: [CLLocation], now: Date = Date()) {
+        if isBatchActive {
+            let fresh = locations.filter { location in
+                guard location.horizontalAccuracy > 0 else { return false }
+                let age = max(0, now.timeIntervalSince(location.timestamp))
+                return age <= batchMaxSampleAge
+            }
+            if !fresh.isEmpty {
+                batchLocations.append(contentsOf: fresh)
+            }
+            if batchLocations.count >= batchTargetCount {
+                finishBatchCapture()
+            }
+            return
+        }
+
+        resumeSingleContinuations(returning: locations.first)
+    }
+
+    func fail() {
+        if isBatchActive {
+            finishBatchCapture()
+        } else {
+            resumeSingleContinuations(returning: nil)
+        }
+    }
+
+    func expireBatchForTesting() {
+        finishBatchCapture()
+    }
+
+    private func scheduleBatchTimeout(maxDuration: TimeInterval) {
+        batchTimeoutTask?.cancel()
+        batchTimeoutTask = Task { @MainActor in
+            let duration = max(0, maxDuration)
+            let nanos = UInt64(duration * 1_000_000_000)
+            try? await Task.sleep(nanoseconds: nanos)
+            finishBatchCapture()
+        }
+    }
+
+    private func finishBatchCapture() {
+        guard isBatchActive else { return }
+
+        endLocationBatchActivity()
+        stopBatchLocationUpdates()
+        batchTimeoutTask?.cancel()
+        batchTimeoutTask = nil
+
+        let locations = batchLocations
+        let batchWaiters = batchContinuations
+        batchLocations = []
+        batchContinuations = []
+        batchTargetCount = 0
+        batchMaxSampleAge = 0
+
+        for continuation in batchWaiters {
+            continuation.resume(returning: locations)
+        }
+        resumeSingleContinuations(returning: locations.first)
+    }
+
+    private func resumeSingleContinuations(returning location: CLLocation?) {
+        guard !singleContinuations.isEmpty else { return }
+        let waiters = singleContinuations
+        singleContinuations = []
+        for continuation in waiters {
+            continuation.resume(returning: location)
+        }
+    }
+}
+
+@MainActor
+final class LocationSampleService: NSObject, CLLocationManagerDelegate {
+    private let manager = CLLocationManager()
+    private static let logger = Logger(subsystem: "com.MCCANN.Border", category: "LocationSampleService")
+    private var previousBatchAccuracy: CLLocationAccuracy?
+    private lazy var captureCoordinator = LocationCaptureCoordinator(
+        requestSingleLocation: { [weak self] in
+            self?.manager.requestLocation()
+        },
+        startBatchLocationUpdates: { [weak self] in
+            guard let self else { return }
+            previousBatchAccuracy = manager.desiredAccuracy
+            manager.desiredAccuracy = kCLLocationAccuracyBest
+            manager.startUpdatingLocation()
+        },
+        stopBatchLocationUpdates: { [weak self] in
+            guard let self else { return }
+            manager.stopUpdatingLocation()
+            if let previousBatchAccuracy {
+                manager.desiredAccuracy = previousBatchAccuracy
+                self.previousBatchAccuracy = nil
+            }
+        },
+        beginLocationBatchActivity: {
+            InferenceActivity.shared.beginLocationBatch()
+        },
+        endLocationBatchActivity: {
+            InferenceActivity.shared.endLocationBatch()
+        }
+    )
 
     override init() {
         super.init()
@@ -133,10 +295,6 @@ final class LocationSampleService: NSObject, CLLocationManagerDelegate {
             return nil
         }
 
-        let previousAccuracy = manager.desiredAccuracy
-        manager.desiredAccuracy = kCLLocationAccuracyBest
-        defer { manager.desiredAccuracy = previousAccuracy }
-
         let targetSamples = max(1, maxSamples)
         let locations = await captureLocations(
             maxSamples: targetSamples,
@@ -214,13 +372,7 @@ final class LocationSampleService: NSObject, CLLocationManagerDelegate {
     }
 
     private func captureLocation() async -> CLLocation? {
-        await withCheckedContinuation { continuation in
-            let isIdle = continuations.isEmpty && batchContinuation == nil
-            continuations.append(continuation)
-            if isIdle {
-                manager.requestLocation()
-            }
-        }
+        await captureCoordinator.captureLocation()
     }
 
     private func captureLocations(
@@ -228,78 +380,18 @@ final class LocationSampleService: NSObject, CLLocationManagerDelegate {
         maxDuration: TimeInterval,
         maxSampleAge: TimeInterval
     ) async -> [CLLocation] {
-        await withCheckedContinuation { continuation in
-            batchContinuation = continuation
-            batchLocations = []
-            batchTargetCount = maxSamples
-            batchMaxSampleAge = maxSampleAge
-            InferenceActivity.shared.beginLocationBatch()
-            manager.startUpdatingLocation()
-
-            batchTimeoutTask?.cancel()
-            batchTimeoutTask = Task { @MainActor in
-                let duration = max(0, maxDuration)
-                let nanos = UInt64(duration * 1_000_000_000)
-                try? await Task.sleep(nanoseconds: nanos)
-                finishBatchCapture()
-            }
-        }
-    }
-
-    private func finishBatchCapture() {
-        guard let continuation = batchContinuation else { return }
-        InferenceActivity.shared.endLocationBatch()
-        manager.stopUpdatingLocation()
-        batchTimeoutTask?.cancel()
-        batchTimeoutTask = nil
-        let locations = batchLocations
-        batchLocations = []
-        batchContinuation = nil
-        continuation.resume(returning: locations)
-
-        if !continuations.isEmpty {
-            let bestLocation = locations.first
-            for cont in continuations {
-                cont.resume(returning: bestLocation)
-            }
-            continuations.removeAll()
-        }
+        await captureCoordinator.captureLocations(
+            maxSamples: maxSamples,
+            maxDuration: maxDuration,
+            maxSampleAge: maxSampleAge
+        )
     }
 
     func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
-        if batchContinuation != nil {
-            let now = Date()
-            let fresh = locations.filter { location in
-                guard location.horizontalAccuracy > 0 else { return false }
-                let age = max(0, now.timeIntervalSince(location.timestamp))
-                return age <= batchMaxSampleAge
-            }
-            if !fresh.isEmpty {
-                batchLocations.append(contentsOf: fresh)
-            }
-            if batchLocations.count >= batchTargetCount {
-                finishBatchCapture()
-            }
-        }
-
-        if !continuations.isEmpty {
-            let location = locations.first
-            for cont in continuations {
-                cont.resume(returning: location)
-            }
-            continuations.removeAll()
-        }
+        captureCoordinator.receive(locations: locations)
     }
 
     func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
-        if batchContinuation != nil {
-            finishBatchCapture()
-            return
-        }
-
-        for cont in continuations {
-            cont.resume(returning: nil)
-        }
-        continuations.removeAll()
+        captureCoordinator.fail()
     }
 }

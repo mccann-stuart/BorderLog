@@ -217,6 +217,7 @@ final class InferenceEngineTests: XCTestCase {
     }
 
     func testBridgesSevenDayVoidWhenCanonicalCountriesMatch() {
+        let calendar = self.calendar
         let start = day(2026, 2, 1)
         let end = day(2026, 2, 9)
         let dayKeys = Set((1...9).lazy.map { day in
@@ -264,6 +265,7 @@ final class InferenceEngineTests: XCTestCase {
     }
 
     func testDoesNotBridgeEightDayVoidWhenCountriesMatch() {
+        let calendar = self.calendar
         let start = day(2026, 2, 1)
         let end = day(2026, 2, 10)
         let dayKeys = Set((1...10).lazy.map { day in
@@ -532,6 +534,7 @@ final class InferenceEngineTests: XCTestCase {
     }
 
     func testTravelBackedTransitionInfillPromotesMarch2026GapsAndKeepsSuggestions() {
+        let calendar = self.calendar
         let dayKeys = Set((6...15).lazy.map { day in
             DayKey.make(from: self.day(2026, 3, day), timeZone: calendar.timeZone)
         })
@@ -578,7 +581,7 @@ final class InferenceEngineTests: XCTestCase {
 
         for travelGapDay in [7, 8, 9] {
             guard let result = results.first(where: {
-                $0.dayKey == DayKey.make(from: self.day(2026, 3, travelGapDay), timeZone: self.calendar.timeZone)
+                $0.dayKey == DayKey.make(from: self.day(2026, 3, travelGapDay), timeZone: calendar.timeZone)
             }) else {
                 XCTFail("Expected transition-infilled result for day \(travelGapDay)")
                 continue
@@ -597,7 +600,7 @@ final class InferenceEngineTests: XCTestCase {
 
         for travelGapDay in [13, 14] {
             guard let result = results.first(where: {
-                $0.dayKey == DayKey.make(from: self.day(2026, 3, travelGapDay), timeZone: self.calendar.timeZone)
+                $0.dayKey == DayKey.make(from: self.day(2026, 3, travelGapDay), timeZone: calendar.timeZone)
             }) else {
                 XCTFail("Expected transition-infilled result for day \(travelGapDay)")
                 continue
@@ -612,6 +615,7 @@ final class InferenceEngineTests: XCTestCase {
     }
 
     func testDifferentCountryGapWithoutTravelEvidenceRemainsSuggestionOnly() {
+        let calendar = self.calendar
         let dayKeys = Set((6...10).lazy.map { day in
             DayKey.make(from: self.day(2026, 3, day), timeZone: calendar.timeZone)
         })
@@ -644,7 +648,7 @@ final class InferenceEngineTests: XCTestCase {
 
         for gapDay in [7, 8, 9] {
             let result = results.first {
-                $0.dayKey == DayKey.make(from: self.day(2026, 3, gapDay), timeZone: self.calendar.timeZone)
+                $0.dayKey == DayKey.make(from: self.day(2026, 3, gapDay), timeZone: calendar.timeZone)
             }
             XCTAssertTrue(result?.contributedCountries.isEmpty == true)
             XCTAssertEqual(result?.suggestedCountryCode1, "GB")
