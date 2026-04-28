@@ -768,7 +768,7 @@ struct SettingsView: View {
             currentTimeZoneId: TimeZone.current.identifier,
             appVariantFlags: DebugExportAppVariantFlags(
                 cloudKitFeatureEnabled: AppConfig.isCloudKitFeatureEnabled,
-                appleSignInEnabled: AuthenticationManager.isAppleSignInEnabled,
+                appleSignInEnabled: true,
                 appGroupAvailable: AppConfig.isAppGroupAvailable
             ),
             privacyWarning: "Full-fidelity developer export: includes raw coordinates, calendar titles and identifiers, photo asset hashes, profile values, and local identifiers."
@@ -800,7 +800,7 @@ struct SettingsView: View {
             passportNationality: readKeychainString(account: "userPassportNationality"),
             homeCountry: readKeychainString(account: "userHomeCountry"),
             appleUserId: readKeychainString(account: "appleUserId"),
-            appleSignInEnabled: AuthenticationManager.isAppleSignInEnabled
+            appleSignInEnabled: true
         )
 
         return DebugExportRuntimeContext(
