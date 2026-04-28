@@ -7,7 +7,7 @@
 
 import Foundation
 
-enum Region: String, CaseIterable, Codable, Identifiable {
+nonisolated enum Region: String, CaseIterable, Codable, Identifiable, Sendable {
     case schengen = "Schengen"
     case nonSchengen = "Non-Schengen"
     case other = "Other"

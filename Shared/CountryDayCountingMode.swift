@@ -7,16 +7,16 @@
 
 import Foundation
 
-enum CountryDayCountingMode: String, CaseIterable, Identifiable, Sendable {
+nonisolated enum CountryDayCountingMode: String, CaseIterable, Identifiable, Sendable {
     case resolvedCountry
     case doubleCountDays
 
     static let storageKey = "countryDayCountingMode"
     static let defaultMode: CountryDayCountingMode = .resolvedCountry
 
-    var id: String { rawValue }
+    nonisolated var id: String { rawValue }
 
-    var label: String {
+    nonisolated var label: String {
         switch self {
         case .resolvedCountry:
             return "Resolved Country"
@@ -25,22 +25,22 @@ enum CountryDayCountingMode: String, CaseIterable, Identifiable, Sendable {
         }
     }
 
-    static func storedMode(from rawValue: String?) -> CountryDayCountingMode {
+    nonisolated static func storedMode(from rawValue: String?) -> CountryDayCountingMode {
         rawValue.flatMap(CountryDayCountingMode.init(rawValue:)) ?? defaultMode
     }
 
-    static func load(from defaults: UserDefaults = AppConfig.sharedDefaults) -> CountryDayCountingMode {
+    nonisolated static func load(from defaults: UserDefaults = AppConfig.sharedDefaults) -> CountryDayCountingMode {
         storedMode(from: defaults.string(forKey: storageKey))
     }
 }
 
-struct CountedPresenceCountry: Hashable, Sendable {
+nonisolated struct CountedPresenceCountry: Hashable, Sendable {
     let id: String
     let countryCode: String?
     let countryName: String
     let regionRaw: String
 
-    var isSchengen: Bool {
+    nonisolated var isSchengen: Bool {
         guard let countryCode else { return false }
         return SchengenMembers.isMember(countryCode)
     }

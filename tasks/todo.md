@@ -73,3 +73,20 @@
 - [ ] Run the planned generic simulator build and focused simulator tests.
 - [ ] Run a broader `LearnTests` pass if focused tests pass, and separate unrelated failures.
 - [ ] Add a review section summarizing implementation, verification, and residual risks.
+
+# Actor-Isolation Warning Cleanup Plan
+
+- [x] Inspect actor-isolated warnings in ledger recompute, calendar data, debug export, pending snapshots, geocode throttle, and Schengen counting.
+- [x] Preserve existing behavior by keeping model APIs in place while removing accidental main-actor isolation from shared protocol/value boundaries.
+- [x] Remove accidental main-actor isolation from pure value/config helpers where appropriate.
+- [x] Run a focused `Learn` simulator build to verify warnings are addressed.
+- [x] Add a review section summarizing implementation, verification, and residual risks.
+
+## Actor-Isolation Warning Cleanup Review
+
+- Removed `TravelEntry` conformance from SwiftData `Stay` and `DayOverride` models while preserving their `region` and `displayTitle` APIs directly on each model.
+- Marked pure shared value/config types and inference pipeline helpers as `nonisolated`/`Sendable` where they do not touch UI or mutable SwiftData state, including app config, signal DTOs, inference processors, debug export payloads, geocode throttle state, and country-counting values.
+- Marked the ledger data-fetching protocol requirements as nonisolated so the `@ModelActor` recompute service can call its injected fetcher without Swift 6 global-actor warnings while retaining the existing real and mock fetchers.
+- Verification passed: clean `build_sim` for scheme `Learn` with derived data at `/tmp/BorderLogActorWarningsCleanDerivedData` completed without the pasted actor-isolation warnings.
+- Verification passed: `xcodebuild test -project Learn.xcodeproj -scheme Learn -destination 'platform=iOS Simulator,name=iPhone 17' -derivedDataPath /tmp/BorderLogActorWarningTests -only-testing:LearnTests/TravelEntryTests -only-testing:LearnTests/StayTests -only-testing:LearnTests/DayOverrideTests`.
+- Residual risk: the broader suite was not rerun for this narrow warning cleanup; prior repo notes already record unrelated broad-suite failures.

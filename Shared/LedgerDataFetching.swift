@@ -9,27 +9,27 @@ import Foundation
 @preconcurrency import SwiftData
 
 protocol LedgerDataFetching {
-    func fetchStays(from start: Date, to end: Date) throws -> [Stay]
-    func fetchOverrides(from start: Date, to end: Date) throws -> [DayOverride]
-    func fetchOverrides(dayKeys: [String]) throws -> [DayOverride]
-    func fetchLocations(from start: Date, to end: Date) throws -> [LocationSample]
-    func fetchPhotos(from start: Date, to end: Date) throws -> [PhotoSignal]
-    func fetchCalendarSignals(from start: Date, to end: Date) throws -> [CalendarSignal]
+    nonisolated func fetchStays(from start: Date, to end: Date) throws -> [Stay]
+    nonisolated func fetchOverrides(from start: Date, to end: Date) throws -> [DayOverride]
+    nonisolated func fetchOverrides(dayKeys: [String]) throws -> [DayOverride]
+    nonisolated func fetchLocations(from start: Date, to end: Date) throws -> [LocationSample]
+    nonisolated func fetchPhotos(from start: Date, to end: Date) throws -> [PhotoSignal]
+    nonisolated func fetchCalendarSignals(from start: Date, to end: Date) throws -> [CalendarSignal]
 
-    func fetchEarliestStayDate() throws -> Date?
-    func fetchEarliestOverrideDate() throws -> Date?
-    func fetchEarliestLocationDate() throws -> Date?
-    func fetchEarliestPhotoDate() throws -> Date?
-    func fetchEarliestCalendarSignalDate() throws -> Date?
+    nonisolated func fetchEarliestStayDate() throws -> Date?
+    nonisolated func fetchEarliestOverrideDate() throws -> Date?
+    nonisolated func fetchEarliestLocationDate() throws -> Date?
+    nonisolated func fetchEarliestPhotoDate() throws -> Date?
+    nonisolated func fetchEarliestCalendarSignalDate() throws -> Date?
 
-    func fetchPresenceDays(keys: [String]) throws -> [PresenceDay]
-    func fetchPresenceDayKeys(from start: Date, to end: Date) throws -> Set<String>
-    func fetchPresenceDayKeys(in keys: Set<String>) throws -> Set<String>
-    func fetchNearestKnownPresenceDay(before date: Date) throws -> PresenceDay?
-    func fetchNearestKnownPresenceDay(after date: Date) throws -> PresenceDay?
-    func insertPresenceDay(_ day: PresenceDay)
+    nonisolated func fetchPresenceDays(keys: [String]) throws -> [PresenceDay]
+    nonisolated func fetchPresenceDayKeys(from start: Date, to end: Date) throws -> Set<String>
+    nonisolated func fetchPresenceDayKeys(in keys: Set<String>) throws -> Set<String>
+    nonisolated func fetchNearestKnownPresenceDay(before date: Date) throws -> PresenceDay?
+    nonisolated func fetchNearestKnownPresenceDay(after date: Date) throws -> PresenceDay?
+    nonisolated func insertPresenceDay(_ day: PresenceDay)
 
-    func save() throws
+    nonisolated func save() throws
 }
 
 struct RealLedgerDataFetcher: LedgerDataFetching {

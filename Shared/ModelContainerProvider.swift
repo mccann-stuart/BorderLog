@@ -9,8 +9,8 @@ import Foundation
 import SwiftData
 import os
 
-enum AppConfig {
-    static let appGroupId: String? = {
+nonisolated enum AppConfig {
+    nonisolated static let appGroupId: String? = {
         if let groupId = Bundle.main.object(forInfoDictionaryKey: "AppGroupId") as? String {
             let trimmed = groupId.trimmingCharacters(in: .whitespacesAndNewlines)
             if !trimmed.isEmpty {
@@ -20,26 +20,26 @@ enum AppConfig {
         return "group.com.MCCANN.Border"
     }()
 
-    static var appGroupContainerURL: URL? {
+    nonisolated static var appGroupContainerURL: URL? {
         guard let appGroupId else { return nil }
         return FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: appGroupId)
     }
 
-    static var isAppGroupAvailable: Bool {
+    nonisolated static var isAppGroupAvailable: Bool {
         appGroupContainerURL != nil
     }
 
-    static let cloudKitContainerId = "iCloud.com.MCCANN.BorderLog"
-    static let isCloudKitFeatureEnabled = false
+    nonisolated static let cloudKitContainerId = "iCloud.com.MCCANN.BorderLog"
+    nonisolated static let isCloudKitFeatureEnabled = false
 
-    static var sharedDefaults: UserDefaults {
+    nonisolated static var sharedDefaults: UserDefaults {
         if isAppGroupAvailable, let appGroupId = appGroupId, let defaults = UserDefaults(suiteName: appGroupId) {
             return defaults
         }
         return .standard
     }
 
-    static var isCloudKitSyncEnabled: Bool {
+    nonisolated static var isCloudKitSyncEnabled: Bool {
         sharedDefaults.bool(forKey: "cloudKitSyncEnabled")
     }
 }

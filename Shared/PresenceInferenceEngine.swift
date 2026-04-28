@@ -7,13 +7,13 @@
 
 import Foundation
 
-struct ResolvedCountry: Hashable, Sendable {
+nonisolated struct ResolvedCountry: Hashable, Sendable {
     let id: String
     let code: String?
     let name: String
 }
 
-struct InferenceContext {
+nonisolated struct InferenceContext {
     let dayKeys: Set<String>
     let stays: [StayPresenceInfo]
     let overrides: [OverridePresenceInfo]
@@ -25,7 +25,7 @@ struct InferenceContext {
     let progress: ((Int, Int) -> Void)?
 }
 
-struct InferencePipelineConfig: Sendable {
+nonisolated struct InferencePipelineConfig: Sendable {
     let stayBaseWeight: Double = 5.0
     let photoBaseWeight: Double = 2.0
     let locationBaseWeight: Double = 3.0
@@ -47,7 +47,7 @@ struct InferencePipelineConfig: Sendable {
     let locationMaxDecayFactor: Double = 1.0
     let contextualDecayFactor: Double = 0.5
 
-    func calibratedLocationWeight(for accuracyMeters: Double) -> Double {
+    nonisolated func calibratedLocationWeight(for accuracyMeters: Double) -> Double {
         let accuracy = max(accuracyMeters, 1)
         let factor = min(
             locationMaxDecayFactor,
@@ -56,7 +56,7 @@ struct InferencePipelineConfig: Sendable {
         return locationBaseWeight * factor
     }
 
-    func confidenceLabel(for winningScore: Double, winningShare: Double) -> ConfidenceLabel {
+    nonisolated func confidenceLabel(for winningScore: Double, winningShare: Double) -> ConfidenceLabel {
         if winningScore >= highConfidenceScore || winningShare >= 0.85 {
             return .high
         }
@@ -67,20 +67,20 @@ struct InferencePipelineConfig: Sendable {
     }
 }
 
-struct InferenceSourceCounts: Sendable {
+nonisolated struct InferenceSourceCounts: Sendable {
     var stayCount = 0
     var photoCount = 0
     var locationCount = 0
     var calendarCount = 0
 }
 
-struct FlightOriginCandidate: Sendable {
+nonisolated struct FlightOriginCandidate: Sendable {
     let country: ResolvedCountry
     var count: Int
     let timeZoneId: String?
 }
 
-struct DayInferenceState: Sendable {
+nonisolated struct DayInferenceState: Sendable {
     var countryScores: [String: Double] = [:]
     var countries: [String: ResolvedCountry] = [:]
     var timeZoneScores: [String: Double] = [:]
@@ -90,7 +90,7 @@ struct DayInferenceState: Sendable {
     var flightOriginCandidates: [String: FlightOriginCandidate] = [:]
 }
 
-struct InferencePipelineState: Sendable {
+nonisolated struct InferencePipelineState: Sendable {
     var days: [String: DayInferenceState]
 
     init(dayKeys: Set<String>) {
@@ -198,16 +198,16 @@ struct InferencePipelineState: Sendable {
     }
 }
 
-protocol SignalProcessor {
+nonisolated protocol SignalProcessor {
     var id: String { get }
-    func process(state: inout InferencePipelineState, context: InferenceContext, config: InferencePipelineConfig)
+    nonisolated func process(state: inout InferencePipelineState, context: InferenceContext, config: InferencePipelineConfig)
 }
 
-struct InferencePipeline {
+nonisolated struct InferencePipeline {
     let config: InferencePipelineConfig
     let processors: [SignalProcessor]
 
-    func execute(context: InferenceContext) -> [PresenceDayResult] {
+    nonisolated func execute(context: InferenceContext) -> [PresenceDayResult] {
         var state = InferencePipelineState(dayKeys: context.dayKeys)
         for processor in processors {
             processor.process(state: &state, context: context, config: config)
@@ -218,7 +218,7 @@ struct InferencePipeline {
 
 // MARK: - Utilities
 
-fileprivate func normalizedCountryIdentity(_ name: String) -> String {
+nonisolated fileprivate func normalizedCountryIdentity(_ name: String) -> String {
     name.folding(
         options: [.caseInsensitive, .diacriticInsensitive, .widthInsensitive],
         locale: Locale(identifier: "en_US_POSIX")
@@ -226,7 +226,7 @@ fileprivate func normalizedCountryIdentity(_ name: String) -> String {
     .lowercased()
 }
 
-fileprivate func resolveCountry(countryCode: String?, countryName: String?) -> ResolvedCountry? {
+nonisolated fileprivate func resolveCountry(countryCode: String?, countryName: String?) -> ResolvedCountry? {
     let canonicalCode = CountryCodeNormalizer.canonicalCode(countryCode: countryCode, countryName: countryName)
     let trimmedName = countryName?.trimmingCharacters(in: .whitespacesAndNewlines)
     let resolvedName: String
@@ -241,14 +241,14 @@ fileprivate func resolveCountry(countryCode: String?, countryName: String?) -> R
     return ResolvedCountry(id: identity, code: canonicalCode, name: resolvedName)
 }
 
-fileprivate func countryMatches(_ lhs: PresenceCountryAllocation, _ rhs: PresenceCountryAllocation) -> Bool {
+nonisolated fileprivate func countryMatches(_ lhs: PresenceCountryAllocation, _ rhs: PresenceCountryAllocation) -> Bool {
     if let lhsCode = lhs.countryCode, let rhsCode = rhs.countryCode {
         return lhsCode == rhsCode
     }
     return lhs.countryName.caseInsensitiveCompare(rhs.countryName) == .orderedSame
 }
 
-fileprivate func countryMatches(_ lhs: PresenceCountryAllocation, _ rhs: ResolvedCountry) -> Bool {
+nonisolated fileprivate func countryMatches(_ lhs: PresenceCountryAllocation, _ rhs: ResolvedCountry) -> Bool {
     if let lhsCode = lhs.countryCode, let rhsCode = rhs.code {
         return lhsCode == rhsCode
     }
@@ -257,7 +257,7 @@ fileprivate func countryMatches(_ lhs: PresenceCountryAllocation, _ rhs: Resolve
 
 // MARK: - Processors
 
-struct StayProcessor: SignalProcessor {
+nonisolated struct StayProcessor: SignalProcessor {
     let id = "stay"
 
     func process(state: inout InferencePipelineState, context: InferenceContext, config: InferencePipelineConfig) {
@@ -299,7 +299,7 @@ struct StayProcessor: SignalProcessor {
     }
 }
 
-struct OverrideProcessor: SignalProcessor {
+nonisolated struct OverrideProcessor: SignalProcessor {
     let id = "override"
 
     func process(state: inout InferencePipelineState, context: InferenceContext, config: InferencePipelineConfig) {
@@ -313,7 +313,7 @@ struct OverrideProcessor: SignalProcessor {
     }
 }
 
-struct PhotoProcessor: SignalProcessor {
+nonisolated struct PhotoProcessor: SignalProcessor {
     let id = "photo"
 
     func process(state: inout InferencePipelineState, context: InferenceContext, config: InferencePipelineConfig) {
@@ -333,7 +333,7 @@ struct PhotoProcessor: SignalProcessor {
     }
 }
 
-struct LocationProcessor: SignalProcessor {
+nonisolated struct LocationProcessor: SignalProcessor {
     let id = "location"
 
     func process(state: inout InferencePipelineState, context: InferenceContext, config: InferencePipelineConfig) {
@@ -354,7 +354,7 @@ struct LocationProcessor: SignalProcessor {
     }
 }
 
-struct CalendarProcessor: SignalProcessor {
+nonisolated struct CalendarProcessor: SignalProcessor {
     let id = "calendar"
 
     func process(state: inout InferencePipelineState, context: InferenceContext, config: InferencePipelineConfig) {
@@ -392,7 +392,7 @@ struct CalendarProcessor: SignalProcessor {
 
 // MARK: - Compiler
 
-private struct PresenceResultCompiler {
+nonisolated private struct PresenceResultCompiler {
     let context: InferenceContext
     let config: InferencePipelineConfig
 
@@ -408,7 +408,7 @@ private struct PresenceResultCompiler {
         let destination: TravelEventEndpoint
     }
 
-    func compile(state: InferencePipelineState) -> [PresenceDayResult] {
+    nonisolated func compile(state: InferencePipelineState) -> [PresenceDayResult] {
         let defaultTimeZone = context.calendar.timeZone
         let orderedDayKeys = context.dayKeys.sorted()
 
@@ -1094,8 +1094,8 @@ private struct PresenceResultCompiler {
     }
 }
 
-struct PresenceInferenceEngine {
-    static func compute(
+nonisolated struct PresenceInferenceEngine {
+    nonisolated static func compute(
         dayKeys: Set<String>,
         stays: [StayPresenceInfo],
         overrides: [OverridePresenceInfo],

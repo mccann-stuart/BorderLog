@@ -7,20 +7,20 @@
 
 import Foundation
 
-enum ConfidenceLabel: String, CaseIterable, Codable {
+nonisolated enum ConfidenceLabel: String, CaseIterable, Codable, Sendable {
     case high
     case medium
     case low
 }
 
-enum PresenceEvidencePhase: String, Codable, CaseIterable, Sendable {
+nonisolated enum PresenceEvidencePhase: String, Codable, CaseIterable, Sendable {
     case base
     case contextual
     case override
     case normalization
 }
 
-struct PresenceCountryAllocation: Codable, Sendable, Equatable {
+nonisolated struct PresenceCountryAllocation: Codable, Sendable, Equatable {
     let countryCode: String?
     let countryName: String
     let normalizedShare: Double
@@ -42,7 +42,7 @@ struct PresenceCountryAllocation: Codable, Sendable, Equatable {
 
 typealias ContributedCountry = PresenceCountryAllocation
 
-struct PresenceEvidenceEntry: Codable, Sendable, Equatable {
+nonisolated struct PresenceEvidenceEntry: Codable, Sendable, Equatable {
     let dayKey: String
     let processorID: String
     let countryCode: String?
@@ -109,7 +109,7 @@ struct PresenceEvidenceEntry: Codable, Sendable, Equatable {
 
 typealias SignalImpact = PresenceEvidenceEntry
 
-struct PresenceConfidenceBreakdown: Codable, Sendable, Equatable {
+nonisolated struct PresenceConfidenceBreakdown: Codable, Sendable, Equatable {
     let score: Double
     let runnerUpScore: Double
     let margin: Double
@@ -164,7 +164,7 @@ nonisolated struct SignalSourceMask: OptionSet, Codable, Sendable {
     }
 }
 
-struct CalendarSignalInfo: Sendable {
+nonisolated struct CalendarSignalInfo: Sendable {
     let dayKey: String
     let countryCode: String?
     let countryName: String
@@ -192,7 +192,7 @@ struct CalendarSignalInfo: Sendable {
     }
 }
 
-struct LocationSignalInfo: Sendable {
+nonisolated struct LocationSignalInfo: Sendable {
     let dayKey: String
     let countryCode: String?
     let countryName: String
@@ -200,14 +200,14 @@ struct LocationSignalInfo: Sendable {
     let timeZoneId: String?
 }
 
-struct PhotoSignalInfo: Sendable {
+nonisolated struct PhotoSignalInfo: Sendable {
     let dayKey: String
     let countryCode: String?
     let countryName: String
     let timeZoneId: String?
 }
 
-struct StayPresenceInfo: Sendable {
+nonisolated struct StayPresenceInfo: Sendable {
     let entryDayKey: String
     let exitDayKey: String?
     let dayTimeZoneId: String
@@ -215,14 +215,14 @@ struct StayPresenceInfo: Sendable {
     let countryName: String
 }
 
-struct OverridePresenceInfo: Sendable {
+nonisolated struct OverridePresenceInfo: Sendable {
     let dayKey: String
     let dayTimeZoneId: String
     let countryCode: String?
     let countryName: String
 }
 
-struct PresenceDayResult: Sendable {
+nonisolated struct PresenceDayResult: Sendable {
     let dayKey: String
     let date: Date
     let timeZoneId: String?
@@ -332,31 +332,31 @@ struct PresenceDayResult: Sendable {
         )
     }
 
-    var contributedCountries: [ContributedCountry] {
+    nonisolated var contributedCountries: [ContributedCountry] {
         countryAllocations
     }
 
-    var evidence: [SignalImpact] {
+    nonisolated var evidence: [SignalImpact] {
         evidenceEntries
     }
 
-    var confidence: Double {
+    nonisolated var confidence: Double {
         confidenceBreakdown.normalizedWinningShare
     }
 
-    var confidenceLabel: ConfidenceLabel {
+    nonisolated var confidenceLabel: ConfidenceLabel {
         confidenceBreakdown.label
     }
 
-    var sources: SignalSourceMask {
+    nonisolated var sources: SignalSourceMask {
         sourceSummary
     }
 
-    var countryCode: String? {
+    nonisolated var countryCode: String? {
         countryAllocations.first?.countryCode
     }
 
-    var countryName: String? {
+    nonisolated var countryName: String? {
         countryAllocations.first?.countryName
     }
 }

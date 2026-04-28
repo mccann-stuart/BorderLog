@@ -9,7 +9,7 @@ import Foundation
 import SwiftData
 
 @Model
-final class Stay: TravelEntry {
+final class Stay {
     var countryName: String
     var countryCode: String?
     var dayTimeZoneId: String
@@ -92,3 +92,18 @@ final class Stay: TravelEntry {
 }
 
 extension Stay: SchengenStay {}
+
+extension Stay {
+    var region: Region {
+        get { Region(rawValue: regionRaw) ?? .other }
+        set { regionRaw = newValue.rawValue }
+    }
+
+    var displayTitle: String {
+        let trimmedCode = countryCode?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        if trimmedCode.isEmpty {
+            return countryName
+        }
+        return "\(countryName) (\(trimmedCode.uppercased()))"
+    }
+}

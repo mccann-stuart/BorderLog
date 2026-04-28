@@ -338,7 +338,7 @@ struct DebugExportDaySnapshot: Codable, Sendable {
     }
 }
 
-struct DebugDataStoreExportPayload: Codable, Sendable {
+nonisolated struct DebugDataStoreExportPayload: Codable, Sendable {
     let metadata: DebugExportMetadata
     let appState: DebugExportAppState
     let userData: DebugExportUserData

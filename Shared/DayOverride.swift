@@ -9,7 +9,7 @@ import Foundation
 import SwiftData
 
 @Model
-final class DayOverride: TravelEntry {
+final class DayOverride {
     @Attribute(.unique) var dayKey: String
     var dayTimeZoneId: String
     var date: Date
@@ -50,3 +50,18 @@ final class DayOverride: TravelEntry {
 }
 
 extension DayOverride: SchengenOverride {}
+
+extension DayOverride {
+    var region: Region {
+        get { Region(rawValue: regionRaw) ?? .other }
+        set { regionRaw = newValue.rawValue }
+    }
+
+    var displayTitle: String {
+        let trimmedCode = countryCode?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        if trimmedCode.isEmpty {
+            return countryName
+        }
+        return "\(countryName) (\(trimmedCode.uppercased()))"
+    }
+}

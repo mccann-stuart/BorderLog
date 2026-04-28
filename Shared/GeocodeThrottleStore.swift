@@ -7,7 +7,7 @@
 
 import Foundation
 
-struct GeocodeThrottleState: Codable {
+nonisolated struct GeocodeThrottleState: Codable, Sendable {
     var timestamps: [TimeInterval]
     var blockedUntil: TimeInterval?
 
@@ -17,11 +17,11 @@ struct GeocodeThrottleState: Codable {
     }
 }
 
-final class GeocodeThrottleStore {
+nonisolated final class GeocodeThrottleStore {
     nonisolated static let shared = GeocodeThrottleStore()
-    private static let stateKey = "borderlog.geocode.throttle.state"
+    private nonisolated static let stateKey = "borderlog.geocode.throttle.state"
 
-    private let defaults: UserDefaults?
+    private nonisolated let defaults: UserDefaults?
 
     nonisolated var isAvailable: Bool {
         defaults != nil
