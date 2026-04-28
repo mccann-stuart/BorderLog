@@ -255,7 +255,7 @@ Journey D — Export / Audit
 
 FR-Auth-1 — Production Apple Sign-in
 	•	Production builds require Sign in with Apple at first run and after sign-out.
-	•	Current local-only development builds keep this flow disabled behind `AuthenticationManager.isAppleSignInEnabled`.
+	•	Sign in with Apple is required and no bypass is permitted.
 	•	Only Apple authentication is supported (no email/password, no Google).
 	•	Store Apple user identifier locally for session continuity; do not create a server-side user record.
 
