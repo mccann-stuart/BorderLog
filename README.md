@@ -13,7 +13,7 @@ Current implementation notes:
 - CloudKit sync is implemented behind `AppConfig.isCloudKitFeatureEnabled == false`; local SwiftData/App Group storage is the active persistence path.
 - Debug data export is compiled and surfaced only in `DEBUG` builds because it intentionally contains full-fidelity diagnostics.
 - Reset All Data clears SwiftData models, keychain-backed local profile/session values, and pending widget location snapshots.
-- Keychain profile/session values use device-bound `kSecAttrAccessibleWhenUnlockedThisDeviceOnly` accessibility.
+- Keychain profile/session values use device-bound `kSecAttrAccessibleWhenPasscodeSetThisDeviceOnly` accessibility.
 - Settings includes a shared Day Counting mode: `Resolved Country` preserves the one-country-per-day default, while `Double Count Days` counts every resolved country allocation on travel days for app and widget summaries.
 
 Weekly Changelog

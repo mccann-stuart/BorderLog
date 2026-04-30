@@ -27,7 +27,7 @@ final class AuthenticationManagerTests: XCTestCase {
     func testKeychainUsesDeviceBoundAccessibility() {
         XCTAssertEqual(
             KeychainHelper.defaultAccessibility as String,
-            kSecAttrAccessibleWhenUnlockedThisDeviceOnly as String
+            kSecAttrAccessibleWhenPasscodeSetThisDeviceOnly as String
         )
     }
 
