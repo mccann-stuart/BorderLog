@@ -225,9 +225,6 @@ func calendarDayDecorationTokens(for summary: CalendarDaySummary) -> [String] {
 
     let flightOriginID = summary.flightOriginCountry?.id
     let flightDestinationID = summary.flightDestinationCountry?.id
-    let extraCountries = summary.countries.filter { country in
-        country.id != flightOriginID && country.id != flightDestinationID
-    }
 
     if summary.flightOriginCountry != nil || summary.flightDestinationCountry != nil {
         var tokens: [String] = []
@@ -243,10 +240,16 @@ func calendarDayDecorationTokens(for summary: CalendarDaySummary) -> [String] {
             tokens.append(emoji(for: destination))
         }
 
-        tokens.append(contentsOf: extraCountries.map { emoji(for: $0) })
+        // ⚡ Bolt: Avoid intermediate array allocations by using .lazy.compactMap instead of .filter().map()
+        tokens.append(contentsOf: summary.countries.lazy.compactMap { country in
+            guard country.id != flightOriginID && country.id != flightDestinationID else { return nil }
+            return emoji(for: country)
+        })
+
         return tokens
     }
 
+    // ⚡ Bolt: Use .map directly instead of mapping then creating a new array
     var tokens = summary.countries.map { emoji(for: $0) }
     if summary.hasFlight {
         tokens.append("✈️")
