@@ -178,7 +178,8 @@ nonisolated struct PendingLocationSnapshot: Codable, Equatable, Sendable {
         queueDirectoryURL: URL? = nil
     ) throws {
         guard !snapshots.isEmpty else { return }
-        let ids = Set(snapshots.map(\.id))
+        // ⚡ Bolt: Use .lazy.map to prevent intermediate O(N) array allocation during Set initialization
+        let ids = Set(snapshots.lazy.map(\.id))
         if let directoryURL = try? resolvedQueueDirectory(fileManager: fileManager, overrideURL: queueDirectoryURL) {
             for id in ids {
                 let fileURL = fileURL(for: id, in: directoryURL)
@@ -275,14 +276,19 @@ nonisolated struct PendingLocationSnapshot: Codable, Equatable, Sendable {
         now: Date
     ) throws {
         let snapshots = all(from: UserDefaults.standard, fileManager: fileManager, queueDirectoryURL: directoryURL)
-        let expiredIDs = snapshots
-            .filter { now.timeIntervalSince($0.timestamp) > maxSnapshotAge }
-            .map(\.id)
+
+        // ⚡ Bolt: Avoid intermediate O(N) array allocations by using lazy evaluation
+        // and formUnion to construct the Set of items to prune instead of the `+` operator.
+        let expiredIDs = snapshots.lazy.compactMap { now.timeIntervalSince($0.timestamp) > maxSnapshotAge ? $0.id : nil }
         let overflowIDs = snapshots
             .sorted { $0.timestamp > $1.timestamp }
             .dropFirst(maxQueuedSnapshots)
-            .map(\.id)
-        for id in Set(expiredIDs + overflowIDs) {
+            .lazy.map(\.id)
+
+        var idsToRemove = Set(expiredIDs)
+        idsToRemove.formUnion(overflowIDs)
+
+        for id in idsToRemove {
             let fileURL = fileURL(for: id, in: directoryURL)
             if fileManager.fileExists(atPath: fileURL.path) {
                 try fileManager.removeItem(at: fileURL)
