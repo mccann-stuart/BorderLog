@@ -85,3 +85,6 @@
 ## 2026-05-07 - Prevent Intermediate Array Allocations
 **Learning:** Chained array operations (like `.filter().map()`) create temporary array allocations which can degrade performance in hot rendering loops, such as calendar views.
 **Action:** Use `.lazy.compactMap { ... }` when filtering and mapping elements before appending them to a sequence to avoid O(N) intermediate array allocations and reduce ARC overhead.
+## 2026-06-25 - Prevent Set Evaluation Overheads via LazyMapSequence
+**Learning:** Using `Set(array.map { ... })` and concatenating sequences before Set creation (`Set(a + b)`) generates unnecessary intermediate `Array` allocations that degrade performance and cause ARC thrashing in data-heavy pathways.
+**Action:** Always initialize a `Set` via `.lazy.map` (e.g., `Set(array.lazy.map { ... })`). For appending additional mapped items, evaluate them lazily and use `.formUnion()` to incrementally add them without the memory overhead of the `+` operator.
