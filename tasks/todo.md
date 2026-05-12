@@ -1,5 +1,26 @@
 # Xcode Console Validation Plan
 
+# App Store Launch Compliance Review Plan
+
+- [x] Refresh current Apple App Store launch requirements from official sources.
+- [x] Inventory app targets, bundle metadata, entitlements, privacy manifest, permissions, icons, and release/debug gates.
+- [x] Review user-data, reset/delete, network/backend, sign-in, CloudKit, widget, and location/calendar/photos flows for App Review risk.
+- [x] Inspect launch/onboarding/settings UI for reviewer access, policy links, consent clarity, and obvious launch blockers.
+- [x] Build the release candidate path and capture warnings/errors that affect submission readiness.
+- [x] Implement small root-cause fixes for confirmed launch blockers only.
+- [x] Add a review section summarizing findings, fixes, verification, and residual App Store submission work.
+
+## App Store Launch Compliance Review
+
+- Added app and widget `PrivacyInfo.xcprivacy` manifests. Both declare no tracking domains, no collected data through app-owned services, and UserDefaults required-reason API use with reason `CA92.1`.
+- Added an in-app Privacy Policy screen from Settings, and tightened privacy copy so it no longer overstates fully on-device processing where Apple services such as MapKit geocoding may process coordinates to resolve countries.
+- Removed macOS sandbox entitlement keys from iOS app/widget entitlements and release build settings, set app Release signing identity to Apple Distribution, and disabled release testability.
+- Replaced disabled sign-in/future iCloud wording with launch-safe copy that states no account is required and current travel data storage is local to the device.
+- Tightened `DebugDataStoreExportService` so the debug export payload and service compile only under `DEBUG`, keeping the diagnostic export out of Release builds.
+- Verification passed: privacy manifests and entitlements are valid property lists, release metadata checks show app Release testability is off, app Release signing is Apple Distribution, and no macOS sandbox/hardened-runtime settings remain in the inspected project/entitlement files.
+- Verification partially passed: the first Release device build exposed the debug-export release leak, and the failed build artifact packaged the widget privacy manifest. After fixing the remaining debug guard, a rerun could not be completed because build escalation approval quota was exhausted. A signed Archive or `generic/platform=iOS` Release build still needs to be rerun before App Store upload.
+- Residual submission work: create or link a public privacy policy URL in App Store Connect, complete the App Privacy nutrition-label answers to match the current code paths, verify the final signed archive contains both app and widget privacy manifests, and avoid enabling CloudKit/iCloud claims until the entitlement and product behavior are launch-ready.
+
 - [x] Classify each pasted console line as app-owned, configuration-owned, or framework/simulator noise.
 - [x] Verify App Group, location, MapKit, and resource references against code, project settings, and built artifacts.
 - [x] Implement root-cause fixes only for confirmed app-owned issues.

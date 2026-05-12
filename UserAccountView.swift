@@ -49,25 +49,25 @@ struct UserAccountView: View {
                         VStack(alignment: .leading, spacing: 8) {
                             Text("Use without an account")
                                 .font(.headline)
-                            Text("Sign in is disabled. Your travel data stays on this device.")
+                            Text("BorderLog does not require an account. Your travel data stays on this device.")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                         }
                         .padding(.vertical, 8)
                     }
                 }
-                
+
                 Section("Data Sync") {
                     VStack(alignment: .leading, spacing: 8) {
                         HStack {
                             Text("iCloud Sync")
                                 .font(.headline)
                             Spacer()
-                            Text("Not Configured")
+                            Text("Off")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                         }
-                        Text("Enable iCloud to sync your travel data across devices. Configure in a future milestone.")
+                        Text("BorderLog currently stores travel data locally on this device.")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }

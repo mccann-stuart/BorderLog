@@ -95,7 +95,7 @@ struct SettingsView: View {
                         Label("Local-First Storage", systemImage: "lock.shield.fill")
                             .font(.headline)
 
-                        Text("All your travel data is stored on this device. Nothing is uploaded to any external server.")
+                        Text("Your travel data is stored on this device. BorderLog does not run analytics, tracking, or app-owned user-data servers.")
                             .font(.callout)
                             .foregroundStyle(.secondary)
                             .fixedSize(horizontal: false, vertical: true)
@@ -234,7 +234,7 @@ struct SettingsView: View {
                 } header: {
                     Text("Data Sources")
                 } footer: {
-                    Text("Location, photo metadata, and read-only calendar events are used to automatically determine which country you were in each day. All processing happens on your device. No data is stored on any server or outside the app.")
+                    Text("Location, photo metadata, and read-only calendar events are used to determine which country you were in each day. BorderLog stores this data locally and may use Apple system services such as MapKit geocoding to resolve countries.")
                 }
 
       
@@ -301,6 +301,12 @@ struct SettingsView: View {
                         Spacer()
                         Text("Local (on-device)")
                             .foregroundStyle(.secondary)
+                    }
+
+                    NavigationLink {
+                        PrivacyPolicyView()
+                    } label: {
+                        Label("Privacy Policy", systemImage: "hand.raised")
                     }
                 } header: {
                     Text("About BorderLog")

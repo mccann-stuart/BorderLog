@@ -85,8 +85,8 @@ struct WelcomeView: View {
                                 .cornerRadius(12)
                         }
                         .padding(.horizontal, 32)
-                        
-                        Text("Sign in with Apple is currently disabled.")
+
+                        Text("No account is required. Your travel data stays on this device.")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }

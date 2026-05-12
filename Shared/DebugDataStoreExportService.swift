@@ -1,5 +1,3 @@
-#if DEBUG
-
 //
 //  DebugDataStoreExportService.swift
 //  Learn
@@ -9,6 +7,8 @@
 
 import Foundation
 @preconcurrency import SwiftData
+
+#if DEBUG
 
 struct DebugExportAppVariantFlags: Codable, Sendable {
     let cloudKitFeatureEnabled: Bool
@@ -77,8 +77,6 @@ struct DebugExportUserData: Codable, Sendable {
         try container.encode(appleSignInEnabled, forKey: .appleSignInEnabled)
     }
 }
-
-#endif
 
 struct DebugExportDateRange: Codable, Sendable {
     let earliest: Date
@@ -929,3 +927,5 @@ actor DebugDataStoreExportService {
         return formatter.string(from: date)
     }
 }
+
+#endif
