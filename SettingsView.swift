@@ -817,7 +817,7 @@ struct SettingsView: View {
               let value = String(data: data, encoding: .utf8) else {
             return nil
         }
-        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmed = value.fastTrimmed
         return trimmed.isEmpty ? nil : trimmed
     }
 

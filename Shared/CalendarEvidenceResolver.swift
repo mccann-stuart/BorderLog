@@ -90,7 +90,7 @@ struct CalendarEvidenceResolver {
         }
 
         guard let name = countryName?
-            .trimmingCharacters(in: .whitespacesAndNewlines),
+            .fastTrimmed,
               !name.isEmpty else {
             return nil
         }

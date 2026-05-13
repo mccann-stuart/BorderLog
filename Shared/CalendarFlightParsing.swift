@@ -215,11 +215,11 @@ enum CalendarFlightParsing {
     private nonisolated static func collapseWhitespace(_ raw: String) -> String {
         let range = NSRange(location: 0, length: (raw as NSString).length)
         return patternWhitespace.stringByReplacingMatches(in: raw, options: [], range: range, withTemplate: " ")
-            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .fastTrimmed
     }
 
     private nonisolated static func normalizeLocationToken(_ raw: String) -> String? {
-        var value = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        var value = raw.fastTrimmed
         guard !value.isEmpty else { return nil }
 
         let range1 = NSRange(location: 0, length: (value as NSString).length)
@@ -230,7 +230,7 @@ enum CalendarFlightParsing {
 
         let range3 = NSRange(location: 0, length: (value as NSString).length)
         value = patternWhitespace.stringByReplacingMatches(in: value, options: [], range: range3, withTemplate: " ")
-        value = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        value = value.fastTrimmed
 
         var shouldContinue = true
         while shouldContinue, let scalar = value.unicodeScalars.last {
@@ -242,7 +242,7 @@ enum CalendarFlightParsing {
             }
         }
 
-        value = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        value = value.fastTrimmed
         return value.isEmpty ? nil : value
     }
 }

@@ -811,7 +811,7 @@ actor DebugDataStoreExportService {
 
         return candidates.first { candidate in
             guard let candidate else { return false }
-            return !candidate.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            return !candidate.fastTrimmed.isEmpty
         } ?? TimeZone.current.identifier
     }
 

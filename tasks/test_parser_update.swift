@@ -30,8 +30,8 @@ func parseFlightInfo(text: String) -> (from: String?, to: String?) {
     if let p = patternPlane, let match = p.firstMatch(in: text, options: [], range: range) {
         if match.numberOfRanges >= 3 {
             return (
-                nsString.substring(with: match.range(at: 1)).trimmingCharacters(in: .whitespacesAndNewlines),
-                nsString.substring(with: match.range(at: 2)).trimmingCharacters(in: .whitespacesAndNewlines)
+                nsString.substring(with: match.range(at: 1)).fastTrimmed,
+                nsString.substring(with: match.range(at: 2)).fastTrimmed
             )
         }
     }
@@ -39,8 +39,8 @@ func parseFlightInfo(text: String) -> (from: String?, to: String?) {
     if let p = patternPlaneEmoji, let match = p.firstMatch(in: text, options: [], range: range) {
         if match.numberOfRanges >= 3 {
             return (
-                nsString.substring(with: match.range(at: 1)).trimmingCharacters(in: .whitespacesAndNewlines),
-                nsString.substring(with: match.range(at: 2)).trimmingCharacters(in: .whitespacesAndNewlines)
+                nsString.substring(with: match.range(at: 1)).fastTrimmed,
+                nsString.substring(with: match.range(at: 2)).fastTrimmed
             )
         }
     }
@@ -49,8 +49,8 @@ func parseFlightInfo(text: String) -> (from: String?, to: String?) {
     if let p = patternFromTo, let match = p.firstMatch(in: text, options: [], range: range) {
         if match.numberOfRanges >= 3 {
             return (
-                nsString.substring(with: match.range(at: 1)).trimmingCharacters(in: .whitespacesAndNewlines),
-                nsString.substring(with: match.range(at: 2)).trimmingCharacters(in: .whitespacesAndNewlines)
+                nsString.substring(with: match.range(at: 1)).fastTrimmed,
+                nsString.substring(with: match.range(at: 2)).fastTrimmed
             )
         }
     }
@@ -59,7 +59,7 @@ func parseFlightInfo(text: String) -> (from: String?, to: String?) {
     if bestTo == nil {
         if let p = patternTo, let match = p.firstMatch(in: text, options: [], range: range) {
             if match.numberOfRanges >= 2 {
-                bestTo = nsString.substring(with: match.range(at: 1)).trimmingCharacters(in: .whitespacesAndNewlines)
+                bestTo = nsString.substring(with: match.range(at: 1)).fastTrimmed
             }
         }
     }

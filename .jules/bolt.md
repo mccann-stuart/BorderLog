@@ -85,3 +85,6 @@
 ## 2026-05-07 - Prevent Intermediate Array Allocations
 **Learning:** Chained array operations (like `.filter().map()`) create temporary array allocations which can degrade performance in hot rendering loops, such as calendar views.
 **Action:** Use `.lazy.compactMap { ... }` when filtering and mapping elements before appending them to a sequence to avoid O(N) intermediate array allocations and reduce ARC overhead.
+## 2026-06-25 - Avoid O(N) Array/String Heap Allocations for Empty String Checks
+**Learning:** Using `trimmingCharacters(in: .whitespacesAndNewlines)` to check if a string only contains whitespaces, or to sanitize it before validation, causes an unnecessary O(N) string allocation and incurs a performance penalty in hot paths like iterative rendering or data processing.
+**Action:** Replace `trimmingCharacters(in: .whitespacesAndNewlines)` with `.fastTrimmed` from `String+Extensions.swift`. It provides an early-exit path that checks the first and last characters and returns the original string unmodified if it is already trimmed, thereby avoiding O(N) memory allocation and ARC overhead.

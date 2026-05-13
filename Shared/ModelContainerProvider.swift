@@ -12,7 +12,7 @@ import os
 nonisolated enum AppConfig {
     nonisolated static let appGroupId: String? = {
         if let groupId = Bundle.main.object(forInfoDictionaryKey: "AppGroupId") as? String {
-            let trimmed = groupId.trimmingCharacters(in: .whitespacesAndNewlines)
+            let trimmed = groupId.fastTrimmed
             if !trimmed.isEmpty {
                 return trimmed
             }

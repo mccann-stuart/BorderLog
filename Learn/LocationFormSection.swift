@@ -26,7 +26,7 @@ struct LocationFormSection: View {
     private let allCountryOptions = CountryOptions.all
 
     private var displayCountryCode: String {
-        let trimmed = countryCode.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmed = countryCode.fastTrimmed
         return trimmed.isEmpty ? "—" : trimmed.uppercased()
     }
 
@@ -157,7 +157,7 @@ struct LocationFormSection: View {
     // MARK: - Helpers
 
     private func syncCountryName(for code: String) {
-        let trimmed = code.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmed = code.fastTrimmed
         guard !trimmed.isEmpty else {
             countryName = ""
             return
