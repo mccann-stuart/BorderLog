@@ -28,7 +28,7 @@ enum CountryCodeNormalizer {
             }
         }
 
-        let trimmed = code.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmed = code.fastTrimmed
         guard !trimmed.isEmpty else { return nil }
         let uppercased = trimmed.uppercased()
         if uppercased == "UK" {
@@ -61,7 +61,7 @@ enum CountryCodeNormalizer {
 
     private nonisolated static func trimmedCountryName(_ name: String?) -> String? {
         guard let name else { return nil }
-        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmed = name.fastTrimmed
         return trimmed.isEmpty ? nil : trimmed
     }
 

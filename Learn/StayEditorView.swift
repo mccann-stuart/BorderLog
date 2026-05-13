@@ -140,7 +140,7 @@ struct StayEditorView: View {
             Text(overlapMessage)
         }
         .onChange(of: draft.countryCode) { _, newValue in
-            let trimmed = newValue.trimmingCharacters(in: .whitespacesAndNewlines)
+            let trimmed = newValue.fastTrimmed
             if trimmed.isEmpty {
                 draft.region = .other
             } else if SchengenMembers.isMember(trimmed) {
@@ -188,7 +188,7 @@ struct StayEditorView: View {
     }
 
     private var canSave: Bool {
-        !draft.countryName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        !draft.countryName.fastTrimmed.isEmpty
     }
 
     private func attemptSave() {
@@ -245,10 +245,10 @@ struct StayEditorView: View {
     }
 
     private func applySave() {
-        let trimmedCountry = draft.countryName.trimmingCharacters(in: .whitespacesAndNewlines)
-        let trimmedCode = draft.countryCode.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedCountry = draft.countryName.fastTrimmed
+        let trimmedCode = draft.countryCode.fastTrimmed
         let normalizedCode = CountryCodeNormalizer.normalize(trimmedCode)
-        let trimmedNotes = draft.notes.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedNotes = draft.notes.fastTrimmed
         let exitDate = draft.hasExitDate ? draft.exitedOn : nil
         let timeZone = Calendar.current.timeZone
         let entryIdentity = DayIdentity.canonicalDay(
@@ -406,7 +406,7 @@ private struct StayDraft {
             self.notes = stay.notes
         } else {
             let entryDate = presetEntry ?? Date()
-            let trimmedCode = (presetCountryCode ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+            let trimmedCode = (presetCountryCode ?? "").fastTrimmed
             let shouldSetExitDate = forceExitDate || presetExit != nil
 
             self.countryName = presetCountryName ?? ""

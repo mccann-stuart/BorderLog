@@ -346,7 +346,7 @@ actor CalendarSignalIngestor {
     }
 
     private func nonEmptyLocation(_ value: String?) -> String? {
-        guard let trimmed = value?.trimmingCharacters(in: .whitespacesAndNewlines), !trimmed.isEmpty else {
+        guard let trimmed = value?.fastTrimmed, !trimmed.isEmpty else {
             return nil
         }
         return trimmed

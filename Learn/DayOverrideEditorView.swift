@@ -106,7 +106,7 @@ struct DayOverrideEditorView: View {
             Text("An override already exists for this day. Replacing it will remove the previous entry.")
         }
         .onChange(of: draft.countryCode) { _, newValue in
-            let trimmed = newValue.trimmingCharacters(in: .whitespacesAndNewlines)
+            let trimmed = newValue.fastTrimmed
             if trimmed.isEmpty {
                 draft.region = .other
             } else if SchengenMembers.isMember(trimmed) {
@@ -156,7 +156,7 @@ struct DayOverrideEditorView: View {
     }
 
     private var canSave: Bool {
-        !draft.countryName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        !draft.countryName.fastTrimmed.isEmpty
     }
 
     private func attemptSave() {
@@ -200,10 +200,10 @@ struct DayOverrideEditorView: View {
             modelContext.delete(replacing)
         }
 
-        let trimmedCountry = draft.countryName.trimmingCharacters(in: .whitespacesAndNewlines)
-        let trimmedCode = draft.countryCode.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedCountry = draft.countryName.fastTrimmed
+        let trimmedCode = draft.countryCode.fastTrimmed
         let normalizedCode = CountryCodeNormalizer.normalize(trimmedCode)
-        let trimmedNotes = draft.notes.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedNotes = draft.notes.fastTrimmed
 
         if let existingOverride {
             existingOverride.date = identity.normalizedDate
@@ -268,7 +268,7 @@ private struct DayOverrideDraft {
             self.date = presetDate ?? Date()
             self.countryName = presetCountryName ?? ""
             self.countryCode = presetCountryCode ?? ""
-            let trimmedCode = (presetCountryCode ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+            let trimmedCode = (presetCountryCode ?? "").fastTrimmed
             if trimmedCode.isEmpty {
                 self.region = .other
             } else if SchengenMembers.isMember(trimmedCode) {

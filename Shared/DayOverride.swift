@@ -58,7 +58,7 @@ extension DayOverride {
     }
 
     var displayTitle: String {
-        let trimmedCode = countryCode?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let trimmedCode = countryCode?.fastTrimmed ?? ""
         if trimmedCode.isEmpty {
             return countryName
         }

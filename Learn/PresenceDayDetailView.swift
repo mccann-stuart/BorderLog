@@ -216,7 +216,7 @@ struct PresenceDayDetailView: View {
         let normalizedCode = CountryCodeNormalizer.normalize(code) ?? code
         let dayKey = day.dayKey
         let region: Region = {
-            let trimmed = normalizedCode.trimmingCharacters(in: .whitespacesAndNewlines)
+            let trimmed = normalizedCode.fastTrimmed
             if trimmed.isEmpty { return .other }
             return SchengenMembers.isMember(trimmed) ? .schengen : .nonSchengen
         }()

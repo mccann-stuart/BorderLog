@@ -23,7 +23,7 @@ struct ProfileSetupView: View {
     }
     
     private func selectedCountryLabel(for code: String) -> String {
-        guard !code.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+        guard !code.fastTrimmed.isEmpty else {
             return "Not set"
         }
         return countryLabel(for: code)

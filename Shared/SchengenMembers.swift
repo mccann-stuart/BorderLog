@@ -49,7 +49,7 @@ enum SchengenMembers {
             }
         }
 
-        let trimmed = code.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
+        let trimmed = code.fastTrimmed.uppercased()
         guard !trimmed.isEmpty else { return false }
         return iso2.contains(trimmed)
     }

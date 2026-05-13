@@ -228,7 +228,7 @@ nonisolated fileprivate func normalizedCountryIdentity(_ name: String) -> String
 
 nonisolated fileprivate func resolveCountry(countryCode: String?, countryName: String?) -> ResolvedCountry? {
     let canonicalCode = CountryCodeNormalizer.canonicalCode(countryCode: countryCode, countryName: countryName)
-    let trimmedName = countryName?.trimmingCharacters(in: .whitespacesAndNewlines)
+    let trimmedName = countryName?.fastTrimmed
     let resolvedName: String
     if let canonicalCode {
         resolvedName = trimmedName ?? Locale.autoupdatingCurrent.localizedString(forRegionCode: canonicalCode) ?? canonicalCode
