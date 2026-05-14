@@ -214,7 +214,7 @@ actor PhotoSignalIngestor {
                 }
             )
         }
-        return Set(try modelContext.fetch(descriptor).map(\.assetIdHash))
+        return Set(try modelContext.fetch(descriptor).lazy.map(\.assetIdHash))
     }
 
     internal func saveContextIfNeeded() throws {

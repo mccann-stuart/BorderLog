@@ -431,3 +431,9 @@ Appended `.lazy` before `.map` to use a lazy sequence generator: `Set(days.lazy.
 - `LearnTests/DebugDataStoreExportServiceTests.swift` covers debug export determinism in debug builds only.
 - `LearnTests/DataManagerTests.swift` covers SwiftData reset coverage and sensitive non-SwiftData cleanup.
 - `LearnTests/AuthenticationManagerTests.swift` covers local auth keychain persistence and the device-bound keychain accessibility constant.
+
+### Collection Transformations
+Multiple instances of intermediate collection allocations were optimized out:
+1. **Set Initializations**: Arrays mapped directly into Sets (`Set(collection.map)`) were updated to use `.lazy.map` to avoid intermediate array allocations.
+2. **Dictionary Initializations**: Tuples arrays mapped into dictionaries (`Dictionary(uniqueKeysWithValues: array.map)`) were rewritten to `reduce(into:)` pre-sized dictionaries.
+3. **Filter-Map Chains**: Standard chained `.filter().map()` operations were simplified into a single `.lazy.compactMap` pass to prevent intermediate buffer allocations.

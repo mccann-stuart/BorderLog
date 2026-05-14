@@ -85,3 +85,14 @@
 ## 2026-05-07 - Prevent Intermediate Array Allocations
 **Learning:** Chained array operations (like `.filter().map()`) create temporary array allocations which can degrade performance in hot rendering loops, such as calendar views.
 **Action:** Use `.lazy.compactMap { ... }` when filtering and mapping elements before appending them to a sequence to avoid O(N) intermediate array allocations and reduce ARC overhead.
+## 2026-06-21 - Optimize Set initialization via lazy mapping
+**Learning:** Using `Set(collection.map { ... })` allocates an intermediate array only to immediately discard it.
+**Action:** Use `Set(collection.lazy.map { ... })` to prevent `O(N)` heap allocations when initializing a `Set` from a transformed collection.
+
+## 2026-06-21 - Replace Dictionary(uniqueKeysWithValues:) with reduce(into:)
+**Learning:** `Dictionary(uniqueKeysWithValues: array.map { ... })` allocates an intermediate tuple array, consuming memory, and risks runtime crashes if keys duplicate.
+**Action:** Replace it with `array.reduce(into: [Key: Value](minimumCapacity: array.count)) { $0[key] = value }` to safely and efficiently initialize dictionaries.
+
+## 2026-06-21 - Optimize filter-map chains
+**Learning:** Chaining `.filter { ... }.map { ... }` generates intermediate array allocations for both the filtered result and the final mapped result.
+**Action:** Replace the chain with a single pass using `.lazy.compactMap { condition ? value : nil }` to avoid intermediate arrays entirely when filtering and mapping elements.

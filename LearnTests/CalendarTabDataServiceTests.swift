@@ -255,10 +255,10 @@ final class CalendarTabDataServiceTests: XCTestCase {
             now: makeDate(2026, 3, 19)
         )
 
-        XCTAssertEqual(Set(snapshot.countrySummaries.map(\.id)), Set(["US", "CA"]))
+        XCTAssertEqual(Set(snapshot.countrySummaries.lazy.map(\.id)), Set(["US", "CA"]))
         XCTAssertFalse(snapshot.countrySummaries.map(\.id).contains("MX"))
 
-        let visibleMonthCountryIDs = Set(snapshot.daySummaries.flatMap(\.countries).map(\.id))
+        let visibleMonthCountryIDs = Set(snapshot.daySummaries.lazy.flatMap(\.countries).map(\.id))
         XCTAssertEqual(visibleMonthCountryIDs, Set(["US"]))
     }
 
@@ -441,7 +441,7 @@ final class CalendarTabDataServiceTests: XCTestCase {
         let march15 = try XCTUnwrap(snapshot.daySummaries.first { $0.dayKey == dayKey })
         XCTAssertEqual(march15.countries.map(\.id), ["GB"])
 
-        let totals = Dictionary(uniqueKeysWithValues: snapshot.countrySummaries.map { ($0.id, $0.totalDays) })
+        let totals = snapshot.countrySummaries.reduce(into: [String: Int](minimumCapacity: snapshot.countrySummaries.count)) { $0[$1.id] = $1.totalDays }
         XCTAssertEqual(totals, ["GB": 1])
     }
 
@@ -474,7 +474,7 @@ final class CalendarTabDataServiceTests: XCTestCase {
         let march15 = try XCTUnwrap(snapshot.daySummaries.first { $0.dayKey == dayKey })
         XCTAssertEqual(march15.countries.map(\.id), ["GB", "FR"])
 
-        let totals = Dictionary(uniqueKeysWithValues: snapshot.countrySummaries.map { ($0.id, $0.totalDays) })
+        let totals = snapshot.countrySummaries.reduce(into: [String: Int](minimumCapacity: snapshot.countrySummaries.count)) { $0[$1.id] = $1.totalDays }
         XCTAssertEqual(totals["GB"], 1)
         XCTAssertEqual(totals["FR"], 1)
     }

@@ -39,7 +39,7 @@ final class PendingLocationSnapshotTests: XCTestCase {
         }
 
         let queued = PendingLocationSnapshot.all(from: defaults, queueDirectoryURL: queueURL)
-        XCTAssertEqual(Set(queued.map(\.id)), Set(snapshots.map(\.id)))
+        XCTAssertEqual(Set(queued.lazy.map(\.id)), Set(snapshots.lazy.map(\.id)))
         XCTAssertEqual(queued.count, snapshots.count)
     }
 
