@@ -7,3 +7,8 @@
 **Vulnerability:** Implementing custom fallback logic when `context.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, ...)` fails can still permanently lock out users if `canEvaluatePolicy` succeeds but `evaluatePolicy` fails (e.g. broken FaceID sensor or repeated face mismatches without fallback to passcode).
 **Learning:** `LAContext` native `.deviceOwnerAuthentication` policy securely and automatically handles falling back to device passcode when biometric authentication is unavailable or fails. The passcode remains a valid root of trust on the device.
 **Prevention:** Always use `.deviceOwnerAuthentication` instead of `.deviceOwnerAuthenticationWithBiometrics` as the primary authentication policy when requiring user verification to unlock sensitive data in iOS apps, to ensure a seamless and reliable fallback to passcode.
+
+## 2026-05-14 - Keychain Access Constraints
+**Vulnerability:** Weak Keychain item accessibility constraint (`kSecAttrAccessibleWhenUnlockedThisDeviceOnly`) allowed accessing data across backups or if the device lacked a passcode.
+**Learning:** `kSecAttrAccessibleWhenPasscodeSetThisDeviceOnly` fails closed (by immediately deleting or blocking save access) if a user removes their device passcode, providing an enhanced baseline for highly sensitive local-first privacy applications.
+**Prevention:** Always default to `kSecAttrAccessibleWhenPasscodeSetThisDeviceOnly` for Keychain data when the app does not explicitly require background access without user authentication.
