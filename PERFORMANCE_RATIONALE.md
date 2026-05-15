@@ -431,3 +431,20 @@ Appended `.lazy` before `.map` to use a lazy sequence generator: `Set(days.lazy.
 - `LearnTests/DebugDataStoreExportServiceTests.swift` covers debug export determinism in debug builds only.
 - `LearnTests/DataManagerTests.swift` covers SwiftData reset coverage and sensitive non-SwiftData cleanup.
 - `LearnTests/AuthenticationManagerTests.swift` covers local auth keychain persistence and the device-bound keychain accessibility constant.
+
+# Performance Optimization Rationale: In-Place Struct Array Mutation & Lazy Source Masking
+
+## Current State
+In `Shared/PresenceInferenceEngine.swift`, `markContributingEvidence` operated via `.map { ... }`, generating an entirely new sequence of `PresenceDayResult` structs and replacing the inner `evidenceEntries` array for each instance. This happened during the final `map` step of inference generation. Additionally, extracting processor IDs for `SignalSourceMask` allocated a full array of strings.
+
+## Problem
+1. **O(N*M) Intermediate Allocation**: Mapping over a large collection of nested structures by instantiating complete copies generates immense memory churn. The `PresenceDayResult` mapping created a completely new `PresenceDayResult` and an internal `[PresenceEvidenceEntry]` array per record.
+2. **Intermediate Array for Masks**: Mapping `processorID`s to calculate `SignalSourceMask` eagerly constructed a full intermediate string array, driving ARC pressure unnecessarily.
+
+## Optimization
+1. Refactored `markContributingEvidence` from an element-wise map transform into an `inout [PresenceDayResult]` loop that directly mutates `evidenceEntries[j].contributedToFinalResult` in-place.
+2. Implemented lazy map iteration: `dayState.evidenceEntries.lazy.map(\.processorID)` when calculating masks.
+
+## Verification
+- **Time Complexity**: Reduced overhead constant for mapping values.
+- **Space Complexity**: Zero intermediate array allocations, reducing transient heap memory allocations during top-level logic evaluations to strictly `O(1)`.

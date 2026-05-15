@@ -228,7 +228,7 @@ nonisolated struct PresenceDayResult: Sendable {
     let timeZoneId: String?
     let countryAllocations: [PresenceCountryAllocation]
     let zoneOverlays: [String]
-    let evidenceEntries: [PresenceEvidenceEntry]
+    var evidenceEntries: [PresenceEvidenceEntry]
     let confidenceBreakdown: PresenceConfidenceBreakdown
     let sourceSummary: SignalSourceMask
     let isOverride: Bool
