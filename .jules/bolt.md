@@ -85,3 +85,6 @@
 ## 2026-05-07 - Prevent Intermediate Array Allocations
 **Learning:** Chained array operations (like `.filter().map()`) create temporary array allocations which can degrade performance in hot rendering loops, such as calendar views.
 **Action:** Use `.lazy.compactMap { ... }` when filtering and mapping elements before appending them to a sequence to avoid O(N) intermediate array allocations and reduce ARC overhead.
+## 2026-10-10 - Replace Array .map with In-Place Loops for Nested Value Types
+**Learning:** Returning a `.map` that reconstructs complex value type arrays (like `[PresenceDayResult]`) with internal arrays of structs (`[PresenceEvidenceEntry]`) forces Swift to do extensive deep copying and triggers significant memory allocations inside loop bounds.
+**Action:** When updating a specific nested flag inside a collection of structs, declare the child arrays as `var` and use `inout` methods containing `for i in 0..<results.count` loops to modify the properties in-place, thus eliminating O(N*M) struct copy overhead.
