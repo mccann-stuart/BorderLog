@@ -10,7 +10,7 @@ protocol KeychainHelperProtocol {
 
 final class KeychainHelper: KeychainHelperProtocol {
     static let standard = KeychainHelper()
-    static let defaultAccessibility = kSecAttrAccessibleWhenUnlockedThisDeviceOnly
+    static let defaultAccessibility = kSecAttrAccessibleWhenPasscodeSetThisDeviceOnly
     private static let logger = Logger(subsystem: "com.MCCANN.Border", category: "Keychain")
 
     private init() {}
