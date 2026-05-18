@@ -178,7 +178,8 @@ nonisolated struct PendingLocationSnapshot: Codable, Equatable, Sendable {
         queueDirectoryURL: URL? = nil
     ) throws {
         guard !snapshots.isEmpty else { return }
-        let ids = Set(snapshots.map(\.id))
+        // ⚡ Bolt: Avoid intermediate array allocations by using .lazy.map when converting to a Set.
+        let ids = Set(snapshots.lazy.map(\.id))
         if let directoryURL = try? resolvedQueueDirectory(fileManager: fileManager, overrideURL: queueDirectoryURL) {
             for id in ids {
                 let fileURL = fileURL(for: id, in: directoryURL)

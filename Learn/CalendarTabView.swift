@@ -188,7 +188,8 @@ struct CalendarTabView: View {
     }
 
     private func summaryPresenceDayKeys(from snapshot: CalendarTabSnapshot) -> [String] {
-        let visibleMonthKeys = Set(snapshot.daySummaries.map(\.dayKey))
+        // ⚡ Bolt: Avoid intermediate array allocations by using .lazy.map when converting to a Set.
+        let visibleMonthKeys = Set(snapshot.daySummaries.lazy.map(\.dayKey))
         return Array(visibleMonthKeys.union(snapshot.summaryUnknownDayKeys)).sorted()
     }
 
