@@ -85,3 +85,11 @@
 ## 2026-05-07 - Prevent Intermediate Array Allocations
 **Learning:** Chained array operations (like `.filter().map()`) create temporary array allocations which can degrade performance in hot rendering loops, such as calendar views.
 **Action:** Use `.lazy.compactMap { ... }` when filtering and mapping elements before appending them to a sequence to avoid O(N) intermediate array allocations and reduce ARC overhead.
+
+## 2026-06-25 - Avoid O(N) array allocation on Set initialization
+**Learning:** Initializing a `Set` via `Set(array.map { ... })` allocates an intermediate mapped array that is immediately discarded after the Set is populated, wasting O(N) memory and causing ARC overhead.
+**Action:** Use `.lazy.map` (e.g. `Set(array.lazy.map { ... })`) to lazily generate elements on demand directly into the Set, preserving O(1) auxiliary memory space during initialization.
+
+## 2026-06-25 - Avoid O(N) intermediate array when chaining map and filter
+**Learning:** Chaining `.map { ... }.filter { ... }` causes Swift to allocate a full array of the mapped elements before the filter step runs, which uses O(N) auxiliary memory space.
+**Action:** Use `.compactMap { ... }` which both transforms and filters elements in a single pass without generating an intermediate array.
