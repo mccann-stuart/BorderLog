@@ -93,3 +93,6 @@
 ## 2026-06-25 - Avoid O(N) intermediate array when chaining map and filter
 **Learning:** Chaining `.map { ... }.filter { ... }` causes Swift to allocate a full array of the mapped elements before the filter step runs, which uses O(N) auxiliary memory space.
 **Action:** Use `.compactMap { ... }` which both transforms and filters elements in a single pass without generating an intermediate array.
+## 2026-06-25 - Avoid Intermediate Array Allocation on Unicode Scalar String Generation
+**Learning:** Initializing strings via loops or mapping over `unicodeScalars` to create `[Character]` or `[UnicodeScalar]` arrays allocates unnecessary heap memory, creating ARC thrashing in high-frequency rendering functions.
+**Action:** Use `unicodeScalars.lazy.compactMap { ... }` combined with `String(String.UnicodeScalarView(scalars))` to map characters and convert them natively in Swift without intermediate array allocations.

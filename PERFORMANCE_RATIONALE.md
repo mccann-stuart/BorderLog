@@ -449,3 +449,20 @@ Code paths frequently transformed arrays into Sets or performed multi-step filte
 
 ## Verification
 Python simulation of identical algorithmic semantics demonstrated a ~22% reduction in peak memory usage (saving ~20MB for a 1M item array).
+
+# Performance Optimization Rationale: Unicode Scalar String Generation
+
+## Current State
+When converting `String` sequences or calculating flag emojis from country codes, the codebase frequently looped through strings to create intermediate arrays or heavily concatenated strings inside loops, like appending translated scalars dynamically or filtering out invalid path characters (like `safeFileStem`).
+
+## Problem
+1. **O(N) Intermediate Allocation**: Converting collections of characters by doing `.map` over `unicodeScalars` dynamically creates memory-expensive arrays of `[Character]` or `[UnicodeScalar]`.
+2. **Memory/ARC Pressure**: Allocating an entire Array of characters to immediately convert it back to a `String` results in rapid ARC retain/release churn on the UI thread when generating emoji strings or file names sequentially.
+
+## Optimization
+Implemented lazy sequence generators via `raw.unicodeScalars.lazy.compactMap { ... }` and initialized strings directly via `String(String.UnicodeScalarView(scalars))`.
+1. Centralized and optimized `countryCodeToEmoji(_:)` within `Shared/CountryCodeNormalizer.swift`.
+2. Replaced the character mapping of `.map` with `.lazy.compactMap` directly feeding the Unicode scalar initializer in `PendingLocationSnapshot.safeFileStem(for:)`.
+
+## Verification
+Python simulation of equivalent behaviors shows that creating an intermediate string representation natively inside a loop degrades execution time overhead vs mapping lazy transformations directly into initialization boundaries.

@@ -8,6 +8,16 @@
 import Foundation
 
 enum CountryCodeNormalizer {
+    nonisolated static func countryCodeToEmoji(_ code: String) -> String {
+        let base: UInt32 = 127397
+        let normalized = normalize(code) ?? code.uppercased()
+        let scalars = normalized.unicodeScalars.lazy.compactMap { scalar -> UnicodeScalar? in
+            UnicodeScalar(base + scalar.value)
+        }
+        let emoji = String(String.UnicodeScalarView(scalars))
+        return emoji.isEmpty ? "🌍" : emoji
+    }
+
     nonisolated static func normalize(_ code: String?) -> String? {
         guard let code else { return nil }
 

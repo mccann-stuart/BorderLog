@@ -43,21 +43,10 @@ struct CountryDaysInfo: Identifiable {
         guard let code = CountryCodeNormalizer.canonicalCode(countryCode: countryCode, countryName: countryName) else {
             return "🌍"
         }
-        return countryCodeToEmoji(code)
+        return CountryCodeNormalizer.countryCodeToEmoji(code)
     }
 }
 
-func countryCodeToEmoji(_ code: String) -> String {
-    let base: UInt32 = 127397
-    var emoji = ""
-    let normalized = CountryCodeNormalizer.normalize(code) ?? code.uppercased()
-    for scalar in normalized.unicodeScalars {
-        if let unicodeScalar = UnicodeScalar(base + scalar.value) {
-            emoji.append(String(unicodeScalar))
-        }
-    }
-    return emoji.isEmpty ? "🌍" : emoji
-}
 
 struct CountryDaysRow: View {
     let info: CountryDaysInfo
