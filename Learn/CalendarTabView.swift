@@ -220,7 +220,7 @@ struct CalendarTabView: View {
 func calendarDayDecorationTokens(for summary: CalendarDaySummary) -> [String] {
     func emoji(for country: CalendarDayCountry) -> String {
         guard let code = country.countryCode else { return "🌍" }
-        return countryCodeToEmoji(code)
+        return CountryCodeNormalizer.countryCodeToEmoji(code)
     }
 
     let flightOriginID = summary.flightOriginCountry?.id

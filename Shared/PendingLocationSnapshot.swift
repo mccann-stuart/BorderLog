@@ -241,10 +241,10 @@ nonisolated struct PendingLocationSnapshot: Codable, Equatable, Sendable {
 
     private static func safeFileStem(for id: String) -> String {
         let allowed = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "-_"))
-        let scalars = id.unicodeScalars.map { scalar in
-            allowed.contains(scalar) ? Character(scalar) : "_"
+        let scalars = id.unicodeScalars.lazy.compactMap { scalar -> UnicodeScalar? in
+            allowed.contains(scalar) ? scalar : UnicodeScalar("_")
         }
-        return String(scalars)
+        return String(String.UnicodeScalarView(scalars))
     }
 
     private static func legacySnapshots(from defaults: UserDefaults) -> [PendingLocationSnapshot] {
