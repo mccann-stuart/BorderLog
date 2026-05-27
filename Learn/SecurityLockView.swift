@@ -3,7 +3,7 @@ import LocalAuthentication
 import os
 
 struct SecurityLockView: View {
-    private let logger = Logger(subsystem: "com.MCCANN.Border", category: "SecurityLockView")
+    private let logger = Logger(subsystem: "com.MCCANN.Border", category: "Security")
 
     @Binding var isUnlocked: Bool
     @State private var authenticationError: String?
@@ -57,6 +57,11 @@ struct SecurityLockView: View {
                 }
             }
         } else {
+            if let error = error {
+                self.logger.error("Device authentication unavailable: \(error, privacy: .private)")
+            } else {
+                self.logger.error("Device authentication unavailable: Unknown error", privacy: .private)
+            }
             DispatchQueue.main.async {
                 self.isUnlocked = false
                 self.authenticationError = "Biometrics and device passcode are unavailable."
