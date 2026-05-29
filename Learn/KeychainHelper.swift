@@ -11,7 +11,7 @@ protocol KeychainHelperProtocol {
 final class KeychainHelper: KeychainHelperProtocol {
     static let standard = KeychainHelper()
     static let defaultAccessibility = kSecAttrAccessibleWhenUnlockedThisDeviceOnly
-    private static let logger = Logger(subsystem: "com.MCCANN.Border", category: "Keychain")
+    private static let logger = Logger(subsystem: "com.MCCANN.Border", category: "Security")
 
     private init() {}
 
@@ -24,7 +24,10 @@ final class KeychainHelper: KeychainHelperProtocol {
         ] as CFDictionary
 
         // Delete any existing item
-        SecItemDelete(deleteQuery)
+        let deleteStatus = SecItemDelete(deleteQuery)
+        if deleteStatus != errSecSuccess && deleteStatus != errSecItemNotFound {
+            Self.logger.error("Error deleting existing item during save to Keychain: \(deleteStatus, privacy: .private)")
+        }
 
         // Create query for adding (with data)
         let addQuery = [
@@ -58,6 +61,9 @@ final class KeychainHelper: KeychainHelperProtocol {
         if status == errSecSuccess {
             return result as? Data
         } else {
+            if status != errSecItemNotFound {
+                Self.logger.error("Error reading from Keychain: \(status, privacy: .private)")
+            }
             return nil
         }
     }
@@ -69,6 +75,9 @@ final class KeychainHelper: KeychainHelperProtocol {
             kSecAttrAccount: account
         ] as CFDictionary
 
-        SecItemDelete(query)
+        let status = SecItemDelete(query)
+        if status != errSecSuccess && status != errSecItemNotFound {
+            Self.logger.error("Error deleting from Keychain: \(status, privacy: .private)")
+        }
     }
 }

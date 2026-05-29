@@ -3,7 +3,7 @@ import LocalAuthentication
 import os
 
 struct SecurityLockView: View {
-    private let logger = Logger(subsystem: "com.MCCANN.Border", category: "SecurityLockView")
+    private let logger = Logger(subsystem: "com.MCCANN.Border", category: "Security")
 
     @Binding var isUnlocked: Bool
     @State private var authenticationError: String?
