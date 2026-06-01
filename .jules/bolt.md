@@ -96,3 +96,6 @@
 ## 2026-06-25 - Avoid Intermediate Array Allocation on Unicode Scalar String Generation
 **Learning:** Initializing strings via loops or mapping over `unicodeScalars` to create `[Character]` or `[UnicodeScalar]` arrays allocates unnecessary heap memory, creating ARC thrashing in high-frequency rendering functions.
 **Action:** Use `unicodeScalars.lazy.compactMap { ... }` combined with `String(String.UnicodeScalarView(scalars))` to map characters and convert them natively in Swift without intermediate array allocations.
+## 2026-06-25 - Avoid redundant sorting and filtering on pre-sorted arrays
+**Learning:** Extracting expired or overflow elements from an array by chaining `.filter` and `.sorted` results in an unnecessary O(N) memory allocation and O(N log N) processing cost. If the input array is already known to be sorted (e.g. by chronological `timestamp`), elements failing criteria are often physically clustered at the boundaries (beginning or end) of the array.
+**Action:** Replace `.filter` and `.sorted` chains on pre-sorted data with a single `for (index, element) in array.enumerated()` pass. Evaluate expiration and overflow conditions in O(1) time and use an early `break` to terminate iteration as soon as valid elements are encountered, thereby reducing both time and memory overhead to O(K) where K is the number of filtered elements.

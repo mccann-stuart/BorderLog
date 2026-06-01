@@ -466,3 +466,24 @@ Implemented lazy sequence generators via `raw.unicodeScalars.lazy.compactMap { .
 
 ## Verification
 Python simulation of equivalent behaviors shows that creating an intermediate string representation natively inside a loop degrades execution time overhead vs mapping lazy transformations directly into initialization boundaries.
+
+# Redundant sorting and filtering in PendingLocationSnapshot
+
+## Current State
+`PendingLocationSnapshot.pruneQueue` utilized standard array transformation chains:
+```swift
+let expiredIDs = snapshots
+    .filter { now.timeIntervalSince($0.timestamp) > maxSnapshotAge }
+    .map(\.id)
+let overflowIDs = snapshots
+    .sorted { $0.timestamp > $1.timestamp }
+    .dropFirst(maxQueuedSnapshots)
+    .map(\.id)
+```
+
+## Problem
+1. **Unnecessary Array Allocation**: The `.filter` closure constructs a new temporary array containing only expired snapshots, and `.map` constructs another array of strings.
+2. **Redundant O(N log N) Sort**: The `snapshots` array is returned from `all()` natively sorted by `timestamp` ascending. Calling `.sorted` in descending order executes a full Timsort pass, creating another intermediate array and squandering CPU cycles.
+
+## Optimization
+Implemented a single linear pass that calculates the overflow threshold beforehand (`max(0, snapshots.count - maxQueuedSnapshots)`) and iterates through the pre-sorted sequence. Since expired and overflow items exist consecutively at the beginning of the array, the loop exits as soon as the first valid snapshot is reached.

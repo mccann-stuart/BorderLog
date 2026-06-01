@@ -275,14 +275,27 @@ nonisolated struct PendingLocationSnapshot: Codable, Equatable, Sendable {
         now: Date
     ) throws {
         let snapshots = all(from: UserDefaults.standard, fileManager: fileManager, queueDirectoryURL: directoryURL)
-        let expiredIDs = snapshots
-            .filter { now.timeIntervalSince($0.timestamp) > maxSnapshotAge }
-            .map(\.id)
-        let overflowIDs = snapshots
-            .sorted { $0.timestamp > $1.timestamp }
-            .dropFirst(maxQueuedSnapshots)
-            .map(\.id)
-        for id in Set(expiredIDs + overflowIDs) {
+
+        var idsToRemove: Set<String> = []
+        let overflowCount = max(0, snapshots.count - maxQueuedSnapshots)
+
+        // ⚡ Bolt: Snapshots are returned sorted by timestamp ascending. We can iterate directly
+        // to find expired and overflowed snapshots (both of which occur at the beginning of the array).
+        // This avoids O(N) array allocations from .filter and O(N log N) sorting overhead.
+        for (index, snapshot) in snapshots.enumerated() {
+            let isOverflow = index < overflowCount
+            let isExpired = now.timeIntervalSince(snapshot.timestamp) > maxSnapshotAge
+
+            if isOverflow || isExpired {
+                idsToRemove.insert(snapshot.id)
+            } else {
+                // Since the array is sorted by timestamp ascending, if the current item is neither
+                // expired nor overflowed, all subsequent items will also be valid.
+                break
+            }
+        }
+
+        for id in idsToRemove {
             let fileURL = fileURL(for: id, in: directoryURL)
             if fileManager.fileExists(atPath: fileURL.path) {
                 try fileManager.removeItem(at: fileURL)
