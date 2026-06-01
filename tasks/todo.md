@@ -97,3 +97,11 @@
 - Refactored `Shared/CloudKitDataResetService.swift` to use `.compactMap` instead of chaining `.map` and `.filter`, completing the transformation in a single pass without intermediate array allocation.
 - Simulated the algorithmic improvements using python since the Swift toolchain was unavailable, showing an approximate 22% memory peak usage reduction compared to standard map/filter chaining.
 - Documented changes in `PERFORMANCE_RATIONALE.md`.
+
+## Sentinel Security Fix: Keychain Logging improvements
+<!-- id: keychain_logging_fix -->
+- [x] Document Sentinel learning on keychain error logging and category centralization.
+- [x] Centralize `Logger` categories in `KeychainHelper` and `SecurityLockView` to `Security`.
+- [x] Add missing error logging for `KeychainHelper.read`, `KeychainHelper.delete`, and the existing-item deletion portion of `KeychainHelper.save`.
+- [x] Make sure to ignore `errSecItemNotFound` inside the added `KeychainHelper` logging.
+- [x] Verify changes.
