@@ -111,7 +111,8 @@ struct DashboardView: View {
     
     var body: some View {
         let visitedSummary = visitedCountriesSummaryData
-        let visitedCountryCodes = Set(visitedSummary.countries.compactMap(\.countryCode))
+        // ⚡ Bolt: Use .lazy.compactMap to avoid allocating an intermediate array when initializing a Set
+        let visitedCountryCodes = Set(visitedSummary.countries.lazy.compactMap(\.countryCode))
 
         ScrollView {
             VStack(spacing: 20) {
