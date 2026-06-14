@@ -440,7 +440,11 @@ nonisolated private struct PresenceResultCompiler {
         fillSuggestions(results: &sortedResults)
         applyTravelBackedTransitionInfill(results: &sortedResults, travelEvents: travelEvents)
 
-        return sortedResults.map(markContributingEvidence)
+        for i in 0..<sortedResults.count {
+            markContributingEvidence(in: &sortedResults[i])
+        }
+
+        return sortedResults
     }
 
     private func baseResult(for dayKey: String, date: Date, timeZoneId: String?, dayState: DayInferenceState) -> PresenceDayResult {
@@ -1016,40 +1020,23 @@ nonisolated private struct PresenceResultCompiler {
         )
     }
 
-    private func markContributingEvidence(_ result: PresenceDayResult) -> PresenceDayResult {
+    // ⚡ Bolt: Mutate evidenceEntries in-place using nested for-loops instead of
+    // replacing the entire array with `.map`. This avoids O(N*M) heap allocations
+    // for [PresenceEvidenceEntry] arrays and [PresenceDayResult] wrapper generation,
+    // drastically reducing ARC overhead for large inference tasks.
+    private func markContributingEvidence(in result: inout PresenceDayResult) {
         let selectedCountries = result.countryAllocations
-        let updatedEvidence = result.evidenceEntries.map { entry in
-            var mutable = entry
-            mutable.contributedToFinalResult =
-                selectedCountries.contains(where: { allocation in
-                    if let countryCode = entry.countryCode, let allocationCode = allocation.countryCode {
-                        return countryCode == allocationCode
-                    }
-                    return entry.countryName.caseInsensitiveCompare(allocation.countryName) == .orderedSame
-                }) || entry.phase == .override
-            return mutable
-        }
+        for i in 0..<result.evidenceEntries.count {
+            let entry = result.evidenceEntries[i]
+            let contributed = selectedCountries.contains(where: { allocation in
+                if let countryCode = entry.countryCode, let allocationCode = allocation.countryCode {
+                    return countryCode == allocationCode
+                }
+                return entry.countryName.caseInsensitiveCompare(allocation.countryName) == .orderedSame
+            }) || entry.phase == .override
 
-        return PresenceDayResult(
-            dayKey: result.dayKey,
-            date: result.date,
-            timeZoneId: result.timeZoneId,
-            countryAllocations: result.countryAllocations,
-            zoneOverlays: result.zoneOverlays,
-            evidenceEntries: updatedEvidence,
-            confidenceBreakdown: result.confidenceBreakdown,
-            sourceSummary: result.sourceSummary,
-            isOverride: result.isOverride,
-            isDisputed: result.isDisputed,
-            stayCount: result.stayCount,
-            photoCount: result.photoCount,
-            locationCount: result.locationCount,
-            calendarCount: result.calendarCount,
-            suggestedCountryCode1: result.suggestedCountryCode1,
-            suggestedCountryName1: result.suggestedCountryName1,
-            suggestedCountryCode2: result.suggestedCountryCode2,
-            suggestedCountryName2: result.suggestedCountryName2
-        )
+            result.evidenceEntries[i].contributedToFinalResult = contributed
+        }
     }
 
     private func isEligibleForAdjacentTravelPromotion(_ result: PresenceDayResult) -> Bool {
