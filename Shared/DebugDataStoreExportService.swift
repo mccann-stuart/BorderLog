@@ -815,23 +815,51 @@ actor DebugDataStoreExportService {
         } ?? TimeZone.current.identifier
     }
 
+    // ⚡ Bolt: Use O(1) auxiliary memory by iterating over elements directly
+    // rather than mapping to an intermediate [Date] array.
     private static func dateRange<T>(
         for items: [T],
         at keyPath: KeyPath<T, Date>
     ) -> DebugExportDateRange? {
         guard !items.isEmpty else { return nil }
-        let dates = items.map { $0[keyPath: keyPath] }
-        guard let earliest = dates.min(), let latest = dates.max() else { return nil }
+        var earliest = items[0][keyPath: keyPath]
+        var latest = earliest
+
+        for item in items.dropFirst() {
+            let date = item[keyPath: keyPath]
+            if date < earliest { earliest = date }
+            if date > latest { latest = date }
+        }
+
         return DebugExportDateRange(earliest: earliest, latest: latest)
     }
 
+    // ⚡ Bolt: Avoid O(N) allocation from flatMap and calculate min/max in a single pass.
     private static func dateRange<T>(
         for items: [T],
         dates: (T) -> [Date]
     ) -> DebugExportDateRange? {
-        let flattenedDates = items.flatMap(dates)
-        guard let earliest = flattenedDates.min(), let latest = flattenedDates.max() else { return nil }
-        return DebugExportDateRange(earliest: earliest, latest: latest)
+        var earliest: Date?
+        var latest: Date?
+
+        for item in items {
+            for date in dates(item) {
+                if let e = earliest {
+                    if date < e { earliest = date }
+                } else {
+                    earliest = date
+                }
+
+                if let l = latest {
+                    if date > l { latest = date }
+                } else {
+                    latest = date
+                }
+            }
+        }
+
+        guard let finalEarliest = earliest, let finalLatest = latest else { return nil }
+        return DebugExportDateRange(earliest: finalEarliest, latest: finalLatest)
     }
 
     private static func sourceLabels(for sources: SignalSourceMask) -> [String] {
