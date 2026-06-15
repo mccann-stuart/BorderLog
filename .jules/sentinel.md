@@ -17,3 +17,8 @@
 **Vulnerability:** The Keychain accessibility class `kSecAttrAccessibleWhenUnlockedThisDeviceOnly` was used for sensitive data. This allows data to be read even when the device is locked, if it was unlocked once after booting.
 **Learning:** For sensitive app data, especially when it acts as an authentication/session mechanism, it should be bound to the passcode. Using `WhenUnlockedThisDeviceOnly` only protects it before the *first* unlock, after which it remains available in memory for any process that can access the keychain group until the device reboots.
 **Prevention:** Always use `kSecAttrAccessibleWhenPasscodeSetThisDeviceOnly` for sensitive data stored in the iOS Keychain. This ensures that a device passcode is mandatory and that the data is encrypted using a key derived from the passcode.
+
+## 2026-06-25 - Hardcoded Keychain Access Groups
+**Vulnerability:** Hardcoding Apple Team IDs in source code to configure `kSecAttrAccessGroup` for cross-target Keychain sharing (like App Extensions).
+**Learning:** Hardcoding team IDs reduces project portability, breaks builds when signing certificates change or are re-provisioned, and exposes internal team identifiers unnecessarily.
+**Prevention:** Always use a dynamic runtime resolution strategy to determine the Team ID. This can be achieved by writing a dummy item to the keychain and immediately reading its `kSecAttrAccessGroup` property, which the OS automatically populates with the correct active Team ID prefix.
