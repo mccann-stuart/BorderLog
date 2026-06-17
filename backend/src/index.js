@@ -27,6 +27,8 @@ const getSecurityHeaders = (baseHeaders) => {
 const createErrorResponse = (message, status) => {
   const headers = getSecurityHeaders();
   headers.set("Content-Type", "text/plain; charset=UTF-8");
+  // Prevent caching of error responses
+  headers.set("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
   return new Response(message, {
     status: status,
     headers: headers
