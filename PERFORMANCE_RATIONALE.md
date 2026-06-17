@@ -487,3 +487,8 @@ let overflowIDs = snapshots
 
 ## Optimization
 Implemented a single linear pass that calculates the overflow threshold beforehand (`max(0, snapshots.count - maxQueuedSnapshots)`) and iterates through the pre-sorted sequence. Since expired and overflow items exist consecutively at the beginning of the array, the loop exits as soon as the first valid snapshot is reached.
+
+### Avoid Min/Max after Map or FlatMap
+* **Rationale:** In Swift, calling `.min()` or `.max()` on a collection transformed via `.map { ... }` or `.flatMap { ... }` forces an O(N) allocation of the intermediate array on the heap.
+* **Implementation:** Instead of using functional chained modifiers like `items.map { ... }.min()`, use a single iteration `for` loop passing over the items, extracting the property and storing it in a local tracking variable using O(1) memory.
+* **Verification:** Validated memory retention logic using an algorithmic simulation in python as testing the memory layout of swift directly in an untethered environment isn't possible.

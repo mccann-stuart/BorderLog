@@ -99,3 +99,6 @@
 ## 2026-06-25 - Avoid redundant sorting and filtering on pre-sorted arrays
 **Learning:** Extracting expired or overflow elements from an array by chaining `.filter` and `.sorted` results in an unnecessary O(N) memory allocation and O(N log N) processing cost. If the input array is already known to be sorted (e.g. by chronological `timestamp`), elements failing criteria are often physically clustered at the boundaries (beginning or end) of the array.
 **Action:** Replace `.filter` and `.sorted` chains on pre-sorted data with a single `for (index, element) in array.enumerated()` pass. Evaluate expiration and overflow conditions in O(1) time and use an early `break` to terminate iteration as soon as valid elements are encountered, thereby reducing both time and memory overhead to O(K) where K is the number of filtered elements.
+## 2024-06-25 - Avoid intermediate allocations when finding min/max in mapped properties
+**Learning:** Using chained operations like `.map { ... }.min()` or `.flatMap { ... }.max()` creates unnecessary intermediate arrays (heap allocations) in Swift, which can cause performance bottlenecks in high-frequency functions or loops (e.g. exporting logs, debug endpoints).
+**Action:** Replace `.map` + `.min()`/`.max()` with a single manual `for` loop passing over the original collection while using O(1) tracking variables.

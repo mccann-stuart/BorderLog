@@ -820,8 +820,17 @@ actor DebugDataStoreExportService {
         at keyPath: KeyPath<T, Date>
     ) -> DebugExportDateRange? {
         guard !items.isEmpty else { return nil }
-        let dates = items.map { $0[keyPath: keyPath] }
-        guard let earliest = dates.min(), let latest = dates.max() else { return nil }
+
+        // ⚡ Bolt: Replace intermediate O(N) array allocation with a single O(N) iteration and O(1) memory trackers
+        var earliest = items[0][keyPath: keyPath]
+        var latest = items[0][keyPath: keyPath]
+
+        for item in items.dropFirst() {
+            let date = item[keyPath: keyPath]
+            if date < earliest { earliest = date }
+            else if date > latest { latest = date }
+        }
+
         return DebugExportDateRange(earliest: earliest, latest: latest)
     }
 
@@ -829,8 +838,22 @@ actor DebugDataStoreExportService {
         for items: [T],
         dates: (T) -> [Date]
     ) -> DebugExportDateRange? {
-        let flattenedDates = items.flatMap(dates)
-        guard let earliest = flattenedDates.min(), let latest = flattenedDates.max() else { return nil }
+        var earliest: Date?
+        var latest: Date?
+
+        // ⚡ Bolt: Replace intermediate O(N) array allocation from flatMap with a single pass and O(1) memory trackers
+        for item in items {
+            for date in dates(item) {
+                if earliest == nil || date < earliest! {
+                    earliest = date
+                }
+                if latest == nil || date > latest! {
+                    latest = date
+                }
+            }
+        }
+
+        guard let earliest = earliest, let latest = latest else { return nil }
         return DebugExportDateRange(earliest: earliest, latest: latest)
     }
 
