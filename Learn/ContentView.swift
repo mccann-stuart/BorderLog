@@ -37,18 +37,41 @@ struct ContentView: View {
     @State private var schengenState = SchengenState()
     @State private var ledgerFilter: LedgerFilter = .all
 
+    // ⚡ Bolt: Fast Prefix Extraction - Avoid allocating multiple lazy iterators and arrays.
     private var previewPresenceDays: [PresenceDay] {
         switch ledgerFilter {
         case .all:
             return Array(presenceDays.prefix(5))
         case .unknown:
-            return Array(presenceDays.lazy.filter { day in
-                day.countryCode == nil && day.countryName == nil
-            }.prefix(5))
+            var results: [PresenceDay] = []
+            results.reserveCapacity(5)
+            for day in presenceDays {
+                if day.countryCode == nil && day.countryName == nil {
+                    results.append(day)
+                    if results.count == 5 { break }
+                }
+            }
+            return results
         case .manual:
-            return Array(presenceDays.lazy.filter { $0.isManuallyModified }.prefix(5))
+            var results: [PresenceDay] = []
+            results.reserveCapacity(5)
+            for day in presenceDays {
+                if day.isManuallyModified {
+                    results.append(day)
+                    if results.count == 5 { break }
+                }
+            }
+            return results
         case .disputed:
-            return Array(presenceDays.lazy.filter { $0.isDisputed && !$0.isManuallyModified }.prefix(5))
+            var results: [PresenceDay] = []
+            results.reserveCapacity(5)
+            for day in presenceDays {
+                if day.isDisputed && !day.isManuallyModified {
+                    results.append(day)
+                    if results.count == 5 { break }
+                }
+            }
+            return results
         }
     }
 
