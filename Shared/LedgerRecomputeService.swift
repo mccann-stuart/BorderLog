@@ -217,7 +217,12 @@ public actor LedgerRecomputeService {
         let twoYearsAgo = calendar.date(byAdding: .year, value: -2, to: today) ?? today
         let earliestSignal = try? self.earliestSignalDate()
 
-        let earliest = [earliestSignal, twoYearsAgo].compactMap { $0 }.min() ?? twoYearsAgo
+        // ⚡ Bolt: Avoid intermediate array allocation by computing the minimum manually.
+        var earliestDate = twoYearsAgo
+        if let s = earliestSignal, s < earliestDate {
+            earliestDate = s
+        }
+        let earliest = earliestDate
         let dayKeys = self.makeDayKeys(from: earliest, to: today, calendar: calendar)
         await self.recompute(dayKeys: dayKeys)
     }
@@ -383,7 +388,13 @@ public actor LedgerRecomputeService {
     private func coverageLowerBound(today: Date, calendar: Calendar) throws -> Date {
         let twoYearsAgo = calendar.date(byAdding: .year, value: -2, to: today) ?? today
         let earliestSignal = try earliestSignalDate().map { calendar.startOfDay(for: $0) }
-        return [earliestSignal, twoYearsAgo].compactMap { $0 }.min() ?? twoYearsAgo
+
+        // ⚡ Bolt: Avoid intermediate array allocation by computing the minimum manually.
+        var earliestDate = twoYearsAgo
+        if let s = earliestSignal, s < earliestDate {
+            earliestDate = s
+        }
+        return earliestDate
     }
 
     private func earliestSignalDate() throws -> Date? {
@@ -392,6 +403,16 @@ public actor LedgerRecomputeService {
         let l = try dataFetcher.fetchEarliestLocationDate()
         let p = try dataFetcher.fetchEarliestPhotoDate()
         let c = try dataFetcher.fetchEarliestCalendarSignalDate()
-        return [s, o, l, p, c].compactMap { $0 }.min()
+
+        // ⚡ Bolt: Avoid intermediate array allocation by tracking the minimum manually.
+        var earliest: Date? = nil
+        for case let val? in [s, o, l, p, c] {
+            if let current = earliest {
+                if val < current { earliest = val }
+            } else {
+                earliest = val
+            }
+        }
+        return earliest
     }
 }
