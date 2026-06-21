@@ -23,6 +23,7 @@ function assertSecurityHeaders(res) {
 function assertErrorHeaders(res) {
   assertSecurityHeaders(res);
   assert.strictEqual(res.headers.get("Content-Type"), "text/plain; charset=UTF-8", "Missing or incorrect Content-Type for error response");
+  assert.strictEqual(res.headers.get("Cache-Control"), "no-store, no-cache, must-revalidate, proxy-revalidate", "Missing or incorrect Cache-Control for error response");
 }
 
 // Helper to run test
