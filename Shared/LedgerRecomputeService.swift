@@ -217,7 +217,10 @@ public actor LedgerRecomputeService {
         let twoYearsAgo = calendar.date(byAdding: .year, value: -2, to: today) ?? today
         let earliestSignal = try? self.earliestSignalDate()
 
-        let earliest = [earliestSignal, twoYearsAgo].compactMap { $0 }.min() ?? twoYearsAgo
+        var earliest = twoYearsAgo
+        if let earliestSignal = earliestSignal, earliestSignal < earliest {
+            earliest = earliestSignal
+        }
         let dayKeys = self.makeDayKeys(from: earliest, to: today, calendar: calendar)
         await self.recompute(dayKeys: dayKeys)
     }
@@ -383,7 +386,12 @@ public actor LedgerRecomputeService {
     private func coverageLowerBound(today: Date, calendar: Calendar) throws -> Date {
         let twoYearsAgo = calendar.date(byAdding: .year, value: -2, to: today) ?? today
         let earliestSignal = try earliestSignalDate().map { calendar.startOfDay(for: $0) }
-        return [earliestSignal, twoYearsAgo].compactMap { $0 }.min() ?? twoYearsAgo
+
+        var earliest = twoYearsAgo
+        if let earliestSignal = earliestSignal, earliestSignal < earliest {
+            earliest = earliestSignal
+        }
+        return earliest
     }
 
     private func earliestSignalDate() throws -> Date? {
@@ -392,6 +400,13 @@ public actor LedgerRecomputeService {
         let l = try dataFetcher.fetchEarliestLocationDate()
         let p = try dataFetcher.fetchEarliestPhotoDate()
         let c = try dataFetcher.fetchEarliestCalendarSignalDate()
-        return [s, o, l, p, c].compactMap { $0 }.min()
+
+        var earliest: Date? = nil
+        if let s = s, (earliest == nil || s < earliest!) { earliest = s }
+        if let o = o, (earliest == nil || o < earliest!) { earliest = o }
+        if let l = l, (earliest == nil || l < earliest!) { earliest = l }
+        if let p = p, (earliest == nil || p < earliest!) { earliest = p }
+        if let c = c, (earliest == nil || c < earliest!) { earliest = c }
+        return earliest
     }
 }
