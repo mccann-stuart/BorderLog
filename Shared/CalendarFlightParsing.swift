@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import os
 
 struct CalendarEventTextSnapshot: Sendable {
     let title: String?
@@ -40,29 +41,40 @@ enum CalendarEventIngestability: Sendable {
 
 enum CalendarFlightParsing {
 
+    private nonisolated static let logger = Logger(subsystem: "com.MCCANN.Border", category: "Security")
+    private nonisolated static func makeRegex(pattern: String, options: NSRegularExpression.Options = []) -> NSRegularExpression {
+        do {
+            return try NSRegularExpression(pattern: pattern, options: options)
+        } catch {
+            logger.error("Failed to compile regex with pattern '\(pattern, privacy: .private)': \(error, privacy: .private)")
+            return try! NSRegularExpression(pattern: "(?!) ", options: [])
+        }
+    }
+
+
     // MARK: - Regex Patterns
 
-    private nonisolated static let patternFromTo = try! NSRegularExpression(pattern: "(?:from\\s+(.+?)\\s+to\\s+(.+))", options: [.caseInsensitive])
-    private nonisolated static let patternTo = try! NSRegularExpression(pattern: "(?:flight|train|ferry|bus)\\s+to\\s+(.+)", options: [.caseInsensitive])
-    private nonisolated static let patternHotel = try! NSRegularExpression(pattern: "hotel\\s+(?:in|at)\\s+(.+)", options: [.caseInsensitive])
-    private nonisolated static let patternFlightNumberRoute = try! NSRegularExpression(
+    private nonisolated static let patternFromTo = makeRegex(pattern: "(?:from\\s+(.+?)\\s+to\\s+(.+))", options: [.caseInsensitive])
+    private nonisolated static let patternTo = makeRegex(pattern: "(?:flight|train|ferry|bus)\\s+to\\s+(.+)", options: [.caseInsensitive])
+    private nonisolated static let patternHotel = makeRegex(pattern: "hotel\\s+(?:in|at)\\s+(.+)", options: [.caseInsensitive])
+    private nonisolated static let patternFlightNumberRoute = makeRegex(
         pattern: "flight\\s*[:\\-]?\\s*[A-Z]{1,3}\\s*\\d{1,4}\\s+(.+?)\\s+to\\s+(.+)",
         options: [.caseInsensitive]
     )
-    private nonisolated static let patternLineRoute = try! NSRegularExpression(
+    private nonisolated static let patternLineRoute = makeRegex(
         pattern: "^\\s*([\\p{L}][\\p{L}\\p{M} .'-]{1,80}?)\\s+to\\s+([\\p{L}][\\p{L}\\p{M} .'-]{1,80}?)\\s*$",
         options: [.caseInsensitive, .anchorsMatchLines]
     )
-    private nonisolated static let patternPlane = try! NSRegularExpression(pattern: "(.+?)\\s*✈\\s*(.+)", options: [])
-    private nonisolated static let patternPlaneEmoji = try! NSRegularExpression(pattern: "(.+?)\\s*✈️\\s*(.+)", options: [])
-    private nonisolated static let patternCodes = try! NSRegularExpression(pattern: "\\b([A-Z]{3})\\s*(?:[-/→]|->)\\s*([A-Z]{3})\\b", options: [])
+    private nonisolated static let patternPlane = makeRegex(pattern: "(.+?)\\s*✈\\s*(.+)", options: [])
+    private nonisolated static let patternPlaneEmoji = makeRegex(pattern: "(.+?)\\s*✈️\\s*(.+)", options: [])
+    private nonisolated static let patternCodes = makeRegex(pattern: "\\b([A-Z]{3})\\s*(?:[-/→]|->)\\s*([A-Z]{3})\\b", options: [])
 
-    private nonisolated static let patternWhitespace = try! NSRegularExpression(pattern: "\\s+", options: [])
-    private nonisolated static let patternFlightSuffix = try! NSRegularExpression(
+    private nonisolated static let patternWhitespace = makeRegex(pattern: "\\s+", options: [])
+    private nonisolated static let patternFlightSuffix = makeRegex(
         pattern: "\\s*\\([A-Z]{1,3}\\s*\\d{1,4}\\)\\s*$",
         options: [.caseInsensitive]
     )
-    private nonisolated static let patternWeekdaySuffix = try! NSRegularExpression(
+    private nonisolated static let patternWeekdaySuffix = makeRegex(
         pattern: "\\s+(?:Mon(?:day)?|Tue(?:sday)?|Wed(?:nesday)?|Thu(?:rsday)?|Fri(?:day)?|Sat(?:urday)?|Sun(?:day)?)\\b.*$",
         options: [.caseInsensitive]
     )
