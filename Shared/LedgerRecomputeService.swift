@@ -217,7 +217,12 @@ public actor LedgerRecomputeService {
         let twoYearsAgo = calendar.date(byAdding: .year, value: -2, to: today) ?? today
         let earliestSignal = try? self.earliestSignalDate()
 
-        let earliest = [earliestSignal, twoYearsAgo].compactMap { $0 }.min() ?? twoYearsAgo
+        // ⚡ Bolt: Avoid intermediate O(N) array allocation from .compactMap { $0 }.min()
+        var earliest = twoYearsAgo
+        if let earliestSignal = earliestSignal, earliestSignal < earliest {
+            earliest = earliestSignal
+        }
+
         let dayKeys = self.makeDayKeys(from: earliest, to: today, calendar: calendar)
         await self.recompute(dayKeys: dayKeys)
     }
@@ -383,7 +388,13 @@ public actor LedgerRecomputeService {
     private func coverageLowerBound(today: Date, calendar: Calendar) throws -> Date {
         let twoYearsAgo = calendar.date(byAdding: .year, value: -2, to: today) ?? today
         let earliestSignal = try earliestSignalDate().map { calendar.startOfDay(for: $0) }
-        return [earliestSignal, twoYearsAgo].compactMap { $0 }.min() ?? twoYearsAgo
+
+        // ⚡ Bolt: Avoid intermediate O(N) array allocation from .compactMap { $0 }.min()
+        var earliest = twoYearsAgo
+        if let earliestSignal = earliestSignal, earliestSignal < earliest {
+            earliest = earliestSignal
+        }
+        return earliest
     }
 
     private func earliestSignalDate() throws -> Date? {
@@ -392,6 +403,18 @@ public actor LedgerRecomputeService {
         let l = try dataFetcher.fetchEarliestLocationDate()
         let p = try dataFetcher.fetchEarliestPhotoDate()
         let c = try dataFetcher.fetchEarliestCalendarSignalDate()
-        return [s, o, l, p, c].compactMap { $0 }.min()
+
+        // ⚡ Bolt: Avoid unnecessary O(N) intermediate array allocation when calculating min() over optional properties
+        var minDate: Date? = nil
+        for date in [s, o, l, p, c] {
+            if let d = date {
+                if let currentMin = minDate {
+                    if d < currentMin { minDate = d }
+                } else {
+                    minDate = d
+                }
+            }
+        }
+        return minDate
     }
 }

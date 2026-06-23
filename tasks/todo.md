@@ -105,3 +105,7 @@
 - [x] Add missing error logging for `KeychainHelper.read`, `KeychainHelper.delete`, and the existing-item deletion portion of `KeychainHelper.save`.
 - [x] Make sure to ignore `errSecItemNotFound` inside the added `KeychainHelper` logging.
 - [x] Verify changes.
+<!-- id: 101 -->
+- **Task:** Optimize `min()` operations in `Shared/LedgerRecomputeService.swift`
+- **Action:** Replaced `.compactMap { $0 }.min()` pattern with O(1) manual variable tracking in a loop.
+- **Status:** Complete

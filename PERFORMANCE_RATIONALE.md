@@ -487,3 +487,6 @@ let overflowIDs = snapshots
 
 ## Optimization
 Implemented a single linear pass that calculates the overflow threshold beforehand (`max(0, snapshots.count - maxQueuedSnapshots)`) and iterates through the pre-sorted sequence. Since expired and overflow items exist consecutively at the beginning of the array, the loop exits as soon as the first valid snapshot is reached.
+
+### Ledger Recompute Min Evaluation Optimization
+In `Shared/LedgerRecomputeService.swift`, finding the earliest signal date involved chaining `.compactMap` and `.min()` (e.g. `[s, o, l, p, c].compactMap { $0 }.min()`). This causes an intermediate O(N) array allocation. This has been replaced by explicit, inline tracking variables over manually iterated tuples/arrays which computes the minimum value directly in O(N) time but drops auxiliary memory from O(N) to O(1).
