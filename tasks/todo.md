@@ -1,3 +1,21 @@
+# App Store Launch Blocker Resolution Plan (9 Jul 2026)
+
+- [x] Establish the current Release build, archive, test, and Simulator-launch baseline without disturbing existing user changes.
+- [x] Audit app and widget metadata, signing/capabilities, privacy declarations, release-only feature gates, and current Apple submission requirements.
+- [x] Reproduce and classify every confirmed launch blocker; separate code/repository fixes from App Store Connect manual work.
+- [x] Implement the smallest root-cause fixes for confirmed repository-owned blockers and add focused regression coverage where behaviour changes.
+- [x] Verify a clean Release build/archive path, focused tests, app launch, key onboarding/settings flows, packaged entitlements/privacy manifests, and runtime logs.
+- [x] Self-review the final diff and add a concise review section with residual manual submission steps and risks.
+
+## App Store Launch Blocker Resolution Review
+
+- Removed the conflicting manual signing identity while retaining automatic signing, restored the orphaned `LearnUITests` target, aligned the app/widget/test deployment targets at iOS 26.0, made the widget universal, enabled Release dSYMs, and kept coverage/testability out of Release packaging.
+- Added the encryption declaration, completed the app/widget UserDefaults required-reason declarations, excluded developer documentation from the app bundle, flattened the App Store icon sources to opaque RGB, and kept app/widget version metadata in sync.
+- Made the 1.0 product posture consistently account-free and local-first, expanded the in-app privacy/retention controls, and added tested `/privacy` and `/support` Worker routes for App Store Connect metadata without deploying them.
+- Resolved the existing calendar parsing/ordering, cross-time-zone stay and Schengen, SwiftData ledger filtering, inference expectation, and pending-location queue failures uncovered by the full test plan. Concurrent queue pruning is now idempotent and tests no longer depend on a date that can age beyond retention.
+- Verification passed: 199 tests discovered with 194 executions and no failures, clean Release simulator build/install/launch, clean runtime logs, both Worker test and Wrangler dry-run paths, and an unsigned generic-device archive whose binaries, plists, privacy manifests, dSYMs, icons, extension family and source exclusions were inspected.
+- The signed archive now fails only because this machine has no provisioning profiles for `com.MCCANN.BorderLog` or `com.MCCANN.BorderLog.BorderLogWidget`; the previous conflicting-signing error is gone. Before upload, install the current stable App Store-supported Xcode, create/select the distribution certificate and profiles with the App Group capability, deploy the Worker pages, and enter their public URLs plus the matching privacy answers in App Store Connect.
+
 # Xcode Console Validation Plan
 
 # App Store Launch Compliance Review Plan

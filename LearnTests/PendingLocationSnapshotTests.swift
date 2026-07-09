@@ -8,7 +8,7 @@ final class PendingLocationSnapshotTests: XCTestCase {
         let (defaults, suiteName) = try makeDefaults()
         defer { defaults.removePersistentDomain(forName: suiteName) }
 
-        let baseDate = Date(timeIntervalSince1970: 1_777_000_000)
+        let baseDate = Date().addingTimeInterval(-60)
         let snapshots = (0..<50).map { index in
             PendingLocationSnapshot(
                 timestamp: baseDate.addingTimeInterval(TimeInterval(index)),
@@ -50,7 +50,7 @@ final class PendingLocationSnapshotTests: XCTestCase {
         defer { defaults.removePersistentDomain(forName: suiteName) }
 
         let snapshot = PendingLocationSnapshot(
-            timestamp: Date(timeIntervalSince1970: 1_777_000_000),
+            timestamp: Date().addingTimeInterval(-60),
             latitude: 48.8566,
             longitude: 2.3522,
             accuracyMeters: 20,

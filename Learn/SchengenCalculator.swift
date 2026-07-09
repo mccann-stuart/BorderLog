@@ -36,41 +36,54 @@ enum SchengenCalculator {
         // --- 1. Collect and Merge Intervals ---
         var mergedIntervals: [Interval] = []
 
-        // Optimization: Stays are typically reverse-sorted by enteredOn (descending) from the query.
-        // We iterate in reverse to process them in chronological order (ascending),
-        // allowing us to merge intervals on-the-fly without an intermediate array or sort.
+        // Callers normally provide reverse-sorted SwiftData rows. Keep that contract check,
+        // but sort again after civil-day normalization: absolute Date ordering can invert
+        // across the International Date Line even when the stored day keys are consecutive.
         assert(zip(stays, stays.dropFirst()).allSatisfy { $0.enteredOn >= $1.enteredOn },
                "SchengenCalculator.summary expects stays to be sorted descending by enteredOn")
 
-        for stay in stays.reversed() where stay.region == .schengen {
-            let stayStart = calendar.startOfDay(for: stay.enteredOn)
-            let stayEnd = calendar.startOfDay(for: stay.exitedOn ?? referenceDate)
+        let normalizedIntervals = stays.compactMap { stay -> Interval? in
+            guard stay.region == .schengen else { return nil }
+            let stayStart = normalizedDate(
+                dayKey: stay.entryDayKey,
+                fallback: stay.enteredOn,
+                calendar: calendar
+            )
+            let stayEnd = stay.exitDayKey.flatMap { DayKey.date(for: $0, timeZone: calendar.timeZone) }
+                ?? calendar.startOfDay(for: stay.exitedOn ?? referenceDate)
 
             // Skip if out of window
             if stayEnd < windowStart || stayStart > windowEnd {
-                continue
+                return nil
             }
 
             let clampedStart = max(stayStart, windowStart)
             let clampedEnd = min(stayEnd, windowEnd)
+            guard clampedStart <= clampedEnd else { return nil }
+            return Interval(start: clampedStart, end: clampedEnd)
+        }.sorted { lhs, rhs in
+            if lhs.start == rhs.start {
+                return lhs.end < rhs.end
+            }
+            return lhs.start < rhs.start
+        }
 
-            guard clampedStart <= clampedEnd else { continue }
-
+        for interval in normalizedIntervals {
             if let lastInterval = mergedIntervals.last {
                 // Check for overlap or adjacency
                 // Since we process in order, new start >= last start.
                 // We just check if new start <= last end + 1 day.
                 if let nextDay = calendar.date(byAdding: .day, value: 1, to: lastInterval.end),
-                   nextDay >= clampedStart {
+                   nextDay >= interval.start {
                     // Merge if overlapping or adjacent
-                    if clampedEnd > lastInterval.end {
-                        mergedIntervals[mergedIntervals.count - 1].end = clampedEnd
+                    if interval.end > lastInterval.end {
+                        mergedIntervals[mergedIntervals.count - 1].end = interval.end
                     }
                 } else {
-                    mergedIntervals.append(Interval(start: clampedStart, end: clampedEnd))
+                    mergedIntervals.append(interval)
                 }
             } else {
-                mergedIntervals.append(Interval(start: clampedStart, end: clampedEnd))
+                mergedIntervals.append(interval)
             }
         }
 
@@ -86,7 +99,11 @@ enum SchengenCalculator {
         // Map: Date -> Region (last one wins)
         var overrideMap: [Date: Region] = [:]
         for overrideDay in overrides {
-            let day = calendar.startOfDay(for: overrideDay.date)
+            let day = normalizedDate(
+                dayKey: overrideDay.dayKey,
+                fallback: overrideDay.date,
+                calendar: calendar
+            )
             if day >= windowStart && day <= windowEnd {
                 overrideMap[day] = overrideDay.region
             }
@@ -127,6 +144,20 @@ enum SchengenCalculator {
         )
     }
 
+    nonisolated private static func normalizedDate(
+        dayKey: String?,
+        fallback: Date,
+        calendar: Calendar
+    ) -> Date {
+        // Day keys preserve the user's selected civil date when the calculation calendar
+        // differs from the time zone in which SwiftData normalized the stored Date.
+        if let dayKey,
+           let normalizedDate = DayKey.date(for: dayKey, timeZone: calendar.timeZone) {
+            return normalizedDate
+        }
+        return calendar.startOfDay(for: fallback)
+    }
+
     @MainActor
     static func summary(
         for stays: [Stay],
@@ -138,13 +169,16 @@ enum SchengenCalculator {
             StayInfo(
                 enteredOn: $0.enteredOn,
                 exitedOn: $0.exitedOn,
-                region: $0.region
+                region: $0.region,
+                entryDayKey: $0.entryDayKey,
+                exitDayKey: $0.exitDayKey
             )
         }
         let overrideInfos = overrides.map {
             OverrideInfo(
                 date: $0.date,
-                region: $0.region
+                region: $0.region,
+                dayKey: $0.dayKey
             )
         }
 

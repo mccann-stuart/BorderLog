@@ -165,6 +165,14 @@ enum CalendarFlightParsing {
                 )
             }
 
+            if let match = patternTo.firstMatch(in: text, options: [], range: range),
+               match.numberOfRanges >= 2 {
+                if bestTo == nil {
+                    bestTo = normalizeLocationToken(nsString.substring(with: match.range(at: 1)))
+                }
+                continue
+            }
+
             do {
                 let preprocessedNSString = preprocessedText as NSString
                 let preprocessedRange = NSRange(location: 0, length: preprocessedNSString.length)
@@ -175,12 +183,6 @@ enum CalendarFlightParsing {
                         normalizeLocationToken(preprocessedNSString.substring(with: match.range(at: 2)))
                     )
                 }
-            }
-
-            if bestTo == nil,
-               let match = patternTo.firstMatch(in: text, options: [], range: range),
-               match.numberOfRanges >= 2 {
-                bestTo = normalizeLocationToken(nsString.substring(with: match.range(at: 1)))
             }
 
             if bestTo == nil,

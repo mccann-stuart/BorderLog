@@ -32,11 +32,15 @@ struct PrivacyPolicyView: View {
             }
 
             Section("Controls") {
-                Text("Permissions can be changed in iOS Settings. Reset All Data deletes local travel records, profile values, and pending widget samples from this device.")
+                Text("Data remains on this device until you delete it or use Reset All Data. Permissions can be changed in iOS Settings. Reset All Data deletes local travel records, Keychain-backed profile and session values, and pending widget samples. Use Reset All Data before uninstalling BorderLog to ensure those Keychain values are removed.")
             }
 
             Section("Tracking") {
                 Text("BorderLog does not track users across apps or websites owned by other companies.")
+            }
+
+            Section("Support") {
+                Text("Support and privacy contact details are available through the Support URL on BorderLog's App Store page. Do not include private travel data in a public support request.")
             }
         }
         .navigationTitle("Privacy Policy")

@@ -36,14 +36,17 @@ final class SchengenState {
             StayInfo(
                 enteredOn: $0.enteredOn,
                 exitedOn: $0.exitedOn,
-                region: $0.region
+                region: $0.region,
+                entryDayKey: $0.entryDayKey,
+                exitDayKey: $0.exitDayKey
             )
         }
 
         let overrideInfos = overrides.map {
             OverrideInfo(
                 date: $0.date,
-                region: $0.region
+                region: $0.region,
+                dayKey: $0.dayKey
             )
         }
 

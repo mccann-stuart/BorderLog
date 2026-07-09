@@ -731,6 +731,23 @@ actor CalendarTabDataService {
 
         append(flightOriginCountry)
         append(flightDestinationCountry)
+
+        // Keep intermediate countries in journey order after the headline origin and destination.
+        let routeCandidates = (
+            accumulator.flightOriginCandidates + accumulator.flightDestinationCandidates
+        ).sorted { lhs, rhs in
+            if lhs.timestamp != rhs.timestamp {
+                return lhs.timestamp < rhs.timestamp
+            }
+            if lhs.eventIdentifier != rhs.eventIdentifier {
+                return lhs.eventIdentifier.localizedCaseInsensitiveCompare(rhs.eventIdentifier) == .orderedAscending
+            }
+            return lhs.country.id.localizedCaseInsensitiveCompare(rhs.country.id) == .orderedAscending
+        }
+        for candidate in routeCandidates {
+            append(candidate.country)
+        }
+
         for country in resolvedCountries {
             append(country)
         }

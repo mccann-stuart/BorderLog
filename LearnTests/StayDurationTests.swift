@@ -119,6 +119,20 @@ final class StayDurationTests: XCTestCase {
         XCTAssertEqual(days, 1)
     }
 
+    func testDurationUsesStoredCivilDaysAcrossCalendarTimeZones() {
+        let stay = Stay(
+            countryName: "France",
+            dayTimeZoneId: "Europe/London",
+            region: .schengen,
+            enteredOn: date(2024, 6, 1),
+            exitedOn: nil
+        )
+
+        let days = stay.durationInDays(asOf: date(2024, 6, 5), calendar: calendar)
+
+        XCTAssertEqual(days, 5)
+    }
+
     func testInvalidStayReturnsZero() {
         // Exited before entered
         let stay = Stay(

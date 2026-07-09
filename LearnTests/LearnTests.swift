@@ -42,6 +42,46 @@ final class SchengenCalculatorWindowTests: XCTestCase {
         XCTAssertEqual(overstayDays, 0)
     }
 
+    func testSortsNormalizedCivilDaysAcrossInternationalDateLine() {
+        var plusFourteenCalendar = calendar
+        plusFourteenCalendar.timeZone = TimeZone(secondsFromGMT: 14 * 60 * 60)!
+        var minusTwelveCalendar = calendar
+        minusTwelveCalendar.timeZone = TimeZone(secondsFromGMT: -12 * 60 * 60)!
+
+        let laterCivilDay = plusFourteenCalendar.date(
+            from: DateComponents(year: 2026, month: 1, day: 2)
+        )!
+        let earlierCivilDay = minusTwelveCalendar.date(
+            from: DateComponents(year: 2026, month: 1, day: 1)
+        )!
+        XCTAssertGreaterThan(earlierCivilDay, laterCivilDay)
+
+        let stays = [
+            StayInfo(
+                enteredOn: earlierCivilDay,
+                exitedOn: earlierCivilDay,
+                region: .schengen,
+                entryDayKey: "2026-01-01",
+                exitDayKey: "2026-01-01"
+            ),
+            StayInfo(
+                enteredOn: laterCivilDay,
+                exitedOn: laterCivilDay,
+                region: .schengen,
+                entryDayKey: "2026-01-02",
+                exitDayKey: "2026-01-02"
+            ),
+        ]
+
+        let summary = SchengenCalculator.summary(
+            for: stays,
+            asOf: date(2026, 1, 10),
+            calendar: calendar
+        )
+
+        XCTAssertEqual(summary.usedDays, 2)
+    }
+
     func testOverridesRemoveSchengenDays() async throws {
         let stays = [
             Stay(countryName: "Germany", region: .schengen, enteredOn: date(2026, 2, 1), exitedOn: date(2026, 2, 3)),
@@ -121,7 +161,13 @@ final class SchengenCalculatorWindowTests: XCTestCase {
     func testIgnoresStaysCompletelyAfterWindow() async throws {
         let referenceDate = date(2026, 7, 1)
         let stays = [
-            Stay(countryName: "France", region: .schengen, enteredOn: date(2026, 7, 2), exitedOn: date(2026, 7, 10)),
+            Stay(
+                countryName: "France",
+                dayTimeZoneId: "Europe/London",
+                region: .schengen,
+                enteredOn: date(2026, 7, 2),
+                exitedOn: date(2026, 7, 10)
+            ),
         ]
 
         let summary = SchengenCalculator.summary(
@@ -138,7 +184,13 @@ final class SchengenCalculatorWindowTests: XCTestCase {
     func testClampsStaysPartiallyAfterWindow() async throws {
         let referenceDate = date(2026, 7, 1)
         let stays = [
-            Stay(countryName: "France", region: .schengen, enteredOn: date(2026, 6, 30), exitedOn: date(2026, 7, 5)),
+            Stay(
+                countryName: "France",
+                dayTimeZoneId: "Europe/London",
+                region: .schengen,
+                enteredOn: date(2026, 6, 30),
+                exitedOn: date(2026, 7, 5)
+            ),
         ]
 
         let summary = SchengenCalculator.summary(

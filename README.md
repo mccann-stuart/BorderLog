@@ -3,18 +3,24 @@ Product Requirements Document (PRD)
 BorderLog (Working Title) — Local‑first Country Presence + Schengen Tracker for Expats
 
 Document status: Draft v0.3, living PRD plus weekly changelog
-Last updated: 20 Apr 2026
+Last updated: 9 Jul 2026
 Platforms: iOS (primary), iPadOS (nice-to-have)
 Distribution: App Store
 Pricing: Free (no subscriptions, no paid tiers)
 
 Current implementation notes:
-- Sign in with Apple is currently feature-flagged off for local-only development; onboarding uses a local session ID until production authentication is re-enabled.
+- Version 1.0 is account-free: Sign in with Apple remains feature-flagged off and onboarding uses a device-local session ID. Enabling accounts later requires account deletion and token-revocation support first.
 - CloudKit sync is implemented behind `AppConfig.isCloudKitFeatureEnabled == false`; local SwiftData/App Group storage is the active persistence path.
 - Debug data export is compiled and surfaced only in `DEBUG` builds because it intentionally contains full-fidelity diagnostics.
 - Reset All Data clears SwiftData models, keychain-backed local profile/session values, and pending widget location snapshots.
 - Keychain profile/session values use device-bound `kSecAttrAccessibleWhenUnlockedThisDeviceOnly` accessibility.
 - Settings includes a shared Day Counting mode: `Resolved Country` preserves the one-country-per-day default, while `Double Count Days` counts every resolved country allocation on travel days for app and widget summaries.
+
+App Store release readiness:
+- The app and widget are configured for iOS 26, and the widget targets both iPhone and iPad as required for app extensions.
+- The Worker implements public `/privacy` and `/support` pages. Deploy it before submission, then use those public URLs in App Store Connect.
+- Produce the submission archive with stable Xcode 26.6 or another Apple-accepted stable toolchain, not the local Xcode 27 beta.
+- App Store distribution still requires production provisioning for both bundle identifiers and the `group.com.MCCANN.Border` App Group.
 
 Weekly Changelog
 
@@ -146,7 +152,7 @@ Key PRs:
 
 1. Executive Summary
 
-BorderLog is a privacy-first iOS app that helps expatriates and frequent travelers track days in/out of countries and remain compliant with zone rules like Schengen’s 90/180. The app is local-first: user data is stored on-device using SwiftData and can optionally sync across the user’s own devices via CloudKit (no app-owned user database). SwiftData supports on-device persistence and can sync across devices when CloudKit is enabled in app entitlements.  ￼
+BorderLog is a privacy-first iOS app that helps expatriates and frequent travelers track days in/out of countries and remain compliant with zone rules like Schengen’s 90/180. Version 1.0 stores user data on-device using SwiftData and does not require an account. CloudKit code exists for a possible later release but is disabled and is not part of the launch product.
 
 Unlike manual spreadsheet approaches, BorderLog infers daily country presence by combining:
 	1.	Location snapshots written into a local table (captured opportunistically by an iOS Widget extension)
@@ -216,14 +222,14 @@ Existing solutions often require heavy manual entry. People also have fragmented
 
 Journey A — First Launch & Setup
 	1.	Welcome → value prop + privacy stance
-	2.	Sign in with Apple in production; local-only development builds currently continue without an account
+	2.	Continue without an account; the app creates a device-local session identifier
 	3.	Optional profile setup (passport nationality, home country, etc.)
 	4.	Permission requests (optional, staged):
 	•	Location permissions (for widget + app inference)
 	•	Photos library permissions (read-only)
 	5.	App generates initial travel ledger using available sources.
 
-Note: Sign in with Apple is implemented using Authentication Services (e.g., ASAuthorizationAppleIDProvider and SwiftUI SignInWithAppleButton).  ￼
+Note: Dormant Sign in with Apple code is retained behind a disabled feature flag. It must not be enabled until the account lifecycle includes in-app deletion and token revocation.
 
 Journey B — Daily Inference + Review
 	1.	App proposes a country for each day (with confidence).
@@ -253,14 +259,14 @@ Journey D — Export / Audit
 
 6.1 Authentication & Identity
 
-FR-Auth-1 — Production Apple Sign-in
-	•	Production builds require Sign in with Apple at first run and after sign-out.
-	•	Current local-only development builds keep this flow disabled behind `AuthenticationManager.isAppleSignInEnabled`.
-	•	Only Apple authentication is supported (no email/password, no Google).
-	•	Store Apple user identifier locally for session continuity; do not create a server-side user record.
+FR-Auth-1 — Version 1.0 local identity
+	•	Production builds do not require an account or sign-in.
+	•	Keep Sign in with Apple disabled behind `AuthenticationManager.isAppleSignInEnabled` for version 1.0.
+	•	Create and store a device-local session identifier for local state continuity.
+	•	Do not create a server-side user record.
 
-FR-Auth-2 — UI compliance
-	•	Use Apple-provided buttons (SignInWithAppleButton for SwiftUI).  ￼
+FR-Auth-2 — Future account compliance
+	•	If accounts are enabled later, use Apple-provided sign-in controls and provide in-app account deletion plus token revocation before release.
 
 FR-Auth-3 — Optional profile
 Profile fields are optional and stored locally:
@@ -536,7 +542,7 @@ No User entity. Identity is an auth/session concern, not a persisted “account.
 Client stack
 	•	SwiftUI UI layer
 	•	SwiftData persistence layer (App Group store)
-	•	CloudKit sync is implemented via SwiftData configuration (iCloud private database) and remains feature-gated off in current development builds.  ￼
+	•	CloudKit sync is implemented via SwiftData configuration (iCloud private database) and remains feature-gated off for the version 1.0 release.
 	•	WidgetKit extension
 	•	Core Location for location samples (with explicit permission flow)  ￼
 	•	PhotoKit for photo metadata ingestion  ￼
@@ -549,13 +555,10 @@ Processing pipeline
 9.2 Cloud backend (minimal; no personal data)
 
 Components
-	1.	Cloudflare Pages
-	•	Hosts static marketing site + privacy policy + documentation.
-	•	Pages supports deploying static HTML sites.  ￼
-	2.	Cloudflare Worker
-	•	Serves a tiny API for configuration and data updates to the app.
+	1.	Cloudflare Worker
+	•	Serves public privacy/support pages plus a tiny API for configuration and data updates to the app.
 	•	Worker uses Fetch API for HTTP handling.  ￼
-	3.	Cloudflare R2
+	2.	Cloudflare R2
 	•	Stores versioned configuration artifacts:
 	•	manifest.json (latest versions)
 	•	countries.json
@@ -565,7 +568,9 @@ Components
 	•	R2 supports an S3-compatible API and is designed as distributed object storage.  ￼
 	•	Workers can access R2 via bucket bindings and expose external access via routes.  ￼
 
-API endpoints (illustrative)
+Public endpoints
+	•	GET /privacy → App Store privacy policy
+	•	GET /support → support and contact guidance
 	•	GET /config/manifest → versions + ETag
 	•	GET /config/zones/{version} → zone definitions
 	•	GET /config/rules/{version} → rule templates (Schengen rolling window)
@@ -581,7 +586,7 @@ Security posture
 
 10.1 Privacy
 	•	No user travel data is sent to app servers.
-	•	All inference happens locally.
+	•	Travel data and inference results are stored locally; Apple system services such as MapKit geocoding may process coordinates when resolving countries.
 	•	Clear disclosures for:
 	•	location usage
 	•	photo metadata usage

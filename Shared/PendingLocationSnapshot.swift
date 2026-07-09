@@ -131,17 +131,8 @@ nonisolated struct PendingLocationSnapshot: Codable, Equatable, Sendable {
     ) -> [PendingLocationSnapshot] {
         var snapshotsByID: [String: PendingLocationSnapshot] = [:]
 
-        if let directoryURL = try? resolvedQueueDirectory(fileManager: fileManager, overrideURL: queueDirectoryURL),
-           let fileURLs = try? fileManager.contentsOfDirectory(
-            at: directoryURL,
-            includingPropertiesForKeys: nil,
-            options: [.skipsHiddenFiles]
-           ) {
-            for fileURL in fileURLs where fileURL.pathExtension == fileExtension {
-                guard let data = try? Data(contentsOf: fileURL),
-                      let snapshot = try? JSONDecoder.pendingSnapshotDecoder.decode(PendingLocationSnapshot.self, from: data) else {
-                    continue
-                }
+        if let directoryURL = try? resolvedQueueDirectory(fileManager: fileManager, overrideURL: queueDirectoryURL) {
+            for snapshot in fileBackedSnapshots(in: directoryURL, fileManager: fileManager) {
                 snapshotsByID[snapshot.id] = snapshot
             }
         }
@@ -257,6 +248,31 @@ nonisolated struct PendingLocationSnapshot: Codable, Equatable, Sendable {
         return (try? JSONDecoder().decode([PendingLocationSnapshot].self, from: data)) ?? []
     }
 
+    private static func fileBackedSnapshots(
+        in directoryURL: URL,
+        fileManager: FileManager
+    ) -> [PendingLocationSnapshot] {
+        guard let fileURLs = try? fileManager.contentsOfDirectory(
+            at: directoryURL,
+            includingPropertiesForKeys: nil,
+            options: [.skipsHiddenFiles]
+        ) else {
+            return []
+        }
+
+        return fileURLs.compactMap { fileURL in
+            guard fileURL.pathExtension == fileExtension,
+                  let data = try? Data(contentsOf: fileURL),
+                  let snapshot = try? JSONDecoder.pendingSnapshotDecoder.decode(
+                    PendingLocationSnapshot.self,
+                    from: data
+                  ) else {
+                return nil
+            }
+            return snapshot
+        }
+    }
+
     private static func removeLegacySnapshots(ids: Set<String>, from defaults: UserDefaults) {
         guard !ids.isEmpty else { return }
         let remaining = legacySnapshots(from: defaults).filter { !ids.contains($0.id) }
@@ -297,8 +313,11 @@ nonisolated struct PendingLocationSnapshot: Codable, Equatable, Sendable {
 
         for id in idsToRemove {
             let fileURL = fileURL(for: id, in: directoryURL)
-            if fileManager.fileExists(atPath: fileURL.path) {
+            do {
                 try fileManager.removeItem(at: fileURL)
+            } catch let error as CocoaError where error.code == .fileNoSuchFile {
+                // Concurrent writers may prune the same expired snapshot. Once
+                // the file is absent, the queue is already in the desired state.
             }
         }
     }

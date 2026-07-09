@@ -165,9 +165,8 @@ final class LedgerRecomputeServiceTests: XCTestCase {
         XCTAssertEqual(count1, count2)
     }
 
-    func testRecomputeExpandsSeedByDependencyPadding() async throws {
-        var calendar = Calendar(identifier: .gregorian)
-        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+    func testRecomputeExpandsSeedByOneDependencyDay() async throws {
+        let calendar = Calendar.current
 
         let mock = MockLedgerDataFetcher()
         await service.setMock(mock)
@@ -176,16 +175,15 @@ final class LedgerRecomputeServiceTests: XCTestCase {
         let seedKey = DayKey.make(from: seedDate, timeZone: calendar.timeZone)
         await service.recompute(dayKeys: [seedKey])
 
-        let expectedStart = calendar.date(byAdding: .day, value: -8, to: seedDate)!
-        let expectedEnd = calendar.date(byAdding: .day, value: 8, to: seedDate)!
+        let expectedStart = calendar.date(byAdding: .day, value: -1, to: seedDate)!
+        let expectedEnd = calendar.date(byAdding: .day, value: 1, to: seedDate)!
         let expectedKeys = Set(makeDayKeys(from: expectedStart, to: expectedEnd, calendar: calendar))
 
         XCTAssertEqual(Set(mock.insertedPresenceDayKeys), expectedKeys)
     }
 
-    func testRecomputeExpandsToNearestKnownAnchors() async throws {
-        var calendar = Calendar(identifier: .gregorian)
-        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+    func testRecomputeDoesNotJumpToDistantKnownAnchors() async throws {
+        let calendar = Calendar.current
 
         let mock = MockLedgerDataFetcher()
         await service.setMock(mock)
@@ -203,22 +201,25 @@ final class LedgerRecomputeServiceTests: XCTestCase {
 
         await service.recompute(dayKeys: [seedKey])
 
-        let expectedKeys = Set(makeDayKeys(from: leftAnchorDate, to: rightAnchorDate, calendar: calendar))
-        XCTAssertEqual(Set(mock.presenceDays.keys), expectedKeys)
+        let expectedStart = calendar.date(byAdding: .day, value: -1, to: seedDate)!
+        let expectedEnd = calendar.date(byAdding: .day, value: 1, to: seedDate)!
+        let expectedKeys = Set(makeDayKeys(from: expectedStart, to: expectedEnd, calendar: calendar))
+
+        XCTAssertEqual(Set(mock.insertedPresenceDayKeys), expectedKeys)
+        XCTAssertNotNil(mock.presenceDays[leftAnchorKey])
+        XCTAssertNotNil(mock.presenceDays[rightAnchorKey])
     }
 
-    func testRecomputeClampsExpandedScopeToToday() async throws {
-        var calendar = Calendar(identifier: .gregorian)
-        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+    func testRecomputeClampsIterativeNextDayExpansionToToday() async throws {
+        let calendar = Calendar.current
 
         let mock = MockLedgerDataFetcher()
         await service.setMock(mock)
 
         let today = calendar.startOfDay(for: Date())
         let seedKey = DayKey.make(from: today, timeZone: calendar.timeZone)
-        let futureAnchorDate = calendar.date(byAdding: .day, value: 30, to: today)!
-        let futureAnchorKey = DayKey.make(from: futureAnchorDate, timeZone: calendar.timeZone)
-        mock.presenceDays[futureAnchorKey] = knownPresenceDay(dayKey: futureAnchorKey, date: futureAnchorDate, timeZoneId: calendar.timeZone.identifier)
+        let tomorrow = calendar.date(byAdding: .day, value: 1, to: today)!
+        let tomorrowKey = DayKey.make(from: tomorrow, timeZone: calendar.timeZone)
 
         await service.recompute(dayKeys: [seedKey])
 
@@ -227,6 +228,7 @@ final class LedgerRecomputeServiceTests: XCTestCase {
         }
         XCTAssertFalse(insertedDates.isEmpty)
         XCTAssertEqual(insertedDates.max(), today)
+        XCTAssertFalse(mock.insertedPresenceDayKeys.contains(tomorrowKey))
     }
 
     func testRecomputePersistsDisputedFlagWhenUpdatingExistingPresenceDay() async throws {

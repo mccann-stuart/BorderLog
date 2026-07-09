@@ -83,10 +83,31 @@ final class Stay {
     }
 
     func durationInDays(asOf referenceDate: Date = Date(), calendar: Calendar = .current) -> Int {
-        let start = calendar.startOfDay(for: enteredOn)
-        let end = calendar.startOfDay(for: exitedOn ?? referenceDate)
+        let timeZone = DayIdentity.canonicalTimeZone(
+            preferredTimeZoneId: dayTimeZoneId,
+            fallback: calendar.timeZone
+        )
+        var countingCalendar = calendar
+        countingCalendar.timeZone = timeZone
+
+        // Stored civil-day keys are authoritative; reinterpreting their midnight in another
+        // time zone can move a stay across a date boundary during daylight-saving time.
+        let start = DayKey.date(for: entryDayKey, timeZone: timeZone)
+            ?? countingCalendar.startOfDay(for: enteredOn)
+        let end: Date
+        if let exitDayKey,
+           let normalizedExit = DayKey.date(for: exitDayKey, timeZone: timeZone) {
+            end = normalizedExit
+        } else if let exitedOn {
+            end = countingCalendar.startOfDay(for: exitedOn)
+        } else {
+            let referenceDayKey = DayKey.make(from: referenceDate, timeZone: timeZone)
+            end = DayKey.date(for: referenceDayKey, timeZone: timeZone)
+                ?? countingCalendar.startOfDay(for: referenceDate)
+        }
+
         guard end >= start else { return 0 }
-        let days = calendar.dateComponents([.day], from: start, to: end).day ?? 0
+        let days = countingCalendar.dateComponents([.day], from: start, to: end).day ?? 0
         return days + 1
     }
 }

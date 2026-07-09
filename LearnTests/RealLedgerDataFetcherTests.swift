@@ -157,6 +157,9 @@ final class RealLedgerDataFetcherTests: XCTestCase {
         let after = try fetcher.fetchNearestKnownPresenceDay(after: d2)
         XCTAssertEqual(after?.dayKey, "2026-02-03")
 
+        let afterKnownDayWithUnknownNeighbour = try fetcher.fetchNearestKnownPresenceDay(after: d1)
+        XCTAssertEqual(afterKnownDayWithUnknownNeighbour?.dayKey, "2026-02-03")
+
         XCTAssertNil(try fetcher.fetchNearestKnownPresenceDay(after: d4))
     }
 

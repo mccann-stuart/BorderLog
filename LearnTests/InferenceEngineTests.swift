@@ -146,7 +146,7 @@ final class InferenceEngineTests: XCTestCase {
         XCTAssertEqual(evidence.count, 3)
     }
 
-    func testResolvedDayMarksWinningAndLosingEvidenceSeparately() {
+    func testResolvedDayMarksEvidenceForEveryRetainedAllocation() {
         let date = day(2026, 2, 15)
         let dayKey = DayKey.make(from: date, timeZone: calendar.timeZone)
         let results = PresenceInferenceEngine.compute(
@@ -164,10 +164,13 @@ final class InferenceEngineTests: XCTestCase {
             calendar: calendar
         )
 
+        let contributedCountries = results.first?.contributedCountries ?? []
+        XCTAssertEqual(contributedCountries.map(\.countryCode), ["FR", "ES"])
+
         let evidence = results.first?.evidence ?? []
         XCTAssertEqual(evidence.count, 3)
         XCTAssertEqual(evidence.filter { $0.countryCode == "FR" && $0.contributedToFinalResult }.count, 2)
-        XCTAssertTrue(evidence.contains(where: { $0.countryCode == "ES" && !$0.contributedToFinalResult }))
+        XCTAssertTrue(evidence.contains(where: { $0.countryCode == "ES" && $0.contributedToFinalResult }))
     }
 
     func testDisputedWhenConfidenceDeltaSmall() {
@@ -309,7 +312,7 @@ final class InferenceEngineTests: XCTestCase {
         }
     }
 
-    func testOvernightOriginFlightPromotesDepartureDayAndPreviousUnknownDay() {
+    func testOvernightTravelPromotesPreviousAndDepartureDaysWithDistinctContext() {
         let previousDate = day(2026, 2, 1)
         let departureDate = day(2026, 2, 2)
         let arrivalDate = day(2026, 2, 3)
@@ -348,22 +351,31 @@ final class InferenceEngineTests: XCTestCase {
             calendar: calendar
         )
 
-        let previous = results.first { $0.dayKey == previousDayKey }
-        XCTAssertEqual(previous?.contributedCountries.first?.countryCode, "GB")
-        XCTAssertEqual(previous?.confidenceLabel, .medium)
-        XCTAssertTrue(previous?.sources.contains(.calendar) == true)
-        XCTAssertTrue(previous?.evidence.contains(where: { $0.source == "CalendarFlightOriginPromotion" }) == true)
+        guard let previous = results.first(where: { $0.dayKey == previousDayKey }) else {
+            XCTFail("Expected the day before departure to be promoted")
+            return
+        }
+        XCTAssertEqual(previous.contributedCountries.first?.countryCode, "GB")
+        XCTAssertEqual(previous.confidence, 0.85, accuracy: 0.001)
+        XCTAssertEqual(previous.confidenceLabel, .high)
+        XCTAssertTrue(previous.sources.contains(.calendar))
+        XCTAssertTrue(previous.evidence.contains(where: { $0.source == "CalendarTravelBeforePromotion" }))
 
-        let departure = results.first { $0.dayKey == departureDayKey }
-        XCTAssertEqual(departure?.contributedCountries.first?.countryCode, "GB")
-        XCTAssertEqual(departure?.confidenceLabel, .medium)
-        XCTAssertTrue(departure?.sources.contains(.calendar) == true)
+        guard let departure = results.first(where: { $0.dayKey == departureDayKey }) else {
+            XCTFail("Expected the departure day to be promoted")
+            return
+        }
+        XCTAssertEqual(departure.contributedCountries.first?.countryCode, "GB")
+        XCTAssertEqual(departure.confidence, 0.55, accuracy: 0.001)
+        XCTAssertEqual(departure.confidenceLabel, .medium)
+        XCTAssertTrue(departure.sources.contains(.calendar))
+        XCTAssertTrue(departure.evidence.contains(where: { $0.source == "CalendarFlightOriginPromotion" }))
 
         let arrival = results.first { $0.dayKey == arrivalDayKey }
         XCTAssertEqual(arrival?.contributedCountries.first?.countryCode, "US")
     }
 
-    func testSameDateOriginFlightPromotesFlightDayAndPreviousUnknownDay() {
+    func testSameDateTravelKeepsDestinationOnFlightDayAndPromotesPreviousDayToOrigin() {
         let previousDate = day(2026, 3, 14)
         let flightDate = day(2026, 3, 15)
 
@@ -400,15 +412,26 @@ final class InferenceEngineTests: XCTestCase {
             calendar: calendar
         )
 
-        let previous = results.first { $0.dayKey == previousDayKey }
-        XCTAssertEqual(previous?.contributedCountries.first?.countryCode, "GB")
-        XCTAssertEqual(previous?.confidenceLabel, .medium)
-        XCTAssertEqual(previous?.timeZoneId, "Europe/London")
+        guard let previous = results.first(where: { $0.dayKey == previousDayKey }) else {
+            XCTFail("Expected the day before departure to be promoted")
+            return
+        }
+        XCTAssertEqual(previous.contributedCountries.first?.countryCode, "GB")
+        XCTAssertEqual(previous.confidence, 0.85, accuracy: 0.001)
+        XCTAssertEqual(previous.confidenceLabel, .high)
+        XCTAssertEqual(previous.timeZoneId, "Europe/London")
+        XCTAssertTrue(previous.evidence.contains(where: { $0.source == "CalendarTravelBeforePromotion" }))
 
-        let flightDay = results.first { $0.dayKey == flightDayKey }
-        XCTAssertEqual(flightDay?.contributedCountries.first?.countryCode, "GB")
-        XCTAssertEqual(flightDay?.confidenceLabel, .medium)
-        XCTAssertEqual(flightDay?.timeZoneId, "Europe/London")
+        guard let flightDay = results.first(where: { $0.dayKey == flightDayKey }) else {
+            XCTFail("Expected the flight day to remain resolved")
+            return
+        }
+        XCTAssertEqual(flightDay.contributedCountries.first?.countryCode, "US")
+        XCTAssertEqual(flightDay.confidenceLabel, .high)
+        XCTAssertEqual(flightDay.timeZoneId, "America/Los_Angeles")
+        XCTAssertTrue(flightDay.evidence.contains(where: {
+            $0.countryCode == "GB" && !$0.contributedToFinalResult
+        }))
     }
 
     func testTravelEventPromotesDayBeforeDepartureAndDayAfterArrival() {

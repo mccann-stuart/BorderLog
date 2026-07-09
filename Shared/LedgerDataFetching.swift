@@ -160,25 +160,45 @@ struct RealLedgerDataFetcher: LedgerDataFetching {
     }
 
     func fetchNearestKnownPresenceDay(before date: Date) throws -> PresenceDay? {
-        var descriptor = FetchDescriptor<PresenceDay>(
+        let descriptor = FetchDescriptor<PresenceDay>(
             predicate: #Predicate { day in
-                day.date < date && (day.countryCode != nil || day.countryName != nil)
+                day.date < date
             },
             sortBy: [SortDescriptor(\.date, order: .reverse)]
         )
-        descriptor.fetchLimit = 1
-        return try modelContext.fetch(descriptor).first
+        return try fetchFirstKnownPresenceDay(matching: descriptor)
     }
 
     func fetchNearestKnownPresenceDay(after date: Date) throws -> PresenceDay? {
-        var descriptor = FetchDescriptor<PresenceDay>(
+        let descriptor = FetchDescriptor<PresenceDay>(
             predicate: #Predicate { day in
-                day.date > date && (day.countryCode != nil || day.countryName != nil)
+                day.date > date
             },
             sortBy: [SortDescriptor(\.date, order: .forward)]
         )
-        descriptor.fetchLimit = 1
-        return try modelContext.fetch(descriptor).first
+        return try fetchFirstKnownPresenceDay(matching: descriptor)
+    }
+
+    private func fetchFirstKnownPresenceDay(
+        matching baseDescriptor: FetchDescriptor<PresenceDay>
+    ) throws -> PresenceDay? {
+        // Country identity is derived from the persisted allocation array, so it can't be
+        // expressed as a SwiftData predicate. Page date-sorted candidates and filter locally.
+        let batchSize = 64
+        var descriptor = baseDescriptor
+        var offset = 0
+
+        while true {
+            descriptor.fetchLimit = batchSize
+            descriptor.fetchOffset = offset
+
+            let days = try modelContext.fetch(descriptor)
+            if let knownDay = days.first(where: { !$0.countryAllocations.isEmpty }) {
+                return knownDay
+            }
+            guard days.count == batchSize else { return nil }
+            offset += days.count
+        }
     }
 
     func insertPresenceDay(_ day: PresenceDay) {
