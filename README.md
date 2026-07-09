@@ -18,7 +18,7 @@ Current implementation notes:
 
 App Store release readiness:
 - The app and widget are configured for iOS 26, and the widget targets both iPhone and iPad as required for app extensions.
-- The Worker implements public `/privacy` and `/support` pages. Deploy it before submission, then use those public URLs in App Store Connect.
+- The Worker implements public `/privacy` and `/support` pages. Configure its `SUPPORT_EMAIL` variable with a monitored address, deploy it, then use those public URLs in App Store Connect. The pages return 503 rather than publish without a valid contact address.
 - Produce the submission archive with stable Xcode 26.6 or another Apple-accepted stable toolchain, not the local Xcode 27 beta.
 - App Store distribution still requires production provisioning for both bundle identifiers and the `group.com.MCCANN.Border` App Group.
 
