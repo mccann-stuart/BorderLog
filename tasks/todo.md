@@ -148,3 +148,10 @@
 - **Task:** Optimize `min()` operations in `Shared/LedgerRecomputeService.swift`
 - **Action:** Replaced `.compactMap { $0 }.min()` pattern with O(1) manual variable tracking in a loop.
 - **Status:** Complete
+
+# Git Sync and Divergent Main Branch Resolution Plan
+
+- [x] Fetch latest from origin and verify diverged commits.
+- [/] Integrate remote changes into local main branch using `git pull --rebase` to avoid merge commits.
+- [ ] Push local main branch changes to remote origin.
+- [ ] Verify that local and remote are fully synchronized.
