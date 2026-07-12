@@ -79,7 +79,7 @@ final class LedgerRecomputeServiceTests: XCTestCase {
         try context.save()
 
         // Run recompute for the specific dayKey
-        await service.recompute(dayKeys: [dayKey])
+        try await service.recompute(dayKeys: [dayKey])
 
         // Verify PresenceDay created with correct country
         var descriptor = FetchDescriptor<PresenceDay>(predicate: #Predicate { $0.dayKey == dayKey })
@@ -94,7 +94,7 @@ final class LedgerRecomputeServiceTests: XCTestCase {
         try context.save()
 
         // Run recompute again
-        await service.recompute(dayKeys: [dayKey])
+        try await service.recompute(dayKeys: [dayKey])
 
         // Verify PresenceDay updated
         fetched = try context.fetch(descriptor)
@@ -107,7 +107,7 @@ final class LedgerRecomputeServiceTests: XCTestCase {
         try context.save()
 
         // Run recompute again
-        await service.recompute(dayKeys: [dayKey])
+        try await service.recompute(dayKeys: [dayKey])
 
         // Verify PresenceDay updated to reflect no stay (or deleted depending on logic, but likely just updated to empty/unknown)
         fetched = try context.fetch(descriptor)
@@ -173,7 +173,7 @@ final class LedgerRecomputeServiceTests: XCTestCase {
 
         let seedDate = date(2026, 1, 10, calendar: calendar)
         let seedKey = DayKey.make(from: seedDate, timeZone: calendar.timeZone)
-        await service.recompute(dayKeys: [seedKey])
+        try await service.recompute(dayKeys: [seedKey])
 
         let expectedStart = calendar.date(byAdding: .day, value: -1, to: seedDate)!
         let expectedEnd = calendar.date(byAdding: .day, value: 1, to: seedDate)!
@@ -199,7 +199,7 @@ final class LedgerRecomputeServiceTests: XCTestCase {
         mock.presenceDays[leftAnchorKey] = knownPresenceDay(dayKey: leftAnchorKey, date: leftAnchorDate, timeZoneId: calendar.timeZone.identifier)
         mock.presenceDays[rightAnchorKey] = knownPresenceDay(dayKey: rightAnchorKey, date: rightAnchorDate, timeZoneId: calendar.timeZone.identifier)
 
-        await service.recompute(dayKeys: [seedKey])
+        try await service.recompute(dayKeys: [seedKey])
 
         let expectedStart = calendar.date(byAdding: .day, value: -1, to: seedDate)!
         let expectedEnd = calendar.date(byAdding: .day, value: 1, to: seedDate)!
@@ -208,6 +208,22 @@ final class LedgerRecomputeServiceTests: XCTestCase {
         XCTAssertEqual(Set(mock.insertedPresenceDayKeys), expectedKeys)
         XCTAssertNotNil(mock.presenceDays[leftAnchorKey])
         XCTAssertNotNil(mock.presenceDays[rightAnchorKey])
+    }
+
+    func testRecomputeRepairsExplicitHistoricalDayOutsideRollingWindow() async throws {
+        let calendar = Calendar.current
+        let mock = MockLedgerDataFetcher()
+        await service.setMock(mock)
+
+        let historicalDate = date(2020, 1, 10, calendar: calendar)
+        let historicalKey = DayKey.make(from: historicalDate, timeZone: calendar.timeZone)
+
+        try await service.recompute(dayKeys: [historicalKey])
+
+        XCTAssertTrue(
+            mock.insertedPresenceDayKeys.contains(historicalKey),
+            "An explicitly dirty historical day must be repaired instead of clamped to the rolling window."
+        )
     }
 
     func testRecomputeClampsIterativeNextDayExpansionToToday() async throws {
@@ -221,7 +237,7 @@ final class LedgerRecomputeServiceTests: XCTestCase {
         let tomorrow = calendar.date(byAdding: .day, value: 1, to: today)!
         let tomorrowKey = DayKey.make(from: tomorrow, timeZone: calendar.timeZone)
 
-        await service.recompute(dayKeys: [seedKey])
+        try await service.recompute(dayKeys: [seedKey])
 
         let insertedDates = mock.insertedPresenceDayKeys.compactMap {
             DayKey.date(for: $0, timeZone: calendar.timeZone).map { calendar.startOfDay(for: $0) }
@@ -262,7 +278,7 @@ final class LedgerRecomputeServiceTests: XCTestCase {
             makePhotoSignal(day: seedDate, dayKey: seedKey, countryCode: "ES", countryName: "Spain", assetIdHash: "asset-3")
         ]
 
-        await service.recompute(dayKeys: [seedKey])
+        try await service.recompute(dayKeys: [seedKey])
 
         let updated = mock.presenceDays[seedKey]
         XCTAssertNotNil(updated)
@@ -284,7 +300,7 @@ final class LedgerRecomputeServiceTests: XCTestCase {
             makePhotoSignal(day: seedDate, dayKey: seedKey, countryCode: "ES", countryName: "Spain", assetIdHash: "asset-13")
         ]
 
-        await service.recompute(dayKeys: [seedKey])
+        try await service.recompute(dayKeys: [seedKey])
 
         let inserted = mock.presenceDays[seedKey]
         XCTAssertNotNil(inserted)

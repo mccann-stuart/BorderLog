@@ -121,6 +121,8 @@ final class DataManagerTests: XCTestCase {
             in: defaults,
             queueDirectoryURL: pendingQueueURL
         )
+        LedgerRecomputeRecoveryStore(defaults: defaults).markDirty(dayKeys: [calendarDay])
+        defaults.set(Data([0x01]), forKey: DiagnosticsStore.storageKey)
 
         // Reset
         try dataManager.resetAllData(
@@ -151,6 +153,8 @@ final class DataManagerTests: XCTestCase {
         XCTAssertNil(mockKeychain.read(service: "com.MCCANN.Border", account: "userPassportNationality"))
         XCTAssertNil(mockKeychain.read(service: "com.MCCANN.Border", account: "userHomeCountry"))
         XCTAssertTrue(PendingLocationSnapshot.dequeueAll(from: defaults, clearAfter: false, queueDirectoryURL: pendingQueueURL).isEmpty)
+        XCTAssertTrue(LedgerRecomputeRecoveryStore(defaults: defaults).dirtyDayKeys().isEmpty)
+        XCTAssertNil(defaults.data(forKey: DiagnosticsStore.storageKey))
     }
 
     func testDeleteRemovesSpecificModel() async throws {

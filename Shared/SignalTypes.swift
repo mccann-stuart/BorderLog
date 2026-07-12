@@ -198,6 +198,26 @@ nonisolated struct LocationSignalInfo: Sendable {
     let countryName: String
     let accuracyMeters: Double
     let timeZoneId: String?
+    let timestamp: Date?
+    let sourceRaw: String?
+
+    nonisolated init(
+        dayKey: String,
+        countryCode: String?,
+        countryName: String,
+        accuracyMeters: Double,
+        timeZoneId: String?,
+        timestamp: Date? = nil,
+        sourceRaw: String? = nil
+    ) {
+        self.dayKey = dayKey
+        self.countryCode = countryCode
+        self.countryName = countryName
+        self.accuracyMeters = accuracyMeters
+        self.timeZoneId = timeZoneId
+        self.timestamp = timestamp
+        self.sourceRaw = sourceRaw
+    }
 }
 
 nonisolated struct PhotoSignalInfo: Sendable {

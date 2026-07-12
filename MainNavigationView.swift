@@ -138,11 +138,37 @@ struct MainNavigationView: View {
         defer { isBootstrappingInference = false }
 
         let container = modelContext.container
+        let recomputeService = LedgerRecomputeService(modelContainer: container)
+
+        let geocodeRetryDayKeys: Set<String>
+        do {
+            let retryService = PhotoSignalGeocodeRetryService(
+                modelContainer: container,
+                resolver: CLGeocoderCountryResolver()
+            )
+            let retryResult = try await retryService.retryUnresolved()
+            geocodeRetryDayKeys = retryResult.touchedDayKeys
+        } catch {
+            Self.logger.error("MainNavigationView unresolved photo retry failed: \(error, privacy: .private)")
+            geocodeRetryDayKeys = []
+        }
+
+        if !geocodeRetryDayKeys.isEmpty {
+            do {
+                try await recomputeService.recompute(dayKeys: Array(geocodeRetryDayKeys))
+            } catch {
+                Self.logger.error("MainNavigationView retried-photo recompute failed: \(error, privacy: .private)")
+            }
+        }
+
+        do {
+            try await recomputeService.reconcileDirtyAndExistingSourceDays()
+        } catch {
+            // Source ingestors retain their dirty-day checkpoints, so a later launch can retry.
+            Self.logger.error("MainNavigationView launch ledger reconciliation failed: \(error, privacy: .private)")
+        }
 
         if !didBootstrapInference {
-            let recomputeService = LedgerRecomputeService(modelContainer: container)
-            await recomputeService.recomputeAll()
-
             await performBootstrapPhotoScanIfNeeded()
 
             let calendarIngestor = CalendarSignalIngestor(modelContainer: container, resolver: CLGeocoderCountryResolver())
@@ -179,13 +205,13 @@ struct MainNavigationView: View {
         }
 
         guard status == .authorized || status == .limited else { return }
-        guard needsPhotoBootstrap() else { return }
 
         let ingestor = PhotoSignalIngestor(modelContainer: modelContext.container, resolver: CLGeocoderCountryResolver())
+        let mode: PhotoSignalIngestor.IngestMode = needsPhotoBootstrap() ? .sequenced : .auto
         do {
-            _ = try await ingestor.ingest(mode: .sequenced)
+            _ = try await ingestor.ingest(mode: mode)
         } catch {
-            Self.logger.error("MainNavigationView photo bootstrap ingest failed: \(error, privacy: .private)")
+            Self.logger.error("MainNavigationView photo ingest failed: \(error, privacy: .private)")
         }
     }
 

@@ -236,10 +236,15 @@ struct ContentView: View {
     }
 
     private func resetAllData() {
-        do {
-            try dataManager.resetAllData()
-        } catch {
-            Self.logger.error("Failed to reset data: \(error, privacy: .private)")
+        Task { @MainActor in
+            do {
+                try await LedgerRefreshCoordinator.shared.run {
+                    try dataManager.resetAllData()
+                    await DiagnosticsStore.shared.reset()
+                }
+            } catch {
+                Self.logger.error("Failed to reset data: \(error, privacy: .private)")
+            }
         }
     }
 
@@ -249,7 +254,11 @@ struct ContentView: View {
         let container = modelContext.container
         await LedgerRefreshCoordinator.shared.run {
             let recomputeService = LedgerRecomputeService(modelContainer: container)
-            await recomputeService.recomputeAll()
+            do {
+                try await recomputeService.recomputeAll()
+            } catch {
+                Self.logger.error("Failed to refresh ledger: \(error, privacy: .private)")
+            }
         }
     }
 

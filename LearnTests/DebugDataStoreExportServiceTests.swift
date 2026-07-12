@@ -42,6 +42,7 @@ final class DebugDataStoreExportServiceTests: XCTestCase {
                 exportedAt: exportedAt,
                 appVersion: "1.2.3",
                 appBuild: "456",
+                buildCommit: "abcdef1234567890",
                 bundleIdentifier: "com.example.BorderLog",
                 deviceModelCategory: "phone",
                 operatingSystemVersion: "Version 26.0",
@@ -82,6 +83,27 @@ final class DebugDataStoreExportServiceTests: XCTestCase {
                 appleSignInEnabled: false
             ),
             snapshotConsistency: "quiescent",
+            diagnostics: DiagnosticsSnapshot(
+                photoScanning: PhotoScanDiagnostics(
+                    runsStarted: 2,
+                    runsCompleted: 1,
+                    assetsScanned: 12,
+                    signalsImported: 4,
+                    assetsRejected: 8,
+                    rejectedMissingLocation: 8,
+                    unresolvedCountrySignals: 1,
+                    lastStartedAt: makeDate(2026, 3, 9, hour: 8),
+                    lastCompletedAt: makeDate(2026, 3, 9, hour: 8, minute: 5)
+                ),
+                photoGeocodeRetries: PhotoGeocodeRetryDiagnostics(
+                    runsCompleted: 1,
+                    candidateSignals: 1,
+                    lookupRequests: 1,
+                    resolvedSignals: 1,
+                    lastCompletedAt: makeDate(2026, 3, 9, hour: 8, minute: 6)
+                ),
+                lastSuccessfulRecomputeAt: makeDate(2026, 3, 9, hour: 8, minute: 7)
+            ),
             pendingLocationSnapshots: [
                 DebugExportPendingLocationSnapshot(
                     id: "pending-fr-1",
@@ -260,10 +282,17 @@ final class DebugDataStoreExportServiceTests: XCTestCase {
 
         XCTAssertEqual(payload.metadata.appVersion, "1.2.3")
         XCTAssertEqual(payload.metadata.appBuild, "456")
+        XCTAssertEqual(payload.metadata.buildCommit, "abcdef1234567890")
         XCTAssertEqual(payload.metadata.deviceModelCategory, "phone")
         XCTAssertEqual(payload.appState.dataStoreMode, "local")
         XCTAssertEqual(payload.appState.pendingWidgetSnapshotCount, 1)
         XCTAssertEqual(payload.snapshotConsistency, "quiescent")
+        XCTAssertEqual(payload.diagnostics.photoScanning.assetsScanned, 12)
+        XCTAssertEqual(payload.diagnostics.photoScanning.assetsRejected, 8)
+        XCTAssertEqual(
+            payload.diagnostics.lastSuccessfulRecomputeAt,
+            makeDate(2026, 3, 9, hour: 8, minute: 7)
+        )
         XCTAssertEqual(payload.userData.passportNationality, "GB")
         XCTAssertNil(payload.userData.appleUserId)
 
@@ -295,6 +324,39 @@ final class DebugDataStoreExportServiceTests: XCTestCase {
 
         XCTAssertEqual(payload.summary.schengenLedgerSummary.usedDays, 1)
         XCTAssertEqual(payload.summary.schengenLedgerSummary.remainingDays, 89)
+    }
+
+    func testBuildPayloadReportsUnresolvedPhotoSignalAndDayRatios() async throws {
+        let container = try makeContainer()
+        try seedData(in: container)
+        let context = container.mainContext
+        context.insert(
+            PhotoSignal(
+                timestamp: makeDate(2026, 3, 5, hour: 12),
+                latitude: 48.8566,
+                longitude: 2.3522,
+                assetIdHash: "asset-unresolved-1",
+                timeZoneId: utc.identifier,
+                dayKey: "2026-03-05",
+                countryCode: nil,
+                countryName: nil
+            )
+        )
+        try context.save()
+
+        let service = DebugDataStoreExportService(modelContainer: container)
+        let payload = try await service.buildPayload(
+            context: makeRuntimeContext(exportedAt: makeDate(2026, 3, 10))
+        )
+
+        let summary = payload.summary.unresolvedPhotoEvidence
+        XCTAssertEqual(summary.totalPhotoSignals, 2)
+        XCTAssertEqual(summary.resolvedPhotoSignals, 1)
+        XCTAssertEqual(summary.unresolvedPhotoSignals, 1)
+        XCTAssertEqual(summary.unresolvedPhotoSignalRatio, 0.5, accuracy: 0.0001)
+        XCTAssertEqual(summary.daysWithPhotoEvidence, 2)
+        XCTAssertEqual(summary.daysWithUnresolvedPhotoEvidence, 1)
+        XCTAssertEqual(summary.unresolvedPhotoEvidenceDayRatio, 0.5, accuracy: 0.0001)
     }
 
     func testBuildPayloadBuildsDeterministicDayUnionAndPreservesDiagnostics() async throws {
@@ -431,12 +493,16 @@ final class DebugDataStoreExportServiceTests: XCTestCase {
         let data = try await service.exportJSON(context: runtimeContext)
 
         let jsonObject = try XCTUnwrap(try JSONSerialization.jsonObject(with: data) as? [String: Any])
-        XCTAssertEqual(Set(jsonObject.keys), Set(["appState", "days", "metadata", "records", "snapshotConsistency", "summary", "userData"]))
+        XCTAssertEqual(Set(jsonObject.keys), Set(["appState", "days", "diagnostics", "metadata", "records", "snapshotConsistency", "summary", "userData"]))
 
         let metadata = try XCTUnwrap(jsonObject["metadata"] as? [String: Any])
         XCTAssertEqual(metadata["exportedAt"] as? String, "2026-03-10T09:30:00.000Z")
+        XCTAssertEqual(metadata["buildCommit"] as? String, "abcdef1234567890")
         XCTAssertEqual(metadata["privacyWarning"] as? String, "test-warning")
         XCTAssertEqual(jsonObject["snapshotConsistency"] as? String, "quiescent")
+
+        let diagnostics = try XCTUnwrap(jsonObject["diagnostics"] as? [String: Any])
+        XCTAssertEqual(diagnostics["lastSuccessfulRecomputeAt"] as? String, "2026-03-09T08:07:00.000Z")
 
         let records = try XCTUnwrap(jsonObject["records"] as? [String: Any])
         let calendarSignals = try XCTUnwrap(records["calendarSignals"] as? [[String: Any]])

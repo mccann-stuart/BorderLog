@@ -19,14 +19,39 @@ struct DataManager {
 
     /// Deletes the provided model from the context.
     func delete(_ model: any PersistentModel) {
+        markDirtyIfNeeded(for: model)
         modelContext.delete(model)
     }
 
     /// Deletes models at the specified offsets from the provided array.
     func delete<T: PersistentModel>(offsets: IndexSet, from models: [T]) {
         for index in offsets {
+            markDirtyIfNeeded(for: models[index])
             modelContext.delete(models[index])
         }
+    }
+
+    private func markDirtyIfNeeded(for model: any PersistentModel) {
+        let dayKeys: [String]
+        switch model {
+        case let stay as Stay:
+            let timeZone = DayIdentity.canonicalTimeZone(preferredTimeZoneId: stay.dayTimeZoneId)
+            dayKeys = [
+                stay.entryDayKey,
+                stay.exitDayKey ?? DayKey.make(from: Date(), timeZone: timeZone)
+            ]
+        case let override as DayOverride:
+            dayKeys = [override.dayKey]
+        case let location as LocationSample:
+            dayKeys = [location.dayKey]
+        case let photo as PhotoSignal:
+            dayKeys = [photo.dayKey]
+        case let calendarSignal as CalendarSignal:
+            dayKeys = [calendarSignal.dayKey]
+        default:
+            return
+        }
+        LedgerRecomputeRecoveryStore.shared.markDirty(dayKeys: dayKeys)
     }
 
     /// Resets all data by deleting all entities.
@@ -50,6 +75,8 @@ struct DataManager {
             keychain.delete(service: "com.MCCANN.Border", account: account)
         }
         PendingLocationSnapshot.removeAll(from: defaults, queueDirectoryURL: pendingLocationQueueDirectoryURL)
+        LedgerRecomputeRecoveryStore(defaults: defaults).reset()
+        defaults.removeObject(forKey: DiagnosticsStore.storageKey)
         Self.logger.info("All data reset.")
     }
 
@@ -134,6 +161,17 @@ struct DataManager {
         )
         modelContext.insert(samplePhoto)
 
+        LedgerRecomputeRecoveryStore.shared.markDirty(dayKeys: [
+            stay1.entryDayKey,
+            stay1.exitDayKey ?? stay1.entryDayKey,
+            stay2.entryDayKey,
+            stay2.exitDayKey ?? stay2.entryDayKey,
+            stay3.entryDayKey,
+            DayKey.make(from: today, timeZone: .current),
+            overrideDay.dayKey,
+            sampleLocation.dayKey,
+            samplePhoto.dayKey
+        ])
         if modelContext.hasChanges {
             try modelContext.save()
         }
@@ -142,7 +180,11 @@ struct DataManager {
         Task {
             await LedgerRefreshCoordinator.shared.run {
                 let recomputeService = LedgerRecomputeService(modelContainer: container)
-                await recomputeService.recomputeAll()
+                do {
+                    try await recomputeService.recomputeAll()
+                } catch {
+                    Self.logger.error("Failed to recompute seeded ledger: \(error, privacy: .private)")
+                }
             }
         }
 

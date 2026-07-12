@@ -82,6 +82,7 @@ struct DayOverrideEditorView: View {
             Button("Delete", role: .destructive) {
                 if let existingOverride {
                     let deletedDayKey = existingOverride.dayKey
+                    LedgerRecomputeRecoveryStore.shared.markDirty(dayKeys: [deletedDayKey])
                     modelContext.delete(existingOverride)
                     do {
                         try modelContext.save()
@@ -226,6 +227,7 @@ struct DayOverrideEditorView: View {
             modelContext.insert(newOverride)
         }
 
+        LedgerRecomputeRecoveryStore.shared.markDirty(dayKeys: impactedDayKeys)
         do {
             try modelContext.save()
             recomputeImpactedOverrideDays(impactedDayKeys)
@@ -244,7 +246,11 @@ struct DayOverrideEditorView: View {
                 // Give SwiftData time to sync the saved context before the background context fetches
                 try? await Task.sleep(nanoseconds: 150_000_000)
                 let service = LedgerRecomputeService(modelContainer: container)
-                await service.recompute(dayKeys: Array(dayKeys))
+                do {
+                    try await service.recompute(dayKeys: Array(dayKeys))
+                } catch {
+                    Self.logger.error("Failed to recompute override days: \(error, privacy: .private)")
+                }
             }
         }
     }
