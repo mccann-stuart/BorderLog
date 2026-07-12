@@ -179,7 +179,6 @@ actor CalendarTabDataService {
 
         let overrides = try fetchOverrides(dayKeys: fetchDayKeys)
         let locations = try fetchLocations(dayKeys: fetchDayKeys)
-        let photos = try fetchPhotos(dayKeys: fetchDayKeys)
         let calendarSignals = try fetchCalendarSignals(dayKeys: fetchDayKeys)
         let presenceDays = try fetchPresenceDays(dayKeys: fetchDayKeys)
         let stays = try fetchStays(rangeStartKey: rangeStartKey, rangeEndKey: rangeEndKey)
@@ -202,15 +201,6 @@ actor CalendarTabDataService {
                 dayKey: location.dayKey,
                 countryCode: location.countryCode,
                 countryName: location.countryName
-            )
-        }
-
-        for photo in photos {
-            addCountry(
-                to: &accumulators,
-                dayKey: photo.dayKey,
-                countryCode: photo.countryCode,
-                countryName: photo.countryName
             )
         }
 
@@ -292,16 +282,6 @@ actor CalendarTabDataService {
         let descriptor = FetchDescriptor<LocationSample>(
             predicate: #Predicate { sample in
                 dayKeys.contains(sample.dayKey)
-            }
-        )
-        return try modelContext.fetch(descriptor)
-    }
-
-    private func fetchPhotos(dayKeys: [String]) throws -> [PhotoSignal] {
-        guard !dayKeys.isEmpty else { return [] }
-        let descriptor = FetchDescriptor<PhotoSignal>(
-            predicate: #Predicate { signal in
-                dayKeys.contains(signal.dayKey)
             }
         )
         return try modelContext.fetch(descriptor)

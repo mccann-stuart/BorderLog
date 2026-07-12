@@ -1,6 +1,6 @@
 # Learn App Target Notes
 
-Last updated: 9 Jul 2026
+Last updated: 11 Jul 2026
 
 This directory contains the BorderLog iOS app target. The canonical product and changelog document is the repo-root `README.md`; this file tracks implementation notes that are specific to the app target.
 
@@ -12,6 +12,7 @@ This directory contains the BorderLog iOS app target. The canonical product and 
 - Debug data export is available only in `DEBUG` builds. It intentionally contains full-fidelity diagnostic data and is not a release audit/export feature.
 - Reset All Data clears SwiftData entities, keychain-backed local profile/session values, and pending widget location snapshots in shared defaults.
 - Keychain-backed profile/session values use device-bound accessibility while the device is unlocked.
+- Photo locations are retained only as unverified review context. They do not score, select a timezone, resolve a country, or block travel-context inference because PhotoKit cannot prove who captured a library asset.
 
 ## User-Facing App Areas
 

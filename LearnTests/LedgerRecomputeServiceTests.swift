@@ -231,7 +231,7 @@ final class LedgerRecomputeServiceTests: XCTestCase {
         XCTAssertFalse(mock.insertedPresenceDayKeys.contains(tomorrowKey))
     }
 
-    func testRecomputePersistsDisputedFlagWhenUpdatingExistingPresenceDay() async throws {
+    func testRecomputeClearsExistingPhotoOnlyInference() async throws {
         let calendar = Calendar.current
         let seedDate = calendar.startOfDay(for: Date())
         let seedKey = DayKey.make(from: seedDate, timeZone: calendar.timeZone)
@@ -266,11 +266,14 @@ final class LedgerRecomputeServiceTests: XCTestCase {
 
         let updated = mock.presenceDays[seedKey]
         XCTAssertNotNil(updated)
-        XCTAssertEqual(updated?.countryCode, "FR")
-        XCTAssertEqual(updated?.isDisputed, true)
+        XCTAssertNil(updated?.countryCode)
+        XCTAssertNil(updated?.countryName)
+        XCTAssertEqual(updated?.isDisputed, false)
+        XCTAssertEqual(updated?.photoCount, 3)
+        XCTAssertTrue(updated?.sources.contains(.photo) == true)
     }
 
-    func testRecomputePersistsDisputedFlagWhenInsertingPresenceDay() async throws {
+    func testRecomputeInsertsUnknownDayForPhotoOnlyMetadata() async throws {
         let calendar = Calendar.current
         let seedDate = calendar.startOfDay(for: Date())
         let seedKey = DayKey.make(from: seedDate, timeZone: calendar.timeZone)
@@ -288,8 +291,51 @@ final class LedgerRecomputeServiceTests: XCTestCase {
 
         let inserted = mock.presenceDays[seedKey]
         XCTAssertNotNil(inserted)
-        XCTAssertEqual(inserted?.countryCode, "FR")
-        XCTAssertEqual(inserted?.isDisputed, true)
+        XCTAssertNil(inserted?.countryCode)
+        XCTAssertNil(inserted?.countryName)
+        XCTAssertEqual(inserted?.isDisputed, false)
+        XCTAssertEqual(inserted?.photoCount, 3)
+        XCTAssertTrue(inserted?.sources.contains(.photo) == true)
+    }
+
+    func testRecomputeAllClearsPhotoDerivedRowsOutsideNormalCoverage() async throws {
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: Date())
+        let oldDate = try XCTUnwrap(calendar.date(byAdding: .year, value: -3, to: today))
+        let futureDate = try XCTUnwrap(calendar.date(byAdding: .day, value: 30, to: today))
+        let oldKey = DayKey.make(from: oldDate, timeZone: calendar.timeZone)
+        let futureKey = DayKey.make(from: futureDate, timeZone: calendar.timeZone)
+
+        let mock = MockLedgerDataFetcher()
+        await service.setMock(mock)
+
+        for (dayKey, date) in [(oldKey, oldDate), (futureKey, futureDate)] {
+            mock.presenceDays[dayKey] = makePresenceDay(
+                dayKey: dayKey,
+                date: date,
+                timeZoneId: calendar.timeZone.identifier,
+                countryCode: "FR",
+                countryName: "France",
+                confidence: 0.5,
+                confidenceLabel: .medium,
+                sources: [.photo],
+                isOverride: false,
+                stayCount: 0,
+                photoCount: 1,
+                locationCount: 0,
+                calendarCount: 0
+            )
+        }
+
+        let succeeded = await service.recomputeAll()
+
+        XCTAssertTrue(succeeded)
+        let updatedOldDay = try XCTUnwrap(mock.presenceDays[oldKey])
+        XCTAssertNil(updatedOldDay.countryCode)
+        XCTAssertNil(updatedOldDay.countryName)
+        XCTAssertEqual(updatedOldDay.photoCount, 0)
+        XCTAssertFalse(updatedOldDay.sources.contains(.photo))
+        XCTAssertNil(mock.presenceDays[futureKey], "Future PresenceDay cache rows should be removed")
     }
 
     private func makeDayKeys(from start: Date, to end: Date, calendar: Calendar) -> [String] {

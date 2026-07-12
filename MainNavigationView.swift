@@ -5,6 +5,7 @@ import Photos
 
 struct MainNavigationView: View {
     private static let logger = Logger(subsystem: "com.MCCANN.Border", category: "MainNavigationView")
+    private static let currentPhotoInferencePolicyVersion = 1
 
     @EnvironmentObject private var authManager: AuthenticationManager
     @Environment(\.modelContext) private var modelContext
@@ -16,6 +17,7 @@ struct MainNavigationView: View {
     @State private var selectedTab = 0
 
     @AppStorage("didBootstrapInference") private var didBootstrapInference = false
+    @AppStorage("photoInferencePolicyVersion") private var photoInferencePolicyVersion = 0
     @State private var locationService = LocationSampleService()
     @State private var didAttemptLaunchLocationCapture = false
     @State private var isBootstrappingInference = false
@@ -139,10 +141,16 @@ struct MainNavigationView: View {
 
         let container = modelContext.container
 
-        if !didBootstrapInference {
+        let requiresPhotoPolicyRecompute = photoInferencePolicyVersion < Self.currentPhotoInferencePolicyVersion
+        if !didBootstrapInference || requiresPhotoPolicyRecompute {
             let recomputeService = LedgerRecomputeService(modelContainer: container)
-            await recomputeService.recomputeAll()
+            let recomputeSucceeded = await recomputeService.recomputeAll()
+            if requiresPhotoPolicyRecompute, recomputeSucceeded {
+                photoInferencePolicyVersion = Self.currentPhotoInferencePolicyVersion
+            }
+        }
 
+        if !didBootstrapInference {
             await performBootstrapPhotoScanIfNeeded()
 
             let calendarIngestor = CalendarSignalIngestor(modelContainer: container, resolver: CLGeocoderCountryResolver())

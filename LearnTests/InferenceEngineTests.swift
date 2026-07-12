@@ -146,7 +146,7 @@ final class InferenceEngineTests: XCTestCase {
         XCTAssertEqual(evidence.count, 3)
     }
 
-    func testResolvedDayMarksEvidenceForEveryRetainedAllocation() {
+    func testPhotoOnlyMetadataRemainsContextWithoutResolvingPresence() {
         let date = day(2026, 2, 15)
         let dayKey = DayKey.make(from: date, timeZone: calendar.timeZone)
         let results = PresenceInferenceEngine.compute(
@@ -164,16 +164,20 @@ final class InferenceEngineTests: XCTestCase {
             calendar: calendar
         )
 
-        let contributedCountries = results.first?.contributedCountries ?? []
-        XCTAssertEqual(contributedCountries.map(\.countryCode), ["FR", "ES"])
+        XCTAssertTrue(results.first?.contributedCountries.isEmpty == true)
+        XCTAssertEqual(results.first?.photoCount, 3)
+        XCTAssertEqual(results.first?.confidenceLabel, .low)
+        XCTAssertTrue(results.first?.sources.contains(.photo) == true)
 
         let evidence = results.first?.evidence ?? []
         XCTAssertEqual(evidence.count, 3)
-        XCTAssertEqual(evidence.filter { $0.countryCode == "FR" && $0.contributedToFinalResult }.count, 2)
-        XCTAssertTrue(evidence.contains(where: { $0.countryCode == "ES" && $0.contributedToFinalResult }))
+        XCTAssertTrue(evidence.allSatisfy { $0.phase == .contextual })
+        XCTAssertTrue(evidence.allSatisfy { $0.calibratedWeight == 0 })
+        XCTAssertTrue(evidence.allSatisfy { $0.reason == "unverified-photo-library-metadata" })
+        XCTAssertTrue(evidence.allSatisfy { !$0.contributedToFinalResult })
     }
 
-    func testDisputedWhenConfidenceDeltaSmall() {
+    func testUnverifiedPhotoMetadataCannotChangeTrustedLocationResult() {
         let date = day(2026, 2, 15)
         let dayKey = DayKey.make(from: date, timeZone: calendar.timeZone)
         let photos = [
@@ -186,17 +190,27 @@ final class InferenceEngineTests: XCTestCase {
             dayKeys: [dayKey],
             stays: [],
             overrides: [],
-            locations: [],
+            locations: [
+                LocationSignalInfo(
+                    dayKey: dayKey,
+                    countryCode: "ES",
+                    countryName: "Spain",
+                    accuracyMeters: 10,
+                    timeZoneId: "Europe/Madrid"
+                )
+            ],
             photos: photos, calendarSignals: [],
             rangeEnd: date,
             calendar: calendar
         )
 
-        XCTAssertEqual(results.first?.contributedCountries.first?.countryCode, "FR")
-        XCTAssertEqual(results.first?.isDisputed, true)
+        XCTAssertEqual(results.first?.contributedCountries.map(\.countryCode), ["ES"])
+        XCTAssertEqual(results.first?.isDisputed, false)
+        XCTAssertEqual(results.first?.photoCount, 3)
+        XCTAssertTrue(results.first?.evidence.filter { $0.source == "photo" }.allSatisfy { !$0.contributedToFinalResult } == true)
     }
 
-    func testDeterministicTimeZoneSelectionWhenScoresTie() {
+    func testPhotoMetadataDoesNotSelectDayTimeZone() {
         let date = day(2026, 2, 15)
         let dayKey = DayKey.make(from: date, timeZone: calendar.timeZone)
 
@@ -216,7 +230,7 @@ final class InferenceEngineTests: XCTestCase {
             calendar: calendar
         )
 
-        XCTAssertEqual(results.first?.timeZoneId, "Europe/Paris")
+        XCTAssertEqual(results.first?.timeZoneId, calendar.timeZone.identifier)
     }
 
     func testBridgesSevenDayVoidWhenCanonicalCountriesMatch() {
@@ -228,17 +242,19 @@ final class InferenceEngineTests: XCTestCase {
         })
         let spainName = localizedCountryName("ES")
 
-        let photos = [
-            PhotoSignalInfo(
+        let locations = [
+            LocationSignalInfo(
                 dayKey: DayKey.make(from: start, timeZone: calendar.timeZone),
                 countryCode: nil,
                 countryName: spainName,
+                accuracyMeters: 10,
                 timeZoneId: "UTC"
             ),
-            PhotoSignalInfo(
+            LocationSignalInfo(
                 dayKey: DayKey.make(from: end, timeZone: calendar.timeZone),
                 countryCode: "ES",
                 countryName: spainName,
+                accuracyMeters: 10,
                 timeZoneId: "UTC"
             )
         ]
@@ -247,8 +263,8 @@ final class InferenceEngineTests: XCTestCase {
             dayKeys: dayKeys,
             stays: [],
             overrides: [],
-            locations: [],
-            photos: photos,
+            locations: locations,
+            photos: [],
             calendarSignals: [],
             rangeEnd: end,
             calendar: calendar
@@ -276,17 +292,19 @@ final class InferenceEngineTests: XCTestCase {
         })
         let spainName = localizedCountryName("ES")
 
-        let photos = [
-            PhotoSignalInfo(
+        let locations = [
+            LocationSignalInfo(
                 dayKey: DayKey.make(from: start, timeZone: calendar.timeZone),
                 countryCode: nil,
                 countryName: spainName,
+                accuracyMeters: 10,
                 timeZoneId: "UTC"
             ),
-            PhotoSignalInfo(
+            LocationSignalInfo(
                 dayKey: DayKey.make(from: end, timeZone: calendar.timeZone),
                 countryCode: "ES",
                 countryName: spainName,
+                accuracyMeters: 10,
                 timeZoneId: "UTC"
             )
         ]
@@ -295,8 +313,8 @@ final class InferenceEngineTests: XCTestCase {
             dayKeys: dayKeys,
             stays: [],
             overrides: [],
-            locations: [],
-            photos: photos,
+            locations: locations,
+            photos: [],
             calendarSignals: [],
             rangeEnd: end,
             calendar: calendar
@@ -326,7 +344,14 @@ final class InferenceEngineTests: XCTestCase {
             stays: [],
             overrides: [],
             locations: [],
-            photos: [],
+            photos: [
+                PhotoSignalInfo(
+                    dayKey: previousDayKey,
+                    countryCode: "JP",
+                    countryName: localizedCountryName("JP"),
+                    timeZoneId: "Asia/Tokyo"
+                )
+            ],
             calendarSignals: [
                 CalendarSignalInfo(
                     dayKey: departureDayKey,

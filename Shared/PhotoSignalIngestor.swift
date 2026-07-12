@@ -57,17 +57,7 @@ actor PhotoSignalIngestor {
 
         let config = Self.ingestQueryConfig(mode: mode, state: state, now: now, calendar: calendar)
 
-        let options = PHFetchOptions()
-        if let endDate = config.endDate {
-            options.predicate = NSPredicate(
-                format: "creationDate >= %@ AND creationDate <= %@",
-                config.startDate as NSDate,
-                endDate as NSDate
-            )
-        } else {
-            options.predicate = NSPredicate(format: "creationDate >= %@", config.startDate as NSDate)
-        }
-        options.sortDescriptors = [NSSortDescriptor(key: "creationDate", ascending: config.sortAscending)]
+        let options = Self.fetchOptions(config: config)
 
         let assets = PHAsset.fetchAssets(with: .image, options: options)
         let assetCount = assets.count
@@ -186,6 +176,26 @@ actor PhotoSignalIngestor {
             let startDate = calendar.date(byAdding: .month, value: -12, to: now) ?? now
             return IngestQueryConfig(startDate: startDate, endDate: nil, sortAscending: true)
         }
+    }
+
+    static func fetchOptions(config: IngestQueryConfig) -> PHFetchOptions {
+        let options = PHFetchOptions()
+        if let endDate = config.endDate {
+            options.predicate = NSPredicate(
+                format: "creationDate >= %@ AND creationDate <= %@",
+                config.startDate as NSDate,
+                endDate as NSDate
+            )
+        } else {
+            options.predicate = NSPredicate(format: "creationDate >= %@", config.startDate as NSDate)
+        }
+        options.sortDescriptors = [NSSortDescriptor(key: "creationDate", ascending: config.sortAscending)]
+
+        // This excludes direct Shared Album and computer-synced assets. PhotoKit cannot
+        // distinguish saved Messages photos or Shared Library contributions from other
+        // user-library assets, so inference must still treat every photo as unverified.
+        options.includeAssetSourceTypes = [.typeUserLibrary]
+        return options
     }
 
     private func fetchOrCreateState() -> PhotoIngestState {

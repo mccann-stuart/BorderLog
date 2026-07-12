@@ -21,6 +21,7 @@ protocol LedgerDataFetching {
     nonisolated func fetchEarliestLocationDate() throws -> Date?
     nonisolated func fetchEarliestPhotoDate() throws -> Date?
     nonisolated func fetchEarliestCalendarSignalDate() throws -> Date?
+    nonisolated func fetchEarliestPresenceDayDate() throws -> Date?
 
     nonisolated func fetchPresenceDays(keys: [String]) throws -> [PresenceDay]
     nonisolated func fetchPresenceDayKeys(from start: Date, to end: Date) throws -> Set<String>
@@ -28,6 +29,7 @@ protocol LedgerDataFetching {
     nonisolated func fetchNearestKnownPresenceDay(before date: Date) throws -> PresenceDay?
     nonisolated func fetchNearestKnownPresenceDay(after date: Date) throws -> PresenceDay?
     nonisolated func insertPresenceDay(_ day: PresenceDay)
+    nonisolated func deletePresenceDays(afterDayKey dayKey: String) throws
 
     nonisolated func save() throws
 }
@@ -120,6 +122,12 @@ struct RealLedgerDataFetcher: LedgerDataFetching {
         return try modelContext.fetch(descriptor).first?.timestamp
     }
 
+    func fetchEarliestPresenceDayDate() throws -> Date? {
+        var descriptor = FetchDescriptor<PresenceDay>(sortBy: [SortDescriptor(\.date, order: .forward)])
+        descriptor.fetchLimit = 1
+        return try modelContext.fetch(descriptor).first?.date
+    }
+
     func fetchPresenceDays(keys: [String]) throws -> [PresenceDay] {
         let descriptor = FetchDescriptor<PresenceDay>(
             predicate: #Predicate { keys.contains($0.dayKey) }
@@ -203,6 +211,13 @@ struct RealLedgerDataFetcher: LedgerDataFetching {
 
     func insertPresenceDay(_ day: PresenceDay) {
         modelContext.insert(day)
+    }
+
+    func deletePresenceDays(afterDayKey dayKey: String) throws {
+        let days = try modelContext.fetch(FetchDescriptor<PresenceDay>())
+        for day in days where day.dayKey > dayKey {
+            modelContext.delete(day)
+        }
     }
 
     func save() throws {

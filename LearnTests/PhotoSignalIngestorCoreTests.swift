@@ -1,6 +1,7 @@
 import XCTest
 import SwiftData
 import CoreLocation
+import Photos
 @testable import Learn
 
 private struct StubResolver: CountryResolving {
@@ -51,6 +52,18 @@ final class PhotoSignalIngestorCoreTests: XCTestCase {
         await XCTAssertThrowsErrorAsync {
             try await ingestor.saveContextIfNeeded()
         }
+    }
+
+    func testFetchOptionsExplicitlyRestrictAssetsToUserLibrary() {
+        let config = PhotoSignalIngestor.IngestQueryConfig(
+            startDate: makeDate(2026, 1, 1),
+            endDate: makeDate(2026, 2, 1),
+            sortAscending: true
+        )
+
+        let options = PhotoSignalIngestor.fetchOptions(config: config)
+
+        XCTAssertEqual(options.includeAssetSourceTypes, [.typeUserLibrary])
     }
 
     func testScannedCheckpointAdvancesForDuplicateNewerAsset() throws {

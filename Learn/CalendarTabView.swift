@@ -21,6 +21,7 @@ struct CalendarTabView: View {
     @State private var presenceDaysByKey: [String: PresenceDay] = [:]
     @State private var isLoading = false
     @State private var loadError: String?
+    @AppStorage("photoInferencePolicyVersion") private var photoInferencePolicyVersion = 0
     @AppStorage(CountryDayCountingMode.storageKey, store: AppConfig.sharedDefaults) private var countryDayCountingModeRaw = CountryDayCountingMode.defaultMode.rawValue
 
     @State private var selectedDayKey: String? // for programmatic navigation
@@ -138,6 +139,9 @@ struct CalendarTabView: View {
         .onChange(of: countryDayCountingModeRaw) { _, _ in
             Task { await refreshSnapshot() }
         }
+        .onChange(of: photoInferencePolicyVersion) { _, _ in
+            Task { await refreshSnapshot() }
+        }
         .onChange(of: scenePhase) { _, newPhase in
             guard newPhase == .active else { return }
             Task { await refreshSnapshot() }
@@ -154,6 +158,7 @@ struct CalendarTabView: View {
         let requestedMonth = visibleMonthStart
         let requestedRange = summaryRange
         let requestedCountingMode = countryDayCountingMode
+        let requestedPhotoInferencePolicyVersion = photoInferencePolicyVersion
         let service = CalendarTabDataService(modelContainer: modelContext.container)
 
         isLoading = true
@@ -167,14 +172,16 @@ struct CalendarTabView: View {
             )
             guard requestedMonth == visibleMonthStart,
                   requestedRange == summaryRange,
-                  requestedCountingMode == countryDayCountingMode else { return }
+                  requestedCountingMode == countryDayCountingMode,
+                  requestedPhotoInferencePolicyVersion == photoInferencePolicyVersion else { return }
 
             snapshot = loadedSnapshot
             loadPresenceDays(for: summaryPresenceDayKeys(from: loadedSnapshot))
         } catch {
             guard requestedMonth == visibleMonthStart,
                   requestedRange == summaryRange,
-                  requestedCountingMode == countryDayCountingMode else { return }
+                  requestedCountingMode == countryDayCountingMode,
+                  requestedPhotoInferencePolicyVersion == photoInferencePolicyVersion else { return }
             Self.logger.error("Failed to load calendar snapshot: \(error, privacy: .private)")
             loadError = "Failed to load calendar data. Please try again."
             loadPresenceDays(for: summaryPresenceDayKeys(from: snapshot))
@@ -182,7 +189,8 @@ struct CalendarTabView: View {
 
         if requestedMonth == visibleMonthStart,
            requestedRange == summaryRange,
-           requestedCountingMode == countryDayCountingMode {
+           requestedCountingMode == countryDayCountingMode,
+           requestedPhotoInferencePolicyVersion == photoInferencePolicyVersion {
             isLoading = false
         }
     }

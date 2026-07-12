@@ -31,6 +31,8 @@ class MockLedgerDataFetcher: LedgerDataFetching {
     var fetchCalendarSignalsError: Error?
     var fetchPresenceDaysError: Error?
     var fetchPresenceDayKeysError: Error?
+    var fetchPresenceDayBoundsError: Error?
+    var deletePresenceDaysError: Error?
     var saveError: Error?
 
     var saveCalled = false
@@ -88,6 +90,11 @@ class MockLedgerDataFetcher: LedgerDataFetching {
         return earliestCalendarSignalDate
     }
 
+    func fetchEarliestPresenceDayDate() throws -> Date? {
+        if let error = fetchPresenceDayBoundsError { throw error }
+        return presenceDays.values.lazy.map(\.date).min()
+    }
+
     func fetchPresenceDays(keys: [String]) throws -> [PresenceDay] {
         if let error = fetchPresenceDaysError { throw error }
         return keys.compactMap { presenceDays[$0] }
@@ -125,6 +132,14 @@ class MockLedgerDataFetcher: LedgerDataFetching {
         insertPresenceDayCalled = true
         insertedPresenceDayKeys.append(day.dayKey)
         presenceDays[day.dayKey] = day
+    }
+
+    func deletePresenceDays(afterDayKey dayKey: String) throws {
+        if let error = deletePresenceDaysError { throw error }
+        let keysToDelete = presenceDays.keys.filter { $0 > dayKey }
+        for key in keysToDelete {
+            presenceDays.removeValue(forKey: key)
+        }
     }
 
     func save() throws {

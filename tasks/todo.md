@@ -1,3 +1,21 @@
+# Unverified Shared Photo Inference Fix (11 Jul 2026)
+
+- [x] Document the PhotoKit provenance boundary and trace every path from photo fetch to persisted daily inference.
+- [x] Restrict photo fetching explicitly to the user-library source so direct iCloud Shared Album assets are not scanned.
+- [x] Make photo metadata contextual and non-scoring so it cannot establish, change, or block a country inference when ownership cannot be verified.
+- [x] Update user-facing and canonical product copy to explain that photo locations are unverified context rather than proof of presence.
+- [x] Add focused regression coverage for photo-only days, conflicts with trusted evidence, travel promotions, migration failures, and fetch-source configuration.
+- [x] Attempt the focused tests and iOS Simulator build, complete alternative type-check verification, review the diff, and record the tooling blocker and residual PhotoKit limitations here.
+
+## Unverified Shared Photo Inference Fix Review
+
+- Photo metadata is now zero-weight, contextual evidence. It cannot resolve or alter a country, select a timezone, become contributing evidence, or block trusted travel-context promotion. Calendar summaries no longer fall back directly to raw photo countries.
+- PhotoKit fetches explicitly request user-library assets, excluding direct Shared Album and computer-synced assets. Apple does not expose enough provenance to distinguish saved Messages media or every Shared Library contribution, so every retained photo location remains labelled unverified.
+- A versioned launch migration recomputes all persisted history, clears legacy photo-derived countries, removes invalid future derived-cache rows by canonical day key, retries after any fetch/save failure, and refreshes Calendar without allowing a pre-migration snapshot to overwrite corrected data.
+- User-facing permission, Settings, privacy, day-detail, app-target, and canonical README copy now states that photos are optional context rather than proof of presence.
+- Verification passed: `git diff --check`; `swiftc -frontend -parse` for every changed Swift file; direct iOS SDK type-check of the 74-file app target; emitted `Learn` module; and direct type-check of the 37-file XCTest target against Xcode's explicit dependency map. Independent read-only review found no remaining material defect.
+- Focused `xcodebuild test` compiled the app and test bundles before the test launcher stalled without starting a test body. Subsequent Simulator test attempts and an incremental `build-for-testing` stalled inside Xcode/CoreSimulator workspace operations and were interrupted cleanly. No XCTest execution is claimed; rerun the focused suite when the local Xcode/Simulator service is healthy. The only direct type-check diagnostics were pre-existing concurrency/test warnings outside this change.
+
 # App Store Launch Blocker Resolution Plan (9 Jul 2026)
 
 - [x] Establish the current Release build, archive, test, and Simulator-launch baseline without disturbing existing user changes.

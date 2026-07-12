@@ -22,7 +22,8 @@ public actor LedgerRecomputeService {
         return fetcher
     }
 
-    public func recompute(dayKeys: [String]) async {
+    @discardableResult
+    public func recompute(dayKeys: [String]) async -> Bool {
         var didBeginInference = false
         defer {
             if didBeginInference {
@@ -31,7 +32,7 @@ public actor LedgerRecomputeService {
                 }
             }
         }
-        guard !dayKeys.isEmpty else { return }
+        guard !dayKeys.isEmpty else { return true }
 
         let calendar = Calendar.current
         let timeZone = calendar.timeZone
@@ -54,17 +55,17 @@ public actor LedgerRecomputeService {
                     timeZone: timeZone,
                     calendar: calendar
                 ) else {
-                    return
+                    return false
                 }
                 scope = expandedScope
             } catch {
                 Self.logger.error("LedgerRecomputeService scope error: \(error, privacy: .private)")
                 onRecomputeError?(error)
-                return
+                return false
             }
 
             let dayKeySet = Set(scope.dayKeys)
-            guard !dayKeySet.isEmpty else { return }
+            guard !dayKeySet.isEmpty else { return false }
 
             // Fetch one day on each side so timestamp-based evidence near midnight is available.
             let rangeStart = calendar.date(byAdding: .day, value: -1, to: scope.start) ?? scope.start
@@ -85,7 +86,7 @@ public actor LedgerRecomputeService {
             } catch {
                 Self.logger.error("LedgerRecomputeService fetch error: \(error, privacy: .private)")
                 onRecomputeError?(error)
-                return
+                return false
             }
 
             let stayInfos = stays.map {
@@ -164,7 +165,14 @@ public actor LedgerRecomputeService {
             )
             
             // Incremental dependency check: Have the boundary days changed their primary result?
-            let existingDays = (try? dataFetcher.fetchPresenceDays(keys: Array(dayKeySet))) ?? []
+            let existingDays: [PresenceDay]
+            do {
+                existingDays = try dataFetcher.fetchPresenceDays(keys: Array(dayKeySet))
+            } catch {
+                Self.logger.error("LedgerRecomputeService existing-day fetch error: \(error, privacy: .private)")
+                onRecomputeError?(error)
+                return false
+            }
             let existingMap = existingDays.reduce(into: [String: PresenceDay](minimumCapacity: existingDays.count)) { $0[$1.dayKey] = $1 }
             
             var needsExpansion = false
@@ -204,27 +212,52 @@ public actor LedgerRecomputeService {
         do {
             try self.upsertPresenceDays(finalResults, originalKeys: finalScopeKeys)
             try dataFetcher.save()
+            return true
         } catch {
             Self.logger.error("LedgerRecomputeService save error: \(error, privacy: .private)")
             onRecomputeError?(error)
+            return false
         }
     }
 
-    public func recomputeAll() async {
+    @discardableResult
+    public func recomputeAll() async -> Bool {
         let calendar = Calendar.current
         let today = calendar.startOfDay(for: Date())
+        let todayKey = DayKey.make(from: today, timeZone: calendar.timeZone)
 
         let twoYearsAgo = calendar.date(byAdding: .year, value: -2, to: today) ?? today
-        let earliestSignal = try? self.earliestSignalDate()
+        let earliestSignal: Date?
+        let earliestPresenceDay: Date?
+        do {
+            earliestSignal = try self.earliestSignalDate()
+            earliestPresenceDay = try dataFetcher.fetchEarliestPresenceDayDate()
+        } catch {
+            Self.logger.error("LedgerRecomputeService full-range fetch error: \(error, privacy: .private)")
+            onRecomputeError?(error)
+            return false
+        }
 
-        // ⚡ Bolt: Avoid intermediate O(N) array allocation from .compactMap { $0 }.min()
         var earliest = twoYearsAgo
         if let earliestSignal = earliestSignal, earliestSignal < earliest {
             earliest = earliestSignal
         }
+        if let earliestPresenceDay = earliestPresenceDay, earliestPresenceDay < earliest {
+            earliest = earliestPresenceDay
+        }
 
         let dayKeys = self.makeDayKeys(from: earliest, to: today, calendar: calendar)
-        await self.recompute(dayKeys: dayKeys)
+        guard await self.recompute(dayKeys: dayKeys) else { return false }
+
+        do {
+            try dataFetcher.deletePresenceDays(afterDayKey: todayKey)
+            try dataFetcher.save()
+            return true
+        } catch {
+            Self.logger.error("LedgerRecomputeService future-cache cleanup error: \(error, privacy: .private)")
+            onRecomputeError?(error)
+            return false
+        }
     }
 
     public func fillMissingDays(asOf: Date = Date(), calendar: Calendar = .current) async {
@@ -388,11 +421,14 @@ public actor LedgerRecomputeService {
     private func coverageLowerBound(today: Date, calendar: Calendar) throws -> Date {
         let twoYearsAgo = calendar.date(byAdding: .year, value: -2, to: today) ?? today
         let earliestSignal = try earliestSignalDate().map { calendar.startOfDay(for: $0) }
+        let earliestPresenceDay = try dataFetcher.fetchEarliestPresenceDayDate().map { calendar.startOfDay(for: $0) }
 
-        // ⚡ Bolt: Avoid intermediate O(N) array allocation from .compactMap { $0 }.min()
         var earliest = twoYearsAgo
         if let earliestSignal = earliestSignal, earliestSignal < earliest {
             earliest = earliestSignal
+        }
+        if let earliestPresenceDay = earliestPresenceDay, earliestPresenceDay < earliest {
+            earliest = earliestPresenceDay
         }
         return earliest
     }

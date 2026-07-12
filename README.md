@@ -3,7 +3,7 @@ Product Requirements Document (PRD)
 BorderLog (Working Title) — Local‑first Country Presence + Schengen Tracker for Expats
 
 Document status: Draft v0.3, living PRD plus weekly changelog
-Last updated: 9 Jul 2026
+Last updated: 11 Jul 2026
 Platforms: iOS (primary), iPadOS (nice-to-have)
 Distribution: App Store
 Pricing: Free (no subscriptions, no paid tiers)
@@ -15,6 +15,7 @@ Current implementation notes:
 - Reset All Data clears SwiftData models, keychain-backed local profile/session values, and pending widget location snapshots.
 - Keychain profile/session values use device-bound `kSecAttrAccessibleWhenUnlockedThisDeviceOnly` accessibility.
 - Settings includes a shared Day Counting mode: `Resolved Country` preserves the one-country-per-day default, while `Double Count Days` counts every resolved country allocation on travel days for app and widget summaries.
+- Photo locations are shown only as unverified review context. They do not score, resolve, alter, or block country inference because PhotoKit cannot prove who captured an asset in the user's library.
 
 App Store release readiness:
 - The app and widget are configured for iOS 26, and the widget targets both iPhone and iPad as required for app extensions.
@@ -23,6 +24,15 @@ App Store release readiness:
 - App Store distribution still requires production provisioning for both bundle identifiers and the `group.com.MCCANN.Border` App Group.
 
 Weekly Changelog
+
+Week of Jul 6-12, 2026
+
+Highlights:
+- Stopped photo-library metadata from determining daily presence because received, saved, and iCloud Shared Library assets cannot be reliably distinguished from photos captured by the user.
+- Kept geotagged photo metadata available as clearly labelled, zero-weight context and explicitly restricted PhotoKit fetches to user-library sources to exclude direct Shared Album assets.
+- Added a one-time ledger recomputation so previously photo-derived country results are neutralised after the policy change.
+
+⸻
 
 Week of Apr 13-19, 2026
 
@@ -156,8 +166,10 @@ BorderLog is a privacy-first iOS app that helps expatriates and frequent travele
 
 Unlike manual spreadsheet approaches, BorderLog infers daily country presence by combining:
 	1.	Location snapshots written into a local table (captured opportunistically by an iOS Widget extension)
-	2.	Photo location metadata (GPS in photo EXIF, exposed via Photos/PhotoKit asset location)
-	3.	Manual entries & user corrections, which override inference
+	2.	Manual entries and user corrections, which override inference
+	3.	Read-only calendar travel signals
+
+Photo location metadata (GPS exposed via Photos/PhotoKit) is shown separately as unverified context and never contributes to inference.
 
 Photo and location permissions are strictly opt-in; the app remains usable in “manual-only” mode.
 
@@ -235,7 +247,7 @@ Journey B — Daily Inference + Review
 	1.	App proposes a country for each day (with confidence).
 	2.	User reviews timeline; taps a day to see evidence:
 	•	widget location samples
-	•	photo locations
+	•	unverified photo locations (context only)
 	•	manual entries
 	3.	User confirms or overrides.
 
@@ -304,7 +316,7 @@ FR-Loc-3 — Minimal storage
 
 6.2.2 Photo Location Metadata (Photo EXIF via PhotoKit)
 FR-Photo-1 — Read photo location metadata only
-	•	With user permission, scan photo library for assets that include location metadata and creation time.
+	•	With user permission, scan user-library assets that include location metadata and creation time. Direct Shared Album and computer-synchronised assets are excluded.
 	•	PhotoKit exposes asset location via PHAsset.location.  ￼
 
 FR-Photo-2 — Permission handling
@@ -313,6 +325,10 @@ FR-Photo-2 — Permission handling
 
 FR-Photo-3 — Minimize retained data
 	•	Store derived signals (timestamp + coordinate + localIdentifier hash); do not copy images.
+
+FR-Photo-4 — Do not infer presence from photo ownership
+	•	Treat every photo location as unverified context because PhotoKit cannot distinguish all received, saved, or Shared Library assets from photos captured by the user.
+	•	Photo metadata must not score, resolve or alter a country, select the day's timezone, anchor gap bridging, or block travel-context inference.
 
 6.2.3 Manual Entries & Corrections
 FR-Manual-1 — Manual trip entry
@@ -354,7 +370,7 @@ The core engine produces a Daily Presence Ledger: for each date, which country (
 
 6.4.1 Inputs
 	•	Location samples (widget/app)
-	•	Photo signals (location + creationDate)
+	•	Photo metadata context (location + creationDate; non-scoring)
 	•	Manual stays and day overrides
 	•	Country/zone definitions & rule configs (from bundled + remote updates)
 
@@ -371,7 +387,7 @@ Step 2: Candidate country scoring
 	•	Manual day override: score = ∞ (wins)
 	•	Manual stay segment: very high weight
 	•	Location samples: high weight, adjusted by accuracy and number of samples
-	•	Photo signals: medium weight (users tend to take photos where they are)
+	•	Photo metadata: zero weight (context only; library presence is not proof of user presence)
 	•	Calendar signals: lower weight (helpful but less reliable)
 
 Step 3: Select day country
@@ -388,7 +404,7 @@ Step 5: Build zone presence
 Each day detail view must show:
 	•	Final country label
 	•	Confidence label (High/Medium/Low)
-	•	Evidence list (e.g., 3 photos in Italy, 2 widget samples in Italy)
+	•	Evidence list (e.g., 2 widget samples in Italy), with photo metadata labelled separately as unverified context
 	•	“Override” control
 
 ⸻
@@ -690,7 +706,7 @@ Enable expatriates, digital nomads, and frequent international travelers to accu
 4. Implement `LocationSampleService` to capture a single fix, resolve country/timezone, store a sample, and trigger ledger recompute.
 5. Implement `PhotoSignalIngestor` to scan the last 12 months (incremental on subsequent runs), hash asset IDs, store signals, and trigger recompute.
 6. Create a WidgetKit extension that captures location on refresh and displays the last sample.
-7. Build `PresenceInferenceEngine` scoring logic with weights (override > stay > location > photo > calendar).
+7. Build `PresenceInferenceEngine` scoring logic with weights (override > stay > location > calendar); retain photo metadata only as zero-weight context.
 8. Add `LedgerRecomputeService` to upsert `PresenceDay` by dayKey and handle unknowns.
 9. Add a Daily Ledger section in Details with confidence pills, evidence, and an override action.
 10. Switch Dashboard metrics to use `PresenceDay` with unknown-day reporting.

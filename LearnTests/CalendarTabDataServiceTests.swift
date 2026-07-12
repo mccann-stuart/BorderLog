@@ -262,7 +262,7 @@ final class CalendarTabDataServiceTests: XCTestCase {
         XCTAssertEqual(visibleMonthCountryIDs, Set(["US"]))
     }
 
-    func testSnapshotFallsBackToCountryNameAndTracksMonthBounds() async throws {
+    func testSnapshotKeepsPhotoOnlyMonthNavigableWithoutUsingPhotoCountry() async throws {
         let container = try makeContainer()
         let context = container.mainContext
 
@@ -288,11 +288,9 @@ final class CalendarTabDataServiceTests: XCTestCase {
             now: now
         )
 
-        let atlantis = try XCTUnwrap(snapshot.countrySummaries.first)
-        XCTAssertEqual(atlantis.id, "Atlantis")
-        XCTAssertEqual(atlantis.countryCode, nil)
-        XCTAssertEqual(atlantis.countryName, "Atlantis")
-        XCTAssertEqual(atlantis.totalDays, 1)
+        XCTAssertTrue(snapshot.countrySummaries.isEmpty)
+        let photoDay = try XCTUnwrap(snapshot.daySummaries.first { $0.dayKey == "2025-01-05" })
+        XCTAssertTrue(photoDay.countries.isEmpty)
 
         let earliestComponents = Calendar.current.dateComponents([.year, .month], from: snapshot.earliestAvailableMonth)
         XCTAssertEqual(earliestComponents.year, 2025)
@@ -303,14 +301,6 @@ final class CalendarTabDataServiceTests: XCTestCase {
         XCTAssertEqual(latestComponents.year, expectedLatestComponents.year)
         XCTAssertEqual(latestComponents.month, expectedLatestComponents.month)
 
-        let fallbackInfo = CountryDaysInfo(
-            countryName: atlantis.countryName,
-            countryCode: atlantis.countryCode,
-            totalDays: atlantis.totalDays,
-            region: Region(rawValue: atlantis.regionRaw) ?? .other,
-            maxAllowedDays: atlantis.maxAllowedDays
-        )
-        XCTAssertEqual(fallbackInfo.flagEmoji, "🌍")
     }
 
     func testSnapshotCountsResolvedBridgeDaysWithoutRawEvidence() async throws {

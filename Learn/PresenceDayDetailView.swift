@@ -351,9 +351,12 @@ private struct EvidenceSection: View {
                 }
             }
 
-            Section("Photos (\(photos.count))") {
+            Section("Unverified Photo Context (\(photos.count))") {
+                Text("Photos in your library may have been shared or saved by someone else. Their locations do not affect BorderLog's country inference.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
                 if photos.isEmpty {
-                    Text("No photo evidence")
+                    Text("No photo metadata")
                         .foregroundStyle(.secondary)
                 } else {
                     ForEach(photos) { photo in
@@ -565,7 +568,16 @@ private struct EvidenceSection: View {
         ],
         zoneOverlays: ["Europe/Madrid"],
         evidence: [
-            SignalImpact(source: "photo", countryCode: "ES", countryName: "Spain", scoreDelta: 0.4),
+            PresenceEvidenceEntry(
+                dayKey: "2026-02-15",
+                processorID: "photo",
+                countryCode: "ES",
+                countryName: "Spain",
+                rawWeight: 0,
+                calibratedWeight: 0,
+                phase: .contextual,
+                reason: "unverified-photo-library-metadata"
+            ),
             SignalImpact(source: "location", countryCode: "ES", countryName: "Spain", scoreDelta: 0.3)
         ],
         confidence: 0.7,

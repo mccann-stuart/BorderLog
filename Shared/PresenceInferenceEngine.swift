@@ -27,7 +27,6 @@ nonisolated struct InferenceContext {
 
 nonisolated struct InferencePipelineConfig: Sendable {
     let stayBaseWeight: Double = 5.0
-    let photoBaseWeight: Double = 2.0
     let locationBaseWeight: Double = 3.0
     let calendarBaseWeight: Double = 1.0
     let overrideWeight: Double = 1_000.0
@@ -157,6 +156,26 @@ nonisolated struct InferencePipelineState: Sendable {
                 reason: "manual-override",
                 contributedToFinalResult: true,
                 timeZoneId: overrideInfo.dayTimeZoneId
+            )
+        )
+        self[dayKey] = dayState
+    }
+
+    mutating func recordPhotoContext(dayKey: String, country: ResolvedCountry, timeZoneId: String?) {
+        var dayState = self[dayKey]
+        dayState.counts.photoCount += 1
+        dayState.evidenceEntries.append(
+            PresenceEvidenceEntry(
+                dayKey: dayKey,
+                processorID: "photo",
+                countryCode: country.code,
+                countryName: country.name,
+                rawWeight: 0,
+                calibratedWeight: 0,
+                phase: .contextual,
+                reason: "unverified-photo-library-metadata",
+                contributedToFinalResult: false,
+                timeZoneId: timeZoneId
             )
         )
         self[dayKey] = dayState
@@ -319,14 +338,11 @@ nonisolated struct PhotoProcessor: SignalProcessor {
     func process(state: inout InferencePipelineState, context: InferenceContext, config: InferencePipelineConfig) {
         for photo in context.photos where context.dayKeys.contains(photo.dayKey) {
             guard let country = resolveCountry(countryCode: photo.countryCode, countryName: photo.countryName) else { continue }
-            state.recordMutation(
+            // PhotoKit exposes where an asset was captured, but not whether the current
+            // user captured it. Keep the metadata visible without treating it as presence.
+            state.recordPhotoContext(
                 dayKey: photo.dayKey,
-                processorID: id,
                 country: country,
-                rawWeight: config.photoBaseWeight,
-                calibratedWeight: config.photoBaseWeight,
-                phase: .base,
-                reason: "photo-signal",
                 timeZoneId: photo.timeZoneId
             )
         }
@@ -1020,13 +1036,14 @@ nonisolated private struct PresenceResultCompiler {
         let selectedCountries = result.countryAllocations
         let updatedEvidence = result.evidenceEntries.map { entry in
             var mutable = entry
+            let matchesSelectedCountry = selectedCountries.contains { allocation in
+                if let countryCode = entry.countryCode, let allocationCode = allocation.countryCode {
+                    return countryCode == allocationCode
+                }
+                return entry.countryName.caseInsensitiveCompare(allocation.countryName) == .orderedSame
+            }
             mutable.contributedToFinalResult =
-                selectedCountries.contains(where: { allocation in
-                    if let countryCode = entry.countryCode, let allocationCode = allocation.countryCode {
-                        return countryCode == allocationCode
-                    }
-                    return entry.countryName.caseInsensitiveCompare(allocation.countryName) == .orderedSame
-                }) || entry.phase == .override
+                (entry.processorID != "photo" && matchesSelectedCountry) || entry.phase == .override
             return mutable
         }
 
@@ -1054,7 +1071,7 @@ nonisolated private struct PresenceResultCompiler {
 
     private func isEligibleForAdjacentTravelPromotion(_ result: PresenceDayResult) -> Bool {
         guard !result.isOverride else { return false }
-        guard result.stayCount == 0, result.photoCount == 0, result.locationCount == 0 else { return false }
+        guard result.stayCount == 0, result.locationCount == 0 else { return false }
         if result.countryAllocations.isEmpty {
             return true
         }

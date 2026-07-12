@@ -123,6 +123,9 @@ final class RealLedgerDataFetcherTests: XCTestCase {
         context.insert(CalendarSignal(timestamp: newer, dayKey: "2025-06-01", latitude: 0, longitude: 0, countryCode: "ES", countryName: "Spain", timeZoneId: "UTC", eventIdentifier: "new-event", title: "Flight", source: "Calendar"))
         context.insert(CalendarSignal(timestamp: oldest, dayKey: "2024-01-01", latitude: 0, longitude: 0, countryCode: "FR", countryName: "France", timeZoneId: "UTC", eventIdentifier: "old-event", title: "Flight", source: "Calendar"))
 
+        context.insert(makePresenceDay(dayKey: "2025-06-01", date: newer, timeZoneId: "UTC", countryCode: "ES", countryName: "Spain", confidence: 1, confidenceLabel: .high, sources: .location, isOverride: false, stayCount: 0, photoCount: 0, locationCount: 1, calendarCount: 0))
+        context.insert(makePresenceDay(dayKey: "2024-01-01", date: oldest, timeZoneId: "UTC", countryCode: "FR", countryName: "France", confidence: 1, confidenceLabel: .high, sources: .location, isOverride: false, stayCount: 0, photoCount: 0, locationCount: 1, calendarCount: 0))
+
         try context.save()
 
         XCTAssertEqual(try fetcher.fetchEarliestStayDate(), oldest)
@@ -130,6 +133,27 @@ final class RealLedgerDataFetcherTests: XCTestCase {
         XCTAssertEqual(try fetcher.fetchEarliestLocationDate(), oldest)
         XCTAssertEqual(try fetcher.fetchEarliestPhotoDate(), oldest)
         XCTAssertEqual(try fetcher.fetchEarliestCalendarSignalDate(), oldest)
+        XCTAssertEqual(try fetcher.fetchEarliestPresenceDayDate(), oldest)
+    }
+
+    func testDeletePresenceDaysUsesCanonicalDayKeyBoundary() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let fetcher = RealLedgerDataFetcher(modelContext: context)
+
+        let calendar = Calendar(identifier: .gregorian)
+        let laterAbsoluteDate = calendar.date(from: DateComponents(year: 2026, month: 3, day: 2))!
+        let earlierAbsoluteDate = calendar.date(from: DateComponents(year: 2026, month: 2, day: 28))!
+
+        context.insert(makePresenceDay(dayKey: "2026-03-01", date: laterAbsoluteDate, timeZoneId: "America/Los_Angeles", countryCode: "US", countryName: "United States", confidence: 1, confidenceLabel: .high, sources: .location, isOverride: false, stayCount: 0, photoCount: 0, locationCount: 1, calendarCount: 0))
+        context.insert(makePresenceDay(dayKey: "2026-03-02", date: earlierAbsoluteDate, timeZoneId: "Pacific/Auckland", countryCode: "NZ", countryName: "New Zealand", confidence: 1, confidenceLabel: .high, sources: .location, isOverride: false, stayCount: 0, photoCount: 0, locationCount: 1, calendarCount: 0))
+        try context.save()
+
+        try fetcher.deletePresenceDays(afterDayKey: "2026-03-01")
+        try fetcher.save()
+
+        let remainingKeys = Set(try context.fetch(FetchDescriptor<PresenceDay>()).map(\.dayKey))
+        XCTAssertEqual(remainingKeys, ["2026-03-01"])
     }
 
     func testPresenceDayRangeAndNearestKnownQueries() throws {

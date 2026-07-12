@@ -40,10 +40,11 @@ final class LedgerRecomputeErrorTests: XCTestCase {
         }
 
         // When
-        await service.recompute(dayKeys: ["2024-01-01"])
+        let succeeded = await service.recompute(dayKeys: [todayKey])
 
         // Then
         await fulfillment(of: [expectation], timeout: 1.0)
+        XCTAssertFalse(succeeded)
         XCTAssertFalse(mockFetcher.saveCalled, "Save should not be called if fetch fails")
     }
 
@@ -62,11 +63,72 @@ final class LedgerRecomputeErrorTests: XCTestCase {
         }
 
         // When
-        await service.recompute(dayKeys: ["2024-01-01"])
+        let succeeded = await service.recompute(dayKeys: [todayKey])
 
         // Then
         await fulfillment(of: [expectation], timeout: 1.0)
+        XCTAssertFalse(succeeded)
         XCTAssertTrue(mockFetcher.saveCalled, "Save should be attempted")
+    }
+
+    func testSuccessfulRecomputeReturnsTrue() async {
+        let succeeded = await service.recompute(dayKeys: [todayKey])
+
+        XCTAssertTrue(succeeded)
+        XCTAssertTrue(mockFetcher.saveCalled)
+    }
+
+    func testExistingPresenceDayFetchFailureReturnsFalse() async {
+        struct TestError: Error {}
+        mockFetcher.fetchPresenceDaysError = TestError()
+
+        let succeeded = await service.recompute(dayKeys: [todayKey])
+
+        XCTAssertFalse(succeeded)
+        XCTAssertFalse(mockFetcher.saveCalled)
+    }
+
+    func testRecomputeAllPresenceDayBoundsFailureReturnsFalse() async {
+        struct TestError: Error, Equatable {}
+        let expectedError = TestError()
+        mockFetcher.fetchPresenceDayBoundsError = expectedError
+
+        let expectation = XCTestExpectation(description: "Error handler called")
+        await service.setErrorHandler { error in
+            if let error = error as? TestError, error == expectedError {
+                expectation.fulfill()
+            }
+        }
+
+        let succeeded = await service.recomputeAll()
+
+        await fulfillment(of: [expectation], timeout: 1.0)
+        XCTAssertFalse(succeeded)
+        XCTAssertFalse(mockFetcher.saveCalled)
+    }
+
+    func testRecomputeAllFutureCacheDeletionFailureReturnsFalse() async {
+        struct TestError: Error, Equatable {}
+        let expectedError = TestError()
+        mockFetcher.deletePresenceDaysError = expectedError
+
+        let expectation = XCTestExpectation(description: "Error handler called")
+        await service.setErrorHandler { error in
+            if let error = error as? TestError, error == expectedError {
+                expectation.fulfill()
+            }
+        }
+
+        let succeeded = await service.recomputeAll()
+
+        await fulfillment(of: [expectation], timeout: 1.0)
+        XCTAssertFalse(succeeded)
+        XCTAssertTrue(mockFetcher.saveCalled, "Historical recompute should save before future cache cleanup")
+    }
+
+    private var todayKey: String {
+        let calendar = Calendar.current
+        return DayKey.make(from: calendar.startOfDay(for: Date()), timeZone: calendar.timeZone)
     }
 }
 
