@@ -247,6 +247,8 @@ final class LocationSampleService: NSObject, CLLocationManagerDelegate {
         )
         
         if source == .widget {
+            // The file-backed pending queue is the cross-process recovery record. The app
+            // marks the day dirty immediately before it commits this snapshot to SwiftData.
             let pending = PendingLocationSnapshot(
                 timestamp: sample.timestamp,
                 latitude: sample.latitude,
@@ -263,6 +265,7 @@ final class LocationSampleService: NSObject, CLLocationManagerDelegate {
         }
 
         modelContext.insert(sample)
+        LedgerRecomputeRecoveryStore.shared.markDirty(dayKeys: [dayKey])
 
         do {
             try modelContext.save()
@@ -273,7 +276,7 @@ final class LocationSampleService: NSObject, CLLocationManagerDelegate {
 
         let container = modelContext.container
         let recomputeService = LedgerRecomputeService(modelContainer: container)
-        await recomputeService.recompute(dayKeys: [dayKey])
+        try await recomputeService.recompute(dayKeys: [dayKey])
 
         return sample
     }
@@ -333,6 +336,8 @@ final class LocationSampleService: NSObject, CLLocationManagerDelegate {
             )
             
             if source == .widget {
+                // Avoid a cross-process read-modify-write race in UserDefaults; the app-side
+                // pending-snapshot importer records the corresponding dirty generation.
                 let pending = PendingLocationSnapshot(
                     timestamp: sample.timestamp,
                     latitude: sample.latitude,
@@ -352,6 +357,7 @@ final class LocationSampleService: NSObject, CLLocationManagerDelegate {
         }
 
         if source != .widget {
+            LedgerRecomputeRecoveryStore.shared.markDirty(dayKeys: dayKeys)
             if modelContext.hasChanges {
                 do {
                     try modelContext.save()
@@ -364,7 +370,7 @@ final class LocationSampleService: NSObject, CLLocationManagerDelegate {
             if !dayKeys.isEmpty {
                 let container = modelContext.container
                 let recomputeService = LedgerRecomputeService(modelContainer: container)
-                await recomputeService.recompute(dayKeys: Array(dayKeys))
+                try await recomputeService.recompute(dayKeys: Array(dayKeys))
             }
         }
 

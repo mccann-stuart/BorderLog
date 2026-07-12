@@ -84,13 +84,14 @@ struct BorderLogApp: App {
                     }
 
                     if context.hasChanges {
+                        LedgerRecomputeRecoveryStore.shared.markDirty(dayKeys: dayKeysToRecompute)
                         try context.save()
                     }
                     try PendingLocationSnapshot.remove(pending, from: AppConfig.sharedDefaults)
 
                     guard !dayKeysToRecompute.isEmpty else { return }
                     let recomputeService = LedgerRecomputeService(modelContainer: container)
-                    await recomputeService.recompute(dayKeys: Array(dayKeysToRecompute))
+                    try await recomputeService.recompute(dayKeys: Array(dayKeysToRecompute))
                 } catch {
                     Self.logger.error("Failed to save ingested pending locations: \(error, privacy: .private)")
                 }

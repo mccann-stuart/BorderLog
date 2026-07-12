@@ -3,7 +3,7 @@ Product Requirements Document (PRD)
 BorderLog (Working Title) — Local‑first Country Presence + Schengen Tracker for Expats
 
 Document status: Draft v0.3, living PRD plus weekly changelog
-Last updated: 9 Jul 2026
+Last updated: 12 Jul 2026
 Platforms: iOS (primary), iPadOS (nice-to-have)
 Distribution: App Store
 Pricing: Free (no subscriptions, no paid tiers)
@@ -12,6 +12,10 @@ Current implementation notes:
 - Version 1.0 is account-free: Sign in with Apple remains feature-flagged off and onboarding uses a device-local session ID. Enabling accounts later requires account deletion and token-revocation support first.
 - CloudKit sync is implemented behind `AppConfig.isCloudKitFeatureEnabled == false`; local SwiftData/App Group storage is the active persistence path.
 - Debug data export is compiled and surfaced only in `DEBUG` builds because it intentionally contains full-fidelity diagnostics.
+- Derived-ledger mutations persist generation-tagged dirty day keys before source saves; launch reconciliation retries interrupted work and refreshes source-backed days once for existing installs.
+- Photo ingestion performs the historical bootstrap once, then uses a hash-deduplicated incremental scan with a one-day overlap. Previously unresolved photo geocodes are retried on launch.
+- High confidence is withheld from disputed, contextual/inferred, weak-location-only, and decisive correlated location-burst results unless independent strong evidence supports the day.
+- Debug support exports include unresolved-photo ratios, aggregate scan/rejection/error and geocode-retry counts, the last successful ledger recompute, and a validated build commit.
 - Reset All Data clears SwiftData models, keychain-backed local profile/session values, and pending widget location snapshots.
 - Keychain profile/session values use device-bound `kSecAttrAccessibleWhenUnlockedThisDeviceOnly` accessibility.
 - Settings includes a shared Day Counting mode: `Resolved Country` preserves the one-country-per-day default, while `Double Count Days` counts every resolved country allocation on travel days for app and widget summaries.
@@ -20,9 +24,20 @@ App Store release readiness:
 - The app and widget are configured for iOS 26, and the widget targets both iPhone and iPad as required for app extensions.
 - The Worker implements public `/privacy` and `/support` pages. Configure its `SUPPORT_EMAIL` variable with a monitored address, deploy it, then use those public URLs in App Store Connect. The pages return 503 rather than publish without a valid contact address.
 - Produce the submission archive with stable Xcode 26.6 or another Apple-accepted stable toolchain, not the local Xcode 27 beta.
+- Inject `GIT_COMMIT_SHA=$(git rev-parse --verify HEAD)` as an Xcode build setting for support or submission builds. Builds without an injected hexadecimal commit report `unavailable` explicitly in debug exports.
 - App Store distribution still requires production provisioning for both bundle identifiers and the `group.com.MCCANN.Border` App Group.
 
 Weekly Changelog
+
+Week of Jul 6-12, 2026
+
+Highlights:
+- Made derived-ledger recovery durable and race-safe with generation-tagged dirty days, throwing recompute failures, historical-day repair, and launch reconciliation.
+- Added post-bootstrap incremental photo scanning, unresolved geocode retries, and unresolved-evidence ratios.
+- Calibrated confidence conservatively for disputed, inferred, weak, and correlated evidence while preserving independent strong evidence and full provenance.
+- Expanded debug support exports with build identity and persisted operational diagnostics.
+
+⸻
 
 Week of Apr 13-19, 2026
 

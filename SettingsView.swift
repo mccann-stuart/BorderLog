@@ -493,13 +493,18 @@ struct SettingsView: View {
     }
 
     private func resetAllData() {
-        do {
-            try dataManager.resetAllData()
-            // Allow the bootstrap to re-run on next launch so fresh inference
-            // is computed against any newly added data.
-            didBootstrapInference = false
-        } catch {
-            Self.logger.error("Failed to reset data: \(error, privacy: .private)")
+        Task { @MainActor in
+            do {
+                try await LedgerRefreshCoordinator.shared.run {
+                    try dataManager.resetAllData()
+                    await DiagnosticsStore.shared.reset()
+                }
+                // Allow the bootstrap to re-run on next launch so fresh inference
+                // is computed against any newly added data.
+                didBootstrapInference = false
+            } catch {
+                Self.logger.error("Failed to reset data: \(error, privacy: .private)")
+            }
         }
     }
 
@@ -586,10 +591,12 @@ struct SettingsView: View {
         Task {
             do {
                 let snapshotConsistency = await LedgerRefreshCoordinator.shared.snapshotConsistency()
+                let diagnostics = await DiagnosticsStore.shared.snapshot()
                 let runtimeContext = await MainActor.run {
                     makeDebugExportContext(
                         exportedAt: exportedAt,
-                        snapshotConsistency: snapshotConsistency
+                        snapshotConsistency: snapshotConsistency,
+                        diagnostics: diagnostics
                     )
                 }
                 let service = DebugDataStoreExportService(modelContainer: container)
@@ -631,6 +638,13 @@ struct SettingsView: View {
 
     private var appBuild: String {
         Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "1"
+    }
+
+    private var buildCommit: String {
+        BuildCommitMetadata.resolvedCommit(
+            infoDictionaryValue: Bundle.main.object(forInfoDictionaryKey: "BuildCommit"),
+            environmentValue: ProcessInfo.processInfo.environment["GIT_COMMIT_SHA"]
+        )
     }
 
     private var dataStoreLabel: String {
@@ -740,7 +754,8 @@ struct SettingsView: View {
 #if DEBUG
     private func makeDebugExportContext(
         exportedAt: Date,
-        snapshotConsistency: String
+        snapshotConsistency: String,
+        diagnostics: DiagnosticsSnapshot
     ) -> DebugExportRuntimeContext {
         let currentLocationStatus = CLLocationManager().authorizationStatus
         let currentPhotoStatus = PHPhotoLibrary.authorizationStatus(for: .readWrite)
@@ -767,6 +782,7 @@ struct SettingsView: View {
             exportedAt: exportedAt,
             appVersion: appVersion,
             appBuild: appBuild,
+            buildCommit: buildCommit,
             bundleIdentifier: Bundle.main.bundleIdentifier,
             deviceModelCategory: deviceModelCategory,
             operatingSystemVersion: ProcessInfo.processInfo.operatingSystemVersionString,
@@ -814,6 +830,7 @@ struct SettingsView: View {
             appState: appState,
             userData: userData,
             snapshotConsistency: snapshotConsistency,
+            diagnostics: diagnostics,
             pendingLocationSnapshots: pendingSnapshots
         )
     }
