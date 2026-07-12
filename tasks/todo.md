@@ -1,11 +1,19 @@
-# Ignore shared photo albums
+# Biometric authentication lifecycle
 
-- [x] Locate the Photos asset fetch used by ingestion.
-- [x] Restrict ingestion to assets from the user's library.
-- [x] Run the narrowest relevant verification and review the diff.
+- [x] Trace the app-level scene lifecycle and biometric authentication flow.
+- [x] Start device-owner authentication only while the scene is active.
+- [x] Treat system and app cancellation as a neutral locked state.
+- [x] Add focused regression coverage for cancellation classification.
+- [x] Run the narrowest relevant test/build and review the diff.
 
 ## Review
 
-Added `PHAssetSourceType.typeUserLibrary` to the existing PhotoKit fetch options so
-shared-album assets are excluded without changing date, image-type, or limited-library
-behaviour. The Learn scheme builds successfully for a generic iOS Simulator.
+The lock overlay now receives the active-scene state, blocks authentication while
+inactive, and starts one authentication request when the scene becomes active.
+App and system cancellation leave the app locked without displaying a failure;
+user cancellation and genuine authentication failures retain the retry message.
+
+Focused cancellation-classifier tests were added. The app and test bundles compile
+successfully with `xcodebuild build-for-testing` for a generic iOS Simulator. A
+focused test execution was attempted on `iPhone 17`, but the simulator launcher did
+not materialise a worker, so the run was stopped after compilation completed.
