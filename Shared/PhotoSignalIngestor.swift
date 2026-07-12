@@ -74,6 +74,7 @@ actor PhotoSignalIngestor {
         let config = Self.ingestQueryConfig(mode: mode, state: state, now: now, calendar: calendar)
 
         let options = PHFetchOptions()
+        options.includeAssetSourceTypes = [.typeUserLibrary]
         if let endDate = config.endDate {
             options.predicate = NSPredicate(
                 format: "creationDate >= %@ AND creationDate <= %@",
