@@ -182,3 +182,17 @@
 - Debug exports now include a validated build commit, persisted photo scan/rejection/error and geocode retry counters, last successful recompute time, and unresolved photo signal/day ratios. Reset All Data clears these diagnostics and recovery checkpoints.
 - Verification passed: unsigned Debug generic-iOS build with injected commit; built `Info.plist` contains that exact 40-character commit; `plutil -lint Learn/Info.plist`; `git diff --check`; and the complete `LearnTests` target (207 tests, 0 failures) on the booted iPhone 17 simulator.
 - Build provenance is intentionally explicit: build/archive automation must supply `GIT_COMMIT_SHA`; otherwise support exports report `unavailable` instead of claiming a stale or fabricated commit.
+
+# macOS and OneDrive Ignore Rules
+
+- [x] Inspect existing ignore rules and tracked macOS/OneDrive artefacts.
+- [x] Add narrow rules for macOS metadata, archive resource forks, and Office lock files surfaced by OneDrive.
+- [x] Remove the already-tracked root `.DS_Store` from the Git index.
+- [x] Verify representative paths are ignored and review the final diff.
+
+## macOS and OneDrive Ignore Rules Review
+
+- Added repository-wide ignores for macOS Finder metadata, AppleDouble/resource-fork artefacts, and `__MACOSX` archive folders.
+- Added a narrow ignore for Microsoft Office `~$` lock files commonly surfaced by OneDrive, without hiding broad temporary or conflicted-copy patterns that may contain real work.
+- Removed the root `.DS_Store` from Git tracking while retaining the local ignored file.
+- Verification passed with representative `git check-ignore` paths and `git diff --check`.
