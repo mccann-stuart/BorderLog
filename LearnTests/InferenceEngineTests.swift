@@ -194,6 +194,220 @@ final class InferenceEngineTests: XCTestCase {
 
         XCTAssertEqual(results.first?.contributedCountries.first?.countryCode, "FR")
         XCTAssertEqual(results.first?.isDisputed, true)
+        XCTAssertEqual(results.first?.confidenceLabel, .medium)
+    }
+
+    func testWeakLocationOnlyEvidenceCannotBeHighConfidence() {
+        let date = day(2026, 2, 15)
+        let dayKey = DayKey.make(from: date, timeZone: calendar.timeZone)
+
+        let results = PresenceInferenceEngine.compute(
+            dayKeys: [dayKey],
+            stays: [],
+            overrides: [],
+            locations: [
+                LocationSignalInfo(
+                    dayKey: dayKey,
+                    countryCode: "ES",
+                    countryName: "Spain",
+                    accuracyMeters: 101,
+                    timeZoneId: nil
+                )
+            ],
+            photos: [],
+            calendarSignals: [],
+            rangeEnd: date,
+            calendar: calendar
+        )
+
+        XCTAssertEqual(results.first?.contributedCountries.first?.countryCode, "ES")
+        XCTAssertEqual(results.first?.confidenceLabel, .medium)
+        XCTAssertEqual(results.first?.locationCount, 1)
+        XCTAssertTrue(results.first?.confidenceBreakdown.calibrationSummary.contains("weak-location-only") == true)
+    }
+
+    func testSameDayLocationBurstCannotBeHighConfidence() {
+        let date = day(2026, 2, 15)
+        let dayKey = DayKey.make(from: date, timeZone: calendar.timeZone)
+        let locations = (0..<6).map { offset in
+            LocationSignalInfo(
+                dayKey: dayKey,
+                countryCode: "ES",
+                countryName: "Spain",
+                accuracyMeters: 10,
+                timeZoneId: nil,
+                timestamp: date.addingTimeInterval(Double(offset)),
+                sourceRaw: LocationSampleSource.app.rawValue
+            )
+        }
+
+        let results = PresenceInferenceEngine.compute(
+            dayKeys: [dayKey],
+            stays: [],
+            overrides: [],
+            locations: locations,
+            photos: [],
+            calendarSignals: [],
+            rangeEnd: date,
+            calendar: calendar
+        )
+
+        XCTAssertEqual(results.first?.contributedCountries.first?.countryCode, "ES")
+        XCTAssertEqual(results.first?.confidence ?? .nan, 1, accuracy: 0.001)
+        XCTAssertEqual(results.first?.confidenceLabel, .medium)
+        XCTAssertEqual(results.first?.locationCount, 6)
+        XCTAssertEqual(results.first?.evidence.count, 6)
+        XCTAssertTrue(results.first?.confidenceBreakdown.calibrationSummary.contains("correlated-location-burst") == true)
+    }
+
+    func testIndependentSameDayLocationsCanRemainHighConfidence() {
+        let date = day(2026, 2, 15)
+        let dayKey = DayKey.make(from: date, timeZone: calendar.timeZone)
+        let locations = [
+            LocationSignalInfo(
+                dayKey: dayKey,
+                countryCode: "ES",
+                countryName: "Spain",
+                accuracyMeters: 10,
+                timeZoneId: nil,
+                timestamp: date,
+                sourceRaw: LocationSampleSource.app.rawValue
+            ),
+            LocationSignalInfo(
+                dayKey: dayKey,
+                countryCode: "ES",
+                countryName: "Spain",
+                accuracyMeters: 10,
+                timeZoneId: nil,
+                timestamp: date.addingTimeInterval(4 * 60 * 60),
+                sourceRaw: LocationSampleSource.app.rawValue
+            )
+        ]
+
+        let result = PresenceInferenceEngine.compute(
+            dayKeys: [dayKey],
+            stays: [],
+            overrides: [],
+            locations: locations,
+            photos: [],
+            calendarSignals: [],
+            rangeEnd: date,
+            calendar: calendar
+        ).first
+
+        XCTAssertEqual(result?.confidenceLabel, .high)
+        XCTAssertFalse(result?.confidenceBreakdown.calibrationSummary.contains("correlated-location-burst") == true)
+    }
+
+    func testCorrelatedLocationBurstWithWeakMixedEvidenceCannotBeHighConfidence() {
+        let date = day(2026, 2, 15)
+        let dayKey = DayKey.make(from: date, timeZone: calendar.timeZone)
+        let locations = (0..<2).map { offset in
+            LocationSignalInfo(
+                dayKey: dayKey,
+                countryCode: "ES",
+                countryName: "Spain",
+                accuracyMeters: 10,
+                timeZoneId: nil,
+                timestamp: date.addingTimeInterval(Double(offset)),
+                sourceRaw: LocationSampleSource.widget.rawValue
+            )
+        }
+        let calendarSignal = CalendarSignalInfo(
+            dayKey: dayKey,
+            countryCode: "ES",
+            countryName: "Spain",
+            timeZoneId: nil,
+            bucketingTimeZoneId: nil,
+            source: "Calendar"
+        )
+
+        let result = PresenceInferenceEngine.compute(
+            dayKeys: [dayKey],
+            stays: [],
+            overrides: [],
+            locations: locations,
+            photos: [],
+            calendarSignals: [calendarSignal],
+            rangeEnd: date,
+            calendar: calendar
+        ).first
+
+        XCTAssertEqual(result?.confidenceLabel, .medium)
+        XCTAssertTrue(result?.confidenceBreakdown.calibrationSummary.contains("correlated-location-burst") == true)
+    }
+
+    func testCorrelatedLocationBurstDoesNotCapIndependentStrongStay() {
+        let date = day(2026, 2, 15)
+        let dayKey = DayKey.make(from: date, timeZone: calendar.timeZone)
+        let locations = (0..<2).map { offset in
+            LocationSignalInfo(
+                dayKey: dayKey,
+                countryCode: "ES",
+                countryName: "Spain",
+                accuracyMeters: 10,
+                timeZoneId: nil,
+                timestamp: date.addingTimeInterval(Double(offset)),
+                sourceRaw: LocationSampleSource.app.rawValue
+            )
+        }
+        let stay = StayPresenceInfo(
+            entryDayKey: dayKey,
+            exitDayKey: dayKey,
+            dayTimeZoneId: calendar.timeZone.identifier,
+            countryCode: "ES",
+            countryName: "Spain"
+        )
+
+        let result = PresenceInferenceEngine.compute(
+            dayKeys: [dayKey],
+            stays: [stay],
+            overrides: [],
+            locations: locations,
+            photos: [],
+            calendarSignals: [],
+            rangeEnd: date,
+            calendar: calendar
+        ).first
+
+        XCTAssertEqual(result?.confidenceLabel, .high)
+        XCTAssertFalse(result?.confidenceBreakdown.calibrationSummary.contains("correlated-location-burst") == true)
+    }
+
+    func testZeroWeightContextCandidateDoesNotCapStrongBaseEvidence() {
+        let date = day(2026, 2, 15)
+        let dayKey = DayKey.make(from: date, timeZone: calendar.timeZone)
+        let stay = StayPresenceInfo(
+            entryDayKey: dayKey,
+            exitDayKey: dayKey,
+            dayTimeZoneId: calendar.timeZone.identifier,
+            countryCode: "ES",
+            countryName: "Spain"
+        )
+        let originCandidate = CalendarSignalInfo(
+            dayKey: dayKey,
+            countryCode: "ES",
+            countryName: "Spain",
+            timeZoneId: nil,
+            bucketingTimeZoneId: nil,
+            eventIdentifier: "trip#origin",
+            source: "CalendarFlightOrigin"
+        )
+
+        let result = PresenceInferenceEngine.compute(
+            dayKeys: [dayKey],
+            stays: [stay],
+            overrides: [],
+            locations: [],
+            photos: [],
+            calendarSignals: [originCandidate],
+            rangeEnd: date,
+            calendar: calendar
+        ).first
+
+        XCTAssertEqual(result?.confidenceLabel, .high)
+        XCTAssertFalse(result?.confidenceBreakdown.calibrationSummary.contains("contextual") == true)
+        XCTAssertFalse(result?.evidence.first(where: { $0.source == "calendar.origin" })?.contributedToFinalResult == true)
     }
 
     func testDeterministicTimeZoneSelectionWhenScoresTie() {
@@ -357,7 +571,8 @@ final class InferenceEngineTests: XCTestCase {
         }
         XCTAssertEqual(previous.contributedCountries.first?.countryCode, "GB")
         XCTAssertEqual(previous.confidence, 0.85, accuracy: 0.001)
-        XCTAssertEqual(previous.confidenceLabel, .high)
+        XCTAssertEqual(previous.confidenceLabel, .medium)
+        XCTAssertTrue(previous.confidenceBreakdown.calibrationSummary.contains("contextual") == true)
         XCTAssertTrue(previous.sources.contains(.calendar))
         XCTAssertTrue(previous.evidence.contains(where: { $0.source == "CalendarTravelBeforePromotion" }))
 
@@ -418,7 +633,7 @@ final class InferenceEngineTests: XCTestCase {
         }
         XCTAssertEqual(previous.contributedCountries.first?.countryCode, "GB")
         XCTAssertEqual(previous.confidence, 0.85, accuracy: 0.001)
-        XCTAssertEqual(previous.confidenceLabel, .high)
+        XCTAssertEqual(previous.confidenceLabel, .medium)
         XCTAssertEqual(previous.timeZoneId, "Europe/London")
         XCTAssertTrue(previous.evidence.contains(where: { $0.source == "CalendarTravelBeforePromotion" }))
 
@@ -477,7 +692,7 @@ final class InferenceEngineTests: XCTestCase {
         }
         XCTAssertEqual(before.contributedCountries.first?.countryCode, "GB")
         XCTAssertEqual(before.confidence, 0.85, accuracy: 0.001)
-        XCTAssertEqual(before.confidenceLabel, .high)
+        XCTAssertEqual(before.confidenceLabel, .medium)
         XCTAssertTrue(before.sources.contains(.calendar))
         XCTAssertEqual(before.calendarCount, 1)
         XCTAssertTrue(before.evidence.contains(where: { $0.source == "CalendarTravelBeforePromotion" }))
@@ -488,7 +703,7 @@ final class InferenceEngineTests: XCTestCase {
         }
         XCTAssertEqual(after.contributedCountries.first?.countryCode, "DE")
         XCTAssertEqual(after.confidence, 0.85, accuracy: 0.001)
-        XCTAssertEqual(after.confidenceLabel, .high)
+        XCTAssertEqual(after.confidenceLabel, .medium)
         XCTAssertTrue(after.sources.contains(.calendar))
         XCTAssertEqual(after.calendarCount, 1)
         XCTAssertTrue(after.evidence.contains(where: { $0.source == "CalendarTravelAfterPromotion" }))

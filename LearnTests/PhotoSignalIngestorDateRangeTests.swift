@@ -40,7 +40,7 @@ final class PhotoSignalIngestorDateRangeTests: XCTestCase {
         XCTAssertEqual(config.sortAscending, true)
     }
 
-    func testAutoConfigUsesLastAssetPlusOneSecond() {
+    func testAutoConfigUsesBoundedOverlapBeforeLastAsset() {
         let calendar = makeUTCcalendar()
         let now = calendar.date(from: DateComponents(year: 2026, month: 2, day: 23, hour: 12, minute: 0))!
         let lastDate = calendar.date(byAdding: .day, value: -10, to: now)!
@@ -53,7 +53,7 @@ final class PhotoSignalIngestorDateRangeTests: XCTestCase {
             calendar: calendar
         )
 
-        XCTAssertEqual(config.startDate, lastDate.addingTimeInterval(1))
+        XCTAssertEqual(config.startDate, lastDate.addingTimeInterval(-24 * 60 * 60))
         XCTAssertNil(config.endDate)
         XCTAssertEqual(config.sortAscending, true)
     }

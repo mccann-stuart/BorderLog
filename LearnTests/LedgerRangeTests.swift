@@ -17,7 +17,7 @@ final class LedgerRangeTests: XCTestCase {
         XCTAssertEqual(count, 0)
 
         // Run recomputeAll
-        await service.recomputeAll()
+        try await service.recomputeAll()
 
         // Check that we have ~730 days (2 years)
         let fetchedDays = try context.fetch(FetchDescriptor<PresenceDay>())

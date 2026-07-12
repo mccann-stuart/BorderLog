@@ -118,6 +118,9 @@ struct StayEditorView: View {
                         enteredOn: existingStay.enteredOn,
                         exitedOn: existingStay.exitedOn
                     )
+                    LedgerRecomputeRecoveryStore.shared.markDirty(
+                        dayKeys: makeDayKeys(from: deletedRange.start, to: deletedRange.end)
+                    )
                     modelContext.delete(existingStay)
                     do {
                         try modelContext.save()
@@ -300,9 +303,13 @@ struct StayEditorView: View {
             modelContext.insert(stay)
         }
 
+        let impactedRange = mergedRange(previous: previousRange, current: newRange)
+        let impactedDayKeys = impactedRange.map { makeDayKeys(from: $0.start, to: $0.end) } ?? []
+        LedgerRecomputeRecoveryStore.shared.markDirty(dayKeys: impactedDayKeys)
+
         do {
             try modelContext.save()
-            if let impactedRange = mergedRange(previous: previousRange, current: newRange) {
+            if let impactedRange {
                 recomputeImpactedStayRange(impactedRange)
             }
             dismiss()
@@ -356,7 +363,11 @@ struct StayEditorView: View {
                 // Give SwiftData time to sync the saved context before the background context fetches
                 try? await Task.sleep(nanoseconds: 150_000_000)
                 let service = LedgerRecomputeService(modelContainer: container)
-                await service.recompute(dayKeys: dayKeys)
+                do {
+                    try await service.recompute(dayKeys: dayKeys)
+                } catch {
+                    Self.logger.error("Failed to recompute stay days: \(error, privacy: .private)")
+                }
             }
         }
     }

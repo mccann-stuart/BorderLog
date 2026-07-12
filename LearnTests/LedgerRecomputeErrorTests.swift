@@ -16,6 +16,9 @@ final class LedgerRecomputeErrorTests: XCTestCase {
     var container: ModelContainer!
     var service: LedgerRecomputeService!
     var mockFetcher: MockLedgerDataFetcher!
+    var recoveryDefaults: UserDefaults!
+    var recoverySuiteName: String!
+    var recoveryStore: LedgerRecomputeRecoveryStore!
 
     override func setUp() async throws {
         let config = ModelConfiguration(isStoredInMemoryOnly: true)
@@ -23,6 +26,18 @@ final class LedgerRecomputeErrorTests: XCTestCase {
         service = LedgerRecomputeService(modelContainer: container)
         mockFetcher = MockLedgerDataFetcher()
         await service.setMock(mockFetcher)
+        recoverySuiteName = "LedgerRecomputeErrorTests.\(UUID().uuidString)"
+        recoveryDefaults = try XCTUnwrap(UserDefaults(suiteName: recoverySuiteName))
+        recoveryStore = LedgerRecomputeRecoveryStore(defaults: recoveryDefaults)
+        await service.setRecoveryStore(recoveryStore)
+    }
+
+    override func tearDown() async throws {
+        recoveryDefaults?.removePersistentDomain(forName: recoverySuiteName)
+        recoveryDefaults = nil
+        recoverySuiteName = nil
+        recoveryStore = nil
+        try await super.tearDown()
     }
 
     func testFetchFailureAbortsRecompute() async throws {
@@ -40,11 +55,17 @@ final class LedgerRecomputeErrorTests: XCTestCase {
         }
 
         // When
-        await service.recompute(dayKeys: ["2024-01-01"])
+        do {
+            try await service.recompute(dayKeys: ["2024-01-01"])
+            XCTFail("Expected fetch failure to propagate")
+        } catch {
+            XCTAssertTrue(error is TestError)
+        }
 
         // Then
         await fulfillment(of: [expectation], timeout: 1.0)
         XCTAssertFalse(mockFetcher.saveCalled, "Save should not be called if fetch fails")
+        XCTAssertEqual(recoveryStore.dirtyDayKeys(), Set(["2024-01-01"]))
     }
 
     func testSaveFailureIsReported() async throws {
@@ -62,11 +83,26 @@ final class LedgerRecomputeErrorTests: XCTestCase {
         }
 
         // When
-        await service.recompute(dayKeys: ["2024-01-01"])
+        do {
+            try await service.recompute(dayKeys: ["2024-01-01"])
+            XCTFail("Expected save failure to propagate")
+        } catch {
+            XCTAssertTrue(error is TestError)
+        }
 
         // Then
         await fulfillment(of: [expectation], timeout: 1.0)
         XCTAssertTrue(mockFetcher.saveCalled, "Save should be attempted")
+        XCTAssertEqual(recoveryStore.dirtyDayKeys(), Set(["2024-01-01"]))
+    }
+
+    func testSuccessfulRecomputeClearsCompletedDirtyKey() async throws {
+        let dayKey = DayKey.make(from: Date(), timeZone: .current)
+
+        try await service.recompute(dayKeys: [dayKey])
+
+        XCTAssertTrue(mockFetcher.saveCalled)
+        XCTAssertFalse(recoveryStore.dirtyDayKeys().contains(dayKey))
     }
 }
 

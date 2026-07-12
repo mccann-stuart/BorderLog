@@ -164,6 +164,25 @@
 - Resolved minor merge conflict in `tasks/todo.md` by retaining both remote review entries and local sync tasks.
 - Successfully pushed the fully synchronized main branch to remote origin.
 
+# Three-User Log Reliability Fix Plan
+
+- [x] Persist dirty ledger day keys and clear them only after a successful recompute; propagate recompute failures and reconcile outstanding/existing source days on launch.
+- [x] Run incremental photo ingestion after the initial bootstrap without re-running the full historical scan.
+- [x] Persist retryable photo geocoding state, retry unresolved records, and expose unresolved-evidence ratios in debug exports.
+- [x] Make confidence conservative for disputed, weak, contextual, and correlated burst evidence while preserving truthful provenance.
+- [x] Add build commit, scan/rejection/error counters, and last successful recompute metadata to debug exports.
+- [x] Add focused recovery, retry, confidence, incremental-scan, and export-diagnostics tests.
+- [x] Run focused tests plus a simulator build, self-review the diff, and document results below.
+
+## Three-User Log Reliability Fix Review
+
+- Added generation-tagged, app-group dirty-day recovery so a successful older recompute cannot clear a newer mutation. Source save/fetch failures now propagate, explicit historical dirty days are repaired, and launch reconciliation retries outstanding work plus performs a versioned refresh of existing source-backed days.
+- The photo bootstrap remains bounded to the initial historical pass. Later activation scans use an incremental one-day overlap with asset-hash deduplication; unresolved photo geocodes are retried and any corrected old/new day identities are recomputed.
+- Confidence is capped below High for disputed, actually contributed contextual/inferred evidence, weak location-only evidence, and decisive same-source 120-second location bursts. Independent same-day samples and strong non-location corroboration remain eligible for High confidence.
+- Debug exports now include a validated build commit, persisted photo scan/rejection/error and geocode retry counters, last successful recompute time, and unresolved photo signal/day ratios. Reset All Data clears these diagnostics and recovery checkpoints.
+- Verification passed: unsigned Debug generic-iOS build with injected commit; built `Info.plist` contains that exact 40-character commit; `plutil -lint Learn/Info.plist`; `git diff --check`; and the complete `LearnTests` target (207 tests, 0 failures) on the booted iPhone 17 simulator.
+- Build provenance is intentionally explicit: build/archive automation must supply `GIT_COMMIT_SHA`; otherwise support exports report `unavailable` instead of claiming a stale or fabricated commit.
+
 # macOS and OneDrive Ignore Rules
 
 - [x] Inspect existing ignore rules and tracked macOS/OneDrive artefacts.

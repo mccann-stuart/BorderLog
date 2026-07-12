@@ -9,9 +9,22 @@ import Foundation
 @preconcurrency import SwiftData
 import os
 
+enum LedgerRecomputeError: LocalizedError {
+    case noValidDayKeys([String])
+
+    var errorDescription: String? {
+        switch self {
+        case .noValidDayKeys(let dayKeys):
+            return "Ledger recompute could not resolve any requested day keys: \(dayKeys.sorted().joined(separator: ", "))."
+        }
+    }
+}
+
 @ModelActor
 public actor LedgerRecomputeService {
+    private static let sourceReconciliationVersion = 1
     internal var _dataFetcher: LedgerDataFetching?
+    internal var _recoveryStore: LedgerRecomputeRecoveryStore?
     private static let logger = Logger(subsystem: "com.MCCANN.Border", category: "LedgerRecomputeService")
     internal var onRecomputeError: ((Error) -> Void)?
 
@@ -22,7 +35,11 @@ public actor LedgerRecomputeService {
         return fetcher
     }
 
-    public func recompute(dayKeys: [String]) async {
+    private var recoveryStore: LedgerRecomputeRecoveryStore {
+        _recoveryStore ?? .shared
+    }
+
+    public func recompute(dayKeys: [String]) async throws {
         var didBeginInference = false
         defer {
             if didBeginInference {
@@ -32,6 +49,10 @@ public actor LedgerRecomputeService {
             }
         }
         guard !dayKeys.isEmpty else { return }
+
+        // Record the work before touching the ledger. If the process exits or any fetch/save
+        // fails, launch reconciliation will retry these keys.
+        let completionToken = recoveryStore.markDirty(dayKeys: dayKeys)
 
         let calendar = Calendar.current
         let timeZone = calendar.timeZone
@@ -54,13 +75,13 @@ public actor LedgerRecomputeService {
                     timeZone: timeZone,
                     calendar: calendar
                 ) else {
-                    return
+                    throw LedgerRecomputeError.noValidDayKeys(Array(currentSeedDayKeys))
                 }
                 scope = expandedScope
             } catch {
                 Self.logger.error("LedgerRecomputeService scope error: \(error, privacy: .private)")
                 onRecomputeError?(error)
-                return
+                throw error
             }
 
             let dayKeySet = Set(scope.dayKeys)
@@ -85,7 +106,7 @@ public actor LedgerRecomputeService {
             } catch {
                 Self.logger.error("LedgerRecomputeService fetch error: \(error, privacy: .private)")
                 onRecomputeError?(error)
-                return
+                throw error
             }
 
             let stayInfos = stays.map {
@@ -114,7 +135,9 @@ public actor LedgerRecomputeService {
                     countryCode: sample.countryCode,
                     countryName: name,
                     accuracyMeters: sample.accuracyMeters,
-                    timeZoneId: sample.timeZoneId
+                    timeZoneId: sample.timeZoneId,
+                    timestamp: sample.timestamp,
+                    sourceRaw: sample.sourceRaw
                 )
             }
 
@@ -164,7 +187,14 @@ public actor LedgerRecomputeService {
             )
             
             // Incremental dependency check: Have the boundary days changed their primary result?
-            let existingDays = (try? dataFetcher.fetchPresenceDays(keys: Array(dayKeySet))) ?? []
+            let existingDays: [PresenceDay]
+            do {
+                existingDays = try dataFetcher.fetchPresenceDays(keys: Array(dayKeySet))
+            } catch {
+                Self.logger.error("LedgerRecomputeService existing-day fetch error: \(error, privacy: .private)")
+                onRecomputeError?(error)
+                throw error
+            }
             let existingMap = existingDays.reduce(into: [String: PresenceDay](minimumCapacity: existingDays.count)) { $0[$1.dayKey] = $1 }
             
             var needsExpansion = false
@@ -204,18 +234,21 @@ public actor LedgerRecomputeService {
         do {
             try self.upsertPresenceDays(finalResults, originalKeys: finalScopeKeys)
             try dataFetcher.save()
+            await DiagnosticsStore.shared.recordSuccessfulRecompute()
+            recoveryStore.clearDirty(matching: completionToken)
         } catch {
             Self.logger.error("LedgerRecomputeService save error: \(error, privacy: .private)")
             onRecomputeError?(error)
+            throw error
         }
     }
 
-    public func recomputeAll() async {
+    public func recomputeAll() async throws {
         let calendar = Calendar.current
         let today = calendar.startOfDay(for: Date())
 
         let twoYearsAgo = calendar.date(byAdding: .year, value: -2, to: today) ?? today
-        let earliestSignal = try? self.earliestSignalDate()
+        let earliestSignal = try self.earliestSignalDate()
 
         // ⚡ Bolt: Avoid intermediate O(N) array allocation from .compactMap { $0 }.min()
         var earliest = twoYearsAgo
@@ -224,7 +257,38 @@ public actor LedgerRecomputeService {
         }
 
         let dayKeys = self.makeDayKeys(from: earliest, to: today, calendar: calendar)
-        await self.recompute(dayKeys: dayKeys)
+        try await self.recompute(dayKeys: dayKeys)
+    }
+
+    /// Repairs work interrupted after a source save and refreshes every day currently backed
+    /// by source data. Running this on launch also repairs older builds that saved signals but
+    /// failed to update their derived ledger rows.
+    public func reconcileDirtyAndExistingSourceDays(asOf: Date = Date()) async throws {
+        let dirtyDayKeys = recoveryStore.dirtyDayKeys()
+        let shouldReconcileSources = recoveryStore.needsSourceReconciliation(
+            version: Self.sourceReconciliationVersion
+        )
+
+        let sourceDayKeys: Set<String>
+        if shouldReconcileSources {
+            do {
+                sourceDayKeys = try existingSourceDayKeys(asOf: asOf)
+            } catch {
+                Self.logger.error("LedgerRecomputeService reconciliation fetch error: \(error, privacy: .private)")
+                onRecomputeError?(error)
+                throw error
+            }
+        } else {
+            sourceDayKeys = []
+        }
+
+        let dayKeys = dirtyDayKeys.union(sourceDayKeys)
+        if !dayKeys.isEmpty {
+            try await recompute(dayKeys: Array(dayKeys))
+        }
+        if shouldReconcileSources {
+            recoveryStore.recordSourceReconciliation(version: Self.sourceReconciliationVersion)
+        }
     }
 
     public func fillMissingDays(asOf: Date = Date(), calendar: Calendar = .current) async {
@@ -277,6 +341,10 @@ public actor LedgerRecomputeService {
         } catch {
             Self.logger.error("LedgerRecomputeService fillMissingDays save error: \(error, privacy: .private)")
         }
+    }
+
+    internal func setRecoveryStore(_ store: LedgerRecomputeRecoveryStore) {
+        _recoveryStore = store
     }
 
     private func upsertPresenceDays(_ results: [PresenceDayResult], originalKeys: [String]) throws {
@@ -362,15 +430,10 @@ public actor LedgerRecomputeService {
         }
 
         let today = calendar.startOfDay(for: Date())
-        let lowerBound = try self.coverageLowerBound(today: today, calendar: calendar)
-
-        var scopeStart = max(mutationStart, lowerBound)
+        var scopeStart = mutationStart
         var scopeEnd = min(mutationEnd, today)
         if scopeStart > scopeEnd {
-            if mutationEnd < lowerBound {
-                scopeStart = lowerBound
-                scopeEnd = lowerBound
-            } else if mutationStart > today {
+            if mutationStart > today {
                 scopeStart = today
                 scopeEnd = today
             } else {
@@ -383,18 +446,6 @@ public actor LedgerRecomputeService {
             end: scopeEnd,
             dayKeys: makeDayKeys(from: scopeStart, to: scopeEnd, calendar: calendar)
         )
-    }
-
-    private func coverageLowerBound(today: Date, calendar: Calendar) throws -> Date {
-        let twoYearsAgo = calendar.date(byAdding: .year, value: -2, to: today) ?? today
-        let earliestSignal = try earliestSignalDate().map { calendar.startOfDay(for: $0) }
-
-        // ⚡ Bolt: Avoid intermediate O(N) array allocation from .compactMap { $0 }.min()
-        var earliest = twoYearsAgo
-        if let earliestSignal = earliestSignal, earliestSignal < earliest {
-            earliest = earliestSignal
-        }
-        return earliest
     }
 
     private func earliestSignalDate() throws -> Date? {
@@ -416,5 +467,50 @@ public actor LedgerRecomputeService {
             }
         }
         return minDate
+    }
+
+    private func existingSourceDayKeys(asOf: Date) throws -> Set<String> {
+        guard let earliestSignalDate = try earliestSignalDate() else { return [] }
+
+        let calendar = Calendar.current
+        let rangeStart = calendar.startOfDay(for: earliestSignalDate)
+        let rangeEnd = max(asOf, rangeStart)
+
+        let stays = try dataFetcher.fetchStays(from: rangeStart, to: rangeEnd)
+        let overrides = try dataFetcher.fetchOverrides(from: rangeStart, to: rangeEnd)
+        let locations = try dataFetcher.fetchLocations(from: rangeStart, to: rangeEnd)
+        let photos = try dataFetcher.fetchPhotos(from: rangeStart, to: rangeEnd)
+        let calendarSignals = try dataFetcher.fetchCalendarSignals(from: rangeStart, to: rangeEnd)
+
+        var dayKeys = Set(overrides.lazy.map(\.dayKey))
+        dayKeys.formUnion(locations.lazy.map(\.dayKey))
+        dayKeys.formUnion(photos.lazy.map(\.dayKey))
+        dayKeys.formUnion(calendarSignals.lazy.map(\.dayKey))
+
+        for stay in stays {
+            let timeZone = DayIdentity.canonicalTimeZone(
+                preferredTimeZoneId: stay.dayTimeZoneId,
+                fallback: calendar.timeZone
+            )
+            var stayCalendar = Calendar(identifier: .gregorian)
+            stayCalendar.timeZone = timeZone
+
+            guard let startDate = DayKey.date(for: stay.entryDayKey, timeZone: timeZone) else {
+                dayKeys.insert(stay.entryDayKey)
+                continue
+            }
+            let endDayKey = stay.exitDayKey ?? DayKey.make(from: asOf, timeZone: timeZone)
+            let endDate = DayKey.date(for: endDayKey, timeZone: timeZone) ?? startDate
+
+            var date = min(startDate, endDate)
+            let finalDate = max(startDate, endDate)
+            while date <= finalDate {
+                dayKeys.insert(DayKey.make(from: date, timeZone: timeZone))
+                guard let nextDate = stayCalendar.date(byAdding: .day, value: 1, to: date) else { break }
+                date = nextDate
+            }
+        }
+
+        return dayKeys
     }
 }

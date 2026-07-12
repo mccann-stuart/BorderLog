@@ -7,8 +7,11 @@
 
 import Foundation
 import SwiftData
+import os
 
 struct SampleData {
+    private static let logger = Logger(subsystem: "com.MCCANN.Border", category: "SampleData")
+
     @MainActor
     static func seed(context: ModelContext) {
         let calendar = Calendar.current
@@ -78,11 +81,26 @@ struct SampleData {
         )
         context.insert(samplePhoto)
 
+        LedgerRecomputeRecoveryStore.shared.markDirty(dayKeys: [
+            stay1.entryDayKey,
+            stay1.exitDayKey ?? stay1.entryDayKey,
+            stay2.entryDayKey,
+            stay2.exitDayKey ?? stay2.entryDayKey,
+            stay3.entryDayKey,
+            DayKey.make(from: today, timeZone: .current),
+            overrideDay.dayKey,
+            sampleLocation.dayKey,
+            samplePhoto.dayKey
+        ])
         Task {
             let container = context.container
             await LedgerRefreshCoordinator.shared.run {
                 let recomputeService = LedgerRecomputeService(modelContainer: container)
-                await recomputeService.recomputeAll()
+                do {
+                    try await recomputeService.recomputeAll()
+                } catch {
+                    Self.logger.error("Failed to recompute sample ledger: \(error, privacy: .private)")
+                }
             }
         }
     }

@@ -440,7 +440,9 @@ nonisolated private struct PresenceResultCompiler {
         fillSuggestions(results: &sortedResults)
         applyTravelBackedTransitionInfill(results: &sortedResults, travelEvents: travelEvents)
 
-        return sortedResults.map(markContributingEvidence)
+        return sortedResults
+            .map(markContributingEvidence)
+            .map(applyingConservativeConfidenceCap)
     }
 
     private func baseResult(for dayKey: String, date: Date, timeZoneId: String?, dayState: DayInferenceState) -> PresenceDayResult {
@@ -1020,13 +1022,23 @@ nonisolated private struct PresenceResultCompiler {
         let selectedCountries = result.countryAllocations
         let updatedEvidence = result.evidenceEntries.map { entry in
             var mutable = entry
-            mutable.contributedToFinalResult =
-                selectedCountries.contains(where: { allocation in
-                    if let countryCode = entry.countryCode, let allocationCode = allocation.countryCode {
-                        return countryCode == allocationCode
-                    }
-                    return entry.countryName.caseInsensitiveCompare(allocation.countryName) == .orderedSame
-                }) || entry.phase == .override
+            let matchesSelectedCountry = selectedCountries.contains(where: { allocation in
+                if let countryCode = entry.countryCode, let allocationCode = allocation.countryCode {
+                    return countryCode == allocationCode
+                }
+                return entry.countryName.caseInsensitiveCompare(allocation.countryName) == .orderedSame
+            })
+
+            switch entry.phase {
+            case .override:
+                mutable.contributedToFinalResult = true
+            case .contextual:
+                // Contextual candidates with zero weight are provenance only. Explicit
+                // contextual promotions set this flag when they actually choose the result.
+                mutable.contributedToFinalResult = entry.contributedToFinalResult
+            case .base, .normalization:
+                mutable.contributedToFinalResult = matchesSelectedCountry && entry.calibratedWeight > 0
+            }
             return mutable
         }
 
@@ -1050,6 +1062,115 @@ nonisolated private struct PresenceResultCompiler {
             suggestedCountryCode2: result.suggestedCountryCode2,
             suggestedCountryName2: result.suggestedCountryName2
         )
+    }
+
+    private func applyingConservativeConfidenceCap(_ result: PresenceDayResult) -> PresenceDayResult {
+        guard !result.isOverride, result.confidenceLabel == .high else { return result }
+
+        var capReasons: [String] = []
+        if result.isDisputed {
+            capReasons.append("disputed")
+        }
+        if result.evidenceEntries.contains(where: {
+            $0.phase == .contextual && $0.contributedToFinalResult
+        }) {
+            capReasons.append("contextual")
+        }
+        if isWeakLocationOnly(result) {
+            capReasons.append("weak-location-only")
+        }
+        if hasDecisiveCorrelatedLocationBurst(result) {
+            capReasons.append("correlated-location-burst")
+        }
+
+        guard !capReasons.isEmpty else { return result }
+
+        let breakdown = result.confidenceBreakdown
+        return PresenceDayResult(
+            dayKey: result.dayKey,
+            date: result.date,
+            timeZoneId: result.timeZoneId,
+            countryAllocations: result.countryAllocations,
+            zoneOverlays: result.zoneOverlays,
+            evidenceEntries: result.evidenceEntries,
+            confidenceBreakdown: PresenceConfidenceBreakdown(
+                score: breakdown.score,
+                runnerUpScore: breakdown.runnerUpScore,
+                margin: breakdown.margin,
+                normalizedWinningShare: breakdown.normalizedWinningShare,
+                label: .medium,
+                calibrationSummary: "\(breakdown.calibrationSummary); capped at medium: \(capReasons.joined(separator: ", "))"
+            ),
+            sourceSummary: result.sourceSummary,
+            isOverride: result.isOverride,
+            isDisputed: result.isDisputed,
+            stayCount: result.stayCount,
+            photoCount: result.photoCount,
+            locationCount: result.locationCount,
+            calendarCount: result.calendarCount,
+            suggestedCountryCode1: result.suggestedCountryCode1,
+            suggestedCountryName1: result.suggestedCountryName1,
+            suggestedCountryCode2: result.suggestedCountryCode2,
+            suggestedCountryName2: result.suggestedCountryName2
+        )
+    }
+
+    private func isWeakLocationOnly(_ result: PresenceDayResult) -> Bool {
+        guard result.sources == .location else { return false }
+        let dayLocations = context.locations.filter { $0.dayKey == result.dayKey }
+        guard !dayLocations.isEmpty else { return false }
+        return dayLocations.allSatisfy {
+            $0.accuracyMeters <= 0 || $0.accuracyMeters > config.locationAccuracyReference
+        }
+    }
+
+    private func hasDecisiveCorrelatedLocationBurst(_ result: PresenceDayResult) -> Bool {
+        guard let winningCountry = result.countryAllocations.first else { return false }
+
+        let matchingLocations = context.locations.filter { location in
+            guard location.dayKey == result.dayKey,
+                  location.timestamp != nil,
+                  let sourceRaw = location.sourceRaw,
+                  !sourceRaw.isEmpty,
+                  let country = resolveCountry(
+                    countryCode: location.countryCode,
+                    countryName: location.countryName
+                  ) else {
+                return false
+            }
+            return countryMatches(winningCountry, country)
+        }
+
+        let locationsBySource = Dictionary(grouping: matchingLocations) { $0.sourceRaw ?? "" }
+        let burstWindow: TimeInterval = 120
+        let containsBurst = locationsBySource.values.contains { locations in
+            let timestamps = locations.compactMap(\.timestamp).sorted()
+            guard timestamps.count > 1 else { return false }
+            return zip(timestamps, timestamps.dropFirst()).contains { earlier, later in
+                later.timeIntervalSince(earlier) <= burstWindow
+            }
+        }
+        guard containsBurst else { return false }
+
+        // Agreeing independent evidence can still justify High confidence. A correlated
+        // location burst is decisive only when non-location base evidence does not reach the
+        // normal absolute High threshold by itself.
+        let independentWinningWeight = result.evidenceEntries.reduce(into: 0.0) { total, entry in
+            let matchesWinningCountry: Bool
+            if let entryCode = entry.countryCode, let winningCode = winningCountry.countryCode {
+                matchesWinningCountry = entryCode == winningCode
+            } else {
+                matchesWinningCountry = entry.countryName.caseInsensitiveCompare(winningCountry.countryName) == .orderedSame
+            }
+            guard entry.phase == .base,
+                  entry.contributedToFinalResult,
+                  matchesWinningCountry,
+                  !entry.processorID.localizedCaseInsensitiveContains("location") else {
+                return
+            }
+            total += entry.calibratedWeight
+        }
+        return independentWinningWeight < config.highConfidenceScore
     }
 
     private func isEligibleForAdjacentTravelPromotion(_ result: PresenceDayResult) -> Bool {

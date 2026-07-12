@@ -20,6 +20,7 @@ struct DebugExportMetadata: Codable, Sendable {
     let exportedAt: Date
     let appVersion: String
     let appBuild: String
+    let buildCommit: String
     let bundleIdentifier: String?
     let deviceModelCategory: String
     let operatingSystemVersion: String
@@ -135,11 +136,22 @@ struct DebugExportSchengenLedgerSummary: Codable, Sendable {
     let windowEnd: Date
 }
 
+struct DebugExportUnresolvedPhotoEvidenceSummary: Codable, Sendable {
+    let totalPhotoSignals: Int
+    let resolvedPhotoSignals: Int
+    let unresolvedPhotoSignals: Int
+    let unresolvedPhotoSignalRatio: Double
+    let daysWithPhotoEvidence: Int
+    let daysWithUnresolvedPhotoEvidence: Int
+    let unresolvedPhotoEvidenceDayRatio: Double
+}
+
 struct DebugExportSummary: Codable, Sendable {
     let recordCounts: DebugExportRecordCounts
     let dateBounds: DebugExportDateBounds
     let presenceDayTotals: DebugExportPresenceDayTotals
     let sourceTotals: DebugExportSourceTotals
+    let unresolvedPhotoEvidence: DebugExportUnresolvedPhotoEvidenceSummary
     let schengenLedgerSummary: DebugExportSchengenLedgerSummary
 }
 
@@ -341,6 +353,7 @@ nonisolated struct DebugDataStoreExportPayload: Codable, Sendable {
     let appState: DebugExportAppState
     let userData: DebugExportUserData
     let snapshotConsistency: String
+    let diagnostics: DiagnosticsSnapshot
     let summary: DebugExportSummary
     let records: DebugExportRecords
     let days: [DebugExportDaySnapshot]
@@ -351,6 +364,7 @@ struct DebugExportRuntimeContext: Codable, Sendable {
     let appState: DebugExportAppState
     let userData: DebugExportUserData
     let snapshotConsistency: String
+    let diagnostics: DiagnosticsSnapshot
     let pendingLocationSnapshots: [DebugExportPendingLocationSnapshot]
 }
 
@@ -554,6 +568,7 @@ actor DebugDataStoreExportService {
             appState: context.appState,
             userData: context.userData,
             snapshotConsistency: context.snapshotConsistency,
+            diagnostics: context.diagnostics,
             summary: summary,
             records: records,
             days: days
@@ -650,13 +665,56 @@ actor DebugDataStoreExportService {
             presenceDaysWithCalendarSource: calendarSourceCount
         )
 
+        let unresolvedPhotoEvidence = makeUnresolvedPhotoEvidenceSummary(
+            photoSignals: records.photoSignals
+        )
+
         return DebugExportSummary(
             recordCounts: recordCounts,
             dateBounds: dateBounds,
             presenceDayTotals: presenceDayTotals,
             sourceTotals: sourceTotals,
+            unresolvedPhotoEvidence: unresolvedPhotoEvidence,
             schengenLedgerSummary: schengenLedgerSummary
         )
+    }
+
+    private static func makeUnresolvedPhotoEvidenceSummary(
+        photoSignals: [DebugExportPhotoSignalRecord]
+    ) -> DebugExportUnresolvedPhotoEvidenceSummary {
+        let unresolvedSignals = photoSignals.filter { signal in
+            !hasCountry(countryCode: signal.countryCode, countryName: signal.countryName)
+        }
+        let totalSignalCount = photoSignals.count
+        let photoDayKeys = Set(photoSignals.map(\.dayKey))
+        let unresolvedDayKeys = Set(unresolvedSignals.map(\.dayKey))
+
+        return DebugExportUnresolvedPhotoEvidenceSummary(
+            totalPhotoSignals: totalSignalCount,
+            resolvedPhotoSignals: totalSignalCount - unresolvedSignals.count,
+            unresolvedPhotoSignals: unresolvedSignals.count,
+            unresolvedPhotoSignalRatio: ratio(
+                numerator: unresolvedSignals.count,
+                denominator: totalSignalCount
+            ),
+            daysWithPhotoEvidence: photoDayKeys.count,
+            daysWithUnresolvedPhotoEvidence: unresolvedDayKeys.count,
+            unresolvedPhotoEvidenceDayRatio: ratio(
+                numerator: unresolvedDayKeys.count,
+                denominator: photoDayKeys.count
+            )
+        )
+    }
+
+    private static func hasCountry(countryCode: String?, countryName: String?) -> Bool {
+        let code = countryCode?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let name = countryName?.trimmingCharacters(in: .whitespacesAndNewlines)
+        return !(code?.isEmpty ?? true) || !(name?.isEmpty ?? true)
+    }
+
+    private static func ratio(numerator: Int, denominator: Int) -> Double {
+        guard denominator > 0 else { return 0 }
+        return Double(numerator) / Double(denominator)
     }
 
     private static func makeDaySnapshots(

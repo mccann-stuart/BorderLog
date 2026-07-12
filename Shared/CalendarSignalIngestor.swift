@@ -42,13 +42,19 @@ actor CalendarSignalIngestor {
     }
 
     private var resolver: CountryResolving?
+    private var recoveryStore: LedgerRecomputeRecoveryStore = .shared
     internal var saveContextOverride: (@Sendable () throws -> Void)?
 
-    init(modelContainer: ModelContainer, resolver: CountryResolving) {
+    init(
+        modelContainer: ModelContainer,
+        resolver: CountryResolving,
+        recoveryStore: LedgerRecomputeRecoveryStore = .shared
+    ) {
         self.modelContainer = modelContainer
         let context = ModelContext(modelContainer)
         self.modelExecutor = DefaultSerialModelExecutor(modelContext: context)
         self.resolver = resolver
+        self.recoveryStore = recoveryStore
     }
 
     func ingest(mode: IngestMode) async throws -> Int {
@@ -164,6 +170,7 @@ actor CalendarSignalIngestor {
                 if eventMutations > 0 {
                     processed += 1
                     if processed % 10 == 0 {
+                        recoveryStore.markDirty(dayKeys: touchedDayKeys)
                         try saveContextIfNeeded()
                     }
                 }
@@ -258,6 +265,7 @@ actor CalendarSignalIngestor {
             if eventMutations > 0 {
                 processed += 1
                 if processed % 10 == 0 {
+                    recoveryStore.markDirty(dayKeys: touchedDayKeys)
                     try saveContextIfNeeded()
                 }
             }
@@ -274,11 +282,13 @@ actor CalendarSignalIngestor {
             processed += orphanDeletes
         }
 
+        recoveryStore.markDirty(dayKeys: touchedDayKeys)
         try saveContextIfNeeded()
 
         if !touchedDayKeys.isEmpty {
             let recomputeService = LedgerRecomputeService(modelContainer: modelContainer)
-            await recomputeService.recompute(dayKeys: Array(touchedDayKeys))
+            await recomputeService.setRecoveryStore(recoveryStore)
+            try await recomputeService.recompute(dayKeys: Array(touchedDayKeys))
         }
 
         return processed

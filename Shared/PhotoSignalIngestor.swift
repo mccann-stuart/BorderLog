@@ -20,6 +20,7 @@ actor PhotoSignalIngestor {
     }
 
     private var resolver: CountryResolving?
+    private var recoveryStore: LedgerRecomputeRecoveryStore = .shared
     internal var saveContextOverride: (@Sendable () throws -> Void)?
 
     struct IngestQueryConfig {
@@ -28,11 +29,16 @@ actor PhotoSignalIngestor {
         let sortAscending: Bool
     }
 
-    init(modelContainer: ModelContainer, resolver: CountryResolving) {
+    init(
+        modelContainer: ModelContainer,
+        resolver: CountryResolving,
+        recoveryStore: LedgerRecomputeRecoveryStore = .shared
+    ) {
         self.modelContainer = modelContainer
         let context = ModelContext(modelContainer)
         self.modelExecutor = DefaultSerialModelExecutor(modelContext: context)
         self.resolver = resolver
+        self.recoveryStore = recoveryStore
     }
 
     func ingest(mode: IngestMode) async throws -> Int {
@@ -41,6 +47,16 @@ actor PhotoSignalIngestor {
             return 0
         }
 
+        await DiagnosticsStore.shared.recordPhotoScanStarted()
+        do {
+            return try await ingestAuthorised(mode: mode)
+        } catch {
+            await DiagnosticsStore.shared.recordPhotoScanFailure()
+            throw error
+        }
+    }
+
+    private func ingestAuthorised(mode: IngestMode) async throws -> Int {
         var didBeginScan = false
         defer {
             if didBeginScan {
@@ -82,6 +98,10 @@ actor PhotoSignalIngestor {
 
         var processed = 0
         var touchedDayKeys: Set<String> = []
+        var rejectedMissingCreationDate = 0
+        var rejectedMissingLocation = 0
+        var rejectedDuplicateAsset = 0
+        var unresolvedCountrySignals = 0
         let saveEvery = 25
         let progressUpdateEvery = 25
 
@@ -95,6 +115,7 @@ actor PhotoSignalIngestor {
                     }
                 }
                 guard let creationDate = asset.creationDate else {
+                    rejectedMissingCreationDate += 1
                     continue
                 }
 
@@ -102,10 +123,12 @@ actor PhotoSignalIngestor {
                 Self.applyScannedAssetCheckpoint(state: state, creationDate: creationDate)
 
                 guard let location = asset.location else {
+                    rejectedMissingLocation += 1
                     continue
                 }
 
                 if existingAssetHashes.contains(assetIdHash) {
+                    rejectedDuplicateAsset += 1
                     continue
                 }
 
@@ -118,6 +141,16 @@ actor PhotoSignalIngestor {
                     self.resolver = createdResolver
                 }
                 let resolution = await activeResolver.resolveCountry(for: location)
+                    .flatMap {
+                        CountryResolution.normalized(
+                            countryCode: $0.countryCode,
+                            countryName: $0.countryName,
+                            timeZone: $0.timeZone
+                        )
+                    }
+                if resolution == nil {
+                    unresolvedCountrySignals += 1
+                }
                 let timeZone = resolution?.timeZone ?? TimeZone.current
                 let dayKey = DayKey.make(from: creationDate, timeZone: timeZone)
 
@@ -143,6 +176,7 @@ actor PhotoSignalIngestor {
                 processed += 1
 
                 if processed % saveEvery == 0, modelContext.hasChanges {
+                    recoveryStore.markDirty(dayKeys: touchedDayKeys)
                     try saveContextIfNeeded()
                 }
             }
@@ -153,11 +187,28 @@ actor PhotoSignalIngestor {
             state.lastFullScanAt = now
         }
 
+        // Persist the recovery checkpoint before committing the corresponding source rows.
+        // A failed save may leave an unnecessary dirty key, which is safe; the inverse would
+        // leave a committed photo permanently absent from the derived ledger.
+        recoveryStore.markDirty(dayKeys: touchedDayKeys)
         try saveContextIfNeeded()
+
+        // The scan itself is complete once its source rows and checkpoint are durable. Record
+        // these counts before recompute so a downstream ledger failure does not erase useful
+        // scan/rejection diagnostics; that failure is recorded separately by the outer catch.
+        await DiagnosticsStore.shared.recordPhotoScanCompleted(
+            assetsScanned: assetCount,
+            signalsImported: processed,
+            rejectedMissingCreationDate: rejectedMissingCreationDate,
+            rejectedMissingLocation: rejectedMissingLocation,
+            rejectedDuplicateAsset: rejectedDuplicateAsset,
+            unresolvedCountrySignals: unresolvedCountrySignals
+        )
 
         if !touchedDayKeys.isEmpty {
             let recomputeService = LedgerRecomputeService(modelContainer: modelContainer)
-            await recomputeService.recompute(dayKeys: Array(touchedDayKeys))
+            await recomputeService.setRecoveryStore(recoveryStore)
+            try await recomputeService.recompute(dayKeys: Array(touchedDayKeys))
         }
 
         return processed
@@ -177,8 +228,11 @@ actor PhotoSignalIngestor {
             return IngestQueryConfig(startDate: Date.distantPast, endDate: nil, sortAscending: true)
         case .auto:
             if let lastDate = state.lastAssetCreationDate {
+                // PhotoKit timestamps are not guaranteed to be unique and assets can arrive
+                // slightly out of order after iCloud synchronisation. Re-scan a bounded overlap;
+                // asset hashes make this idempotent while keeping the post-bootstrap scan small.
                 return IngestQueryConfig(
-                    startDate: lastDate.addingTimeInterval(1),
+                    startDate: lastDate.addingTimeInterval(-24 * 60 * 60),
                     endDate: nil,
                     sortAscending: true
                 )

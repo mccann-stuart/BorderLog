@@ -244,6 +244,7 @@ struct PresenceDayDetailView: View {
             )
             modelContext.insert(newOverride)
         }
+        LedgerRecomputeRecoveryStore.shared.markDirty(dayKeys: [dayKey])
         do {
             try modelContext.save()
             recomputeImpactedDay(dayKey)
@@ -262,6 +263,7 @@ struct PresenceDayDetailView: View {
                 modelContext.delete(match)
             }
         }
+        LedgerRecomputeRecoveryStore.shared.markDirty(dayKeys: [dayKey])
         do {
             try modelContext.save()
             recomputeImpactedDay(dayKey)
@@ -277,7 +279,11 @@ struct PresenceDayDetailView: View {
                 // Need a slight delay to ensure SwiftData propagation to the background context
                 try? await Task.sleep(nanoseconds: 150_000_000)
                 let service = LedgerRecomputeService(modelContainer: container)
-                await service.recompute(dayKeys: [dayKey])
+                do {
+                    try await service.recompute(dayKeys: [dayKey])
+                } catch {
+                    Self.logger.error("Failed to recompute override day: \(error, privacy: .private)")
+                }
             }
         }
     }
