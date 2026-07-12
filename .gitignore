@@ -25,3 +25,14 @@ TestResults.xml
 **/xcuserdata/
 *.xcuserdatad/
 *.xcbkptlist
+
+### macOS ###
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+__MACOSX/
+
+### Microsoft Office / OneDrive ###
+# Office lock files can be surfaced by OneDrive while a document is open.
+~$*

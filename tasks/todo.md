@@ -163,3 +163,17 @@
 - Resolved minor merge conflict in `Shared/PendingLocationSnapshot.swift` by combining the remote linear iteration performance improvements with the local concurrent deletion `do-catch` recovery blocks.
 - Resolved minor merge conflict in `tasks/todo.md` by retaining both remote review entries and local sync tasks.
 - Successfully pushed the fully synchronized main branch to remote origin.
+
+# macOS and OneDrive Ignore Rules
+
+- [x] Inspect existing ignore rules and tracked macOS/OneDrive artefacts.
+- [x] Add narrow rules for macOS metadata, archive resource forks, and Office lock files surfaced by OneDrive.
+- [x] Remove the already-tracked root `.DS_Store` from the Git index.
+- [x] Verify representative paths are ignored and review the final diff.
+
+## macOS and OneDrive Ignore Rules Review
+
+- Added repository-wide ignores for macOS Finder metadata, AppleDouble/resource-fork artefacts, and `__MACOSX` archive folders.
+- Added a narrow ignore for Microsoft Office `~$` lock files commonly surfaced by OneDrive, without hiding broad temporary or conflicted-copy patterns that may contain real work.
+- Removed the root `.DS_Store` from Git tracking while retaining the local ignored file.
+- Verification passed with representative `git check-ignore` paths and `git diff --check`.
