@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="pin" x1="0" y1="0" x2="0" y2="1">
+      <stop stop-color="#10D3DE"/>
+      <stop offset="1" stop-color="#0068B9"/>
+    </linearGradient>
+  </defs>
+  <path d="M310 310C271 310 240 341 240 380C240 425 286 480 310 502C334 480 380 425 380 380C380 341 349 310 310 310Z" fill="url(#pin)"/>
+  <circle cx="310" cy="378" r="28" fill="#D8EEF1"/>
+  <path d="M780 481C741 481 710 512 710 551C710 596 756 645 780 668C804 645 850 596 850 551C850 512 819 481 780 481Z" fill="url(#pin)"/>
+  <circle cx="780" cy="548" r="28" fill="#C8E0E3"/>
+</svg>

@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <defs><clipPath id="globe-clip"><circle cx="512" cy="520" r="308"/></clipPath></defs>
+  <g clip-path="url(#globe-clip)" fill="none" stroke="#77E5E5" stroke-width="8" stroke-linecap="round" opacity="0.24">
+    <path d="M512 214C431 318 431 722 512 826"/>
+    <path d="M512 214C593 318 593 722 512 826"/>
+    <path d="M222 486C333 291 691 291 802 486"/>
+    <path d="M214 535C344 664 680 664 810 535"/>
+    <path d="M260 647C385 728 639 728 764 647"/>
+  </g>
+  <path d="M512 214V826" fill="none" stroke="#A4F1EC" stroke-width="15" stroke-linecap="round" stroke-dasharray="23 45" opacity="0.38"/>
+</svg>
