@@ -103,3 +103,6 @@
 ## 2026-06-25 - Avoid O(N) array allocation on minimum/maximum evaluation over optional properties
 **Learning:** Using chained properties like `.compactMap { $0 }.min()` over an array of optional properties creates intermediate arrays that are immediately discarded, causing unnecessary memory allocation and GC overhead for extracting a single value.
 **Action:** Replace this pattern with a single `for` loop and an explicit tracking variable, reducing memory overhead to O(1) while maintaining O(N) evaluation time, or use `if let` blocks when evaluating only two options.
+## 2026-07-13 - Cached DateFormatter in SettingsView
+**Learning:** Swift's `DateFormatter` instantiation is notoriously slow and should be statically cached when called repeatedly or inside frequent methods.
+**Action:** Use `private static let` for single instance formatters instead of creating new instances locally.

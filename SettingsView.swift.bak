@@ -249,7 +249,7 @@ struct SettingsView: View {
                     Text("Location and read-only events from your selected calendars help determine which country you were in each day. Verified photo metadata is shown only as non-scoring review context. BorderLog stores this data locally and may use Apple system services such as MapKit geocoding to resolve countries.")
                 }
 
-      
+
 
                 // MARK: – Setup
                 Section {
@@ -890,18 +890,13 @@ struct SettingsView: View {
         }
     }
 
-    // ⚡ Bolt: Cached DateFormatter to avoid expensive instantiation on every export
-    private static let debugExportDateFormatter: DateFormatter = {
+    private static func debugExportFilename(for date: Date) -> String {
         let formatter = DateFormatter()
         formatter.calendar = Calendar(identifier: .gregorian)
         formatter.locale = Locale(identifier: "en_US_POSIX")
         formatter.timeZone = TimeZone.current
         formatter.dateFormat = "yyyy-MM-dd-HHmmss"
-        return formatter
-    }()
-
-    private static func debugExportFilename(for date: Date) -> String {
-        return "borderlog-debug-export-\(debugExportDateFormatter.string(from: date))"
+        return "borderlog-debug-export-\(formatter.string(from: date))"
     }
 #endif
 
