@@ -28,43 +28,7 @@ struct WorldMapView: View {
     var body: some View {
         ZStack {
             GeometryReader { proxy in
-                if proxy.size.width > 0 && proxy.size.height > 0 {
-                    // Base map
-                    Map(position: $cameraPosition, interactionModes: .all) {
-                        let loadedPolygons = usePolygonMapView ? polygonLoader.getPolygons(for: visitedCountries) : [:]
-                        
-                        // Add annotations for visited countries
-                        ForEach(Array(visitedCountries), id: \.self) { code in
-                            if usePolygonMapView {
-                                if let polys = loadedPolygons[CountryCodeNormalizer.normalize(code) ?? code.uppercased()] {
-                                    ForEach(0..<polys.count, id: \.self) { polyIdx in
-                                        MapPolygon(coordinates: polys[polyIdx].first ?? [])
-                                            .foregroundStyle(.blue.opacity(0.2))
-                                            .stroke(.blue.opacity(0.8), lineWidth: 1)
-                                    }
-                                }
-                            } else {
-                                if let coordinate = countryCoordinate(for: code) {
-                                    Annotation(code, coordinate: coordinate) {
-                                        Circle()
-                                            .fill(.blue)
-                                            .frame(width: 10, height: 10)
-                                            .overlay(
-                                                Circle()
-                                                    .stroke(.white, lineWidth: 2)
-                                            )
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    .mapStyle(.standard(elevation: .flat))
-                    .onChange(of: cameraPosition) { _, _ in
-                        scheduleAutoZoomIfNeeded()
-                    }
-                } else {
-                    Color.clear
-                }
+                mapView(for: proxy)
             }
             
             // Overlay with visited countries count
@@ -95,6 +59,47 @@ struct WorldMapView: View {
         }
     }
     
+    @ViewBuilder
+    private func mapView(for proxy: GeometryProxy) -> some View {
+        if proxy.size.width > 0 && proxy.size.height > 0 {
+            // Base map
+            Map(position: $cameraPosition, interactionModes: .all) {
+                let loadedPolygons = usePolygonMapView ? polygonLoader.getPolygons(for: visitedCountries) : [:]
+
+                // Add annotations for visited countries
+                ForEach(Array(visitedCountries), id: \.self) { code in
+                    if usePolygonMapView {
+                        if let polys = loadedPolygons[CountryCodeNormalizer.normalize(code) ?? code.uppercased()] {
+                            ForEach(0..<polys.count, id: \.self) { polyIdx in
+                                MapPolygon(coordinates: polys[polyIdx].first ?? [])
+                                    .foregroundStyle(.blue.opacity(0.2))
+                                    .stroke(.blue.opacity(0.8), lineWidth: 1)
+                            }
+                        }
+                    } else {
+                        if let coordinate = countryCoordinate(for: code) {
+                            Annotation(code, coordinate: coordinate) {
+                                Circle()
+                                    .fill(.blue)
+                                    .frame(width: 10, height: 10)
+                                    .overlay(
+                                        Circle()
+                                            .stroke(.white, lineWidth: 2)
+                                    )
+                            }
+                        }
+                    }
+                }
+            }
+            .mapStyle(.standard(elevation: .flat))
+            .onChange(of: cameraPosition) { _, _ in
+                scheduleAutoZoomIfNeeded()
+            }
+        } else {
+            Color.clear
+        }
+    }
+
     private func updateCamera(for codes: Set<String>, animated: Bool) {
         suppressAutoZoom = true
         autoZoomTask?.cancel()
