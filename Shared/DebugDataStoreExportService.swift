@@ -769,6 +769,8 @@ actor DebugDataStoreExportService {
                 let timeZone = DayIdentity.canonicalTimeZone(preferredTimeZoneId: timeZoneId)
                 let normalizedDate = DayKey.date(for: dayKey, timeZone: timeZone) ?? DayIdentity.normalizedDate(for: dayKey, dayTimeZoneId: timeZoneId)
 
+                let hasAnyRawEvidence = !stays.isEmpty || dayOverride != nil || !locations.isEmpty || !photos.isEmpty || !calendarSignals.isEmpty
+
                 return DebugExportDaySnapshot(
                     dayKey: dayKey,
                     date: normalizedDate,
@@ -787,15 +789,10 @@ actor DebugDataStoreExportService {
                         photos: photos.count,
                         calendarSignals: calendarSignals.count
                     ),
-                    hasAnyRawEvidence: !stays.isEmpty || dayOverride != nil || !locations.isEmpty || !photos.isEmpty || !calendarSignals.isEmpty
+                    hasAnyRawEvidence: hasAnyRawEvidence
                 )
             }
-            .sorted {
-                if $0.date == $1.date {
-                    return $0.dayKey < $1.dayKey
-                }
-                return $0.date < $1.date
-            }
+            .sorted { ($0.date, $0.dayKey) < ($1.date, $1.dayKey) }
     }
 
     private static func makePresenceSummary(_ presence: DebugExportPresenceDayRecord) -> DebugExportPresenceSummary {
