@@ -1,0 +1,85 @@
+{
+  "fill" : {
+    "linear-gradient" : [
+      "display-p3:0.05014,0.11947,0.21072,1.00000",
+      "extended-srgb:0.00000,0.53333,1.00000,1.00000"
+    ]
+  },
+  "groups" : [
+    {
+      "layers" : [
+        {
+          "glass" : false,
+          "image-name" : "07-calendar-details.svg",
+          "name" : "07-calendar-details"
+        },
+        {
+          "image-name" : "06-calendar-body.svg",
+          "name" : "06-calendar-body"
+        }
+      ],
+      "name" : "Calendar",
+      "shadow" : {
+        "kind" : "neutral",
+        "opacity" : 0.6
+      },
+      "translucency" : {
+        "enabled" : true,
+        "value" : 0.2
+      }
+    },
+    {
+      "layers" : [
+        {
+          "fill-specializations" : [
+            {
+              "appearance" : "dark",
+              "value" : "none"
+            }
+          ],
+          "glass" : false,
+          "image-name" : "04-flight-route.svg",
+          "name" : "04-flight-route"
+        },
+        {
+          "image-name" : "03-location-pins.svg",
+          "name" : "03-location-pins"
+        }
+      ],
+      "name" : "Journey",
+      "shadow" : {
+        "kind" : "neutral",
+        "opacity" : 0.6
+      },
+      "translucency" : {
+        "enabled" : true,
+        "value" : 0.2
+      }
+    },
+    {
+      "layers" : [
+        {
+          "glass" : false,
+          "image-name" : "02-globe-graticule.svg",
+          "name" : "02-globe-graticule"
+        },
+        {
+          "image-name" : "01-globe-base.svg",
+          "name" : "01-globe-base"
+        }
+      ],
+      "name" : "Globe",
+      "shadow" : {
+        "kind" : "none",
+        "opacity" : 0.6
+      },
+      "translucency" : {
+        "enabled" : false,
+        "value" : 0.2
+      }
+    }
+  ],
+  "supported-platforms" : {
+    "squares" : "shared"
+  }
+}

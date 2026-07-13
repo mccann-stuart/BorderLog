@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="globe" x1="270" y1="270" x2="760" y2="790" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#12CBEA"/>
+      <stop offset="0.46" stop-color="#078FDC"/>
+      <stop offset="1" stop-color="#07559C"/>
+    </linearGradient>
+    <clipPath id="globe-clip"><circle cx="512" cy="520" r="308"/></clipPath>
+  </defs>
+  <circle cx="512" cy="520" r="308" fill="url(#globe)"/>
+  <path d="M512 212A308 308 0 0 0 281 724C364 650 421 513 453 358C470 280 492 229 512 212Z" fill="#42E6E0" opacity="0.16" clip-path="url(#globe-clip)"/>
+</svg>

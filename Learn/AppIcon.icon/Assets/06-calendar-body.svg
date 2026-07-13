@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="calendar" x1="0" y1="0" x2="0" y2="1">
+      <stop stop-color="#B9D6D9"/>
+      <stop offset="1" stop-color="#77A8B1"/>
+    </linearGradient>
+  </defs>
+  <g transform="translate(-56 0)">
+    <rect x="629" y="650" width="321" height="261" rx="38" fill="url(#calendar)"/>
+    <path d="M629 688Q629 650 667 650H912Q950 650 950 688V720H629Z" fill="#C5DEE0" opacity="0.42"/>
+    <rect x="700" y="620" width="36" height="90" rx="18" fill="#BCD0D1"/>
+    <rect x="844" y="620" width="36" height="90" rx="18" fill="#BCD0D1"/>
+  </g>
+</svg>
