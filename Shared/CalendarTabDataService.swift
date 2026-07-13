@@ -449,25 +449,25 @@ actor CalendarTabDataService {
     ) {
         guard var accumulator = accumulators[signal.dayKey] else { return }
 
-        if let country = Self.normalizedCountry(
+        guard let country = Self.normalizedCountry(
             countryCode: signal.countryCode,
             countryName: signal.countryName
-        ) {
-            accumulator.countriesByID[country.id] = country
+        ) else { return }
 
-            if Self.isFlightSignalSource(signal.source) {
-                accumulator.hasFlight = true
-                let candidate = FlightCountryCandidate(
-                    country: country,
-                    timestamp: signal.timestamp,
-                    eventIdentifier: signal.eventIdentifier
-                )
+        accumulator.countriesByID[country.id] = country
 
-                if Self.isFlightOriginSignalSource(signal.source) {
-                    accumulator.flightOriginCandidates.append(candidate)
-                } else {
-                    accumulator.flightDestinationCandidates.append(candidate)
-                }
+        if Self.isFlightSignalSource(signal.source) {
+            accumulator.hasFlight = true
+            let candidate = FlightCountryCandidate(
+                country: country,
+                timestamp: signal.timestamp,
+                eventIdentifier: signal.eventIdentifier
+            )
+
+            if Self.isFlightOriginSignalSource(signal.source) {
+                accumulator.flightOriginCandidates.append(candidate)
+            } else {
+                accumulator.flightDestinationCandidates.append(candidate)
             }
         }
 
