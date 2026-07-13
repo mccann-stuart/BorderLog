@@ -110,35 +110,7 @@ struct SettingsView: View {
                     Text("Privacy")
                 }
 
-                if AppConfig.isCloudKitFeatureEnabled {
-                    // MARK: – iCloud Sync
-                    Section {
-                        Toggle(isOn: $cloudKitSyncEnabled) {
-                            Label("iCloud Sync", systemImage: "icloud")
-                        }
-
-                        Button(role: .destructive) {
-                            isConfirmingCloudKitDelete = true
-                        } label: {
-                            HStack {
-                                Label(
-                                    isDeletingCloudKitData ? "Deleting…" : "Delete iCloud Data",
-                                    systemImage: isDeletingCloudKitData ? "arrow.triangle.2.circlepath" : "trash"
-                                )
-                                if isDeletingCloudKitData {
-                                    Spacer()
-                                    ProgressView()
-                                }
-                            }
-                        }
-                        .disabled(isDeletingCloudKitData)
-                    } header: {
-                        Text("iCloud Sync")
-                    } footer: {
-                        Text("Sync uses your iCloud private database. Changes take effect after restarting the app.")
-                    }
-                }
-
+                cloudKitSection
 
                 // MARK: – Data Sources
                 Section {
@@ -415,6 +387,40 @@ struct SettingsView: View {
                 refreshPermissions()
                 refreshWidgetLastWriteDate()
             }
+    }
+
+    // MARK: – CloudKit Section
+
+    @ViewBuilder
+    private var cloudKitSection: some View {
+        if AppConfig.isCloudKitFeatureEnabled {
+            // MARK: – iCloud Sync
+            Section {
+                Toggle(isOn: $cloudKitSyncEnabled) {
+                    Label("iCloud Sync", systemImage: "icloud")
+                }
+
+                Button(role: .destructive) {
+                    isConfirmingCloudKitDelete = true
+                } label: {
+                    HStack {
+                        Label(
+                            isDeletingCloudKitData ? "Deleting…" : "Delete iCloud Data",
+                            systemImage: isDeletingCloudKitData ? "arrow.triangle.2.circlepath" : "trash"
+                        )
+                        if isDeletingCloudKitData {
+                            Spacer()
+                            ProgressView()
+                        }
+                    }
+                }
+                .disabled(isDeletingCloudKitData)
+            } header: {
+                Text("iCloud Sync")
+            } footer: {
+                Text("Sync uses your iCloud private database. Changes take effect after restarting the app.")
+            }
+        }
     }
 
     // MARK: – Smart Location Row
