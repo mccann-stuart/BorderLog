@@ -19,6 +19,7 @@ Current implementation notes:
 - Reset All Data clears SwiftData models, keychain-backed local profile/session values, and pending widget location snapshots.
 - Keychain profile/session values use device-bound `kSecAttrAccessibleWhenUnlockedThisDeviceOnly` accessibility.
 - Settings includes a shared Day Counting mode: `Resolved Country` preserves the one-country-per-day default, while `Double Count Days` counts every resolved country allocation on travel days for app and widget summaries.
+- Calendar ingestion defaults to all accessible calendars for backwards compatibility. Users can choose an explicit subset, including none, in Settings; applying a change rebuilds the two-year calendar-evidence window and derived ledger immediately.
 
 App Store release readiness:
 - The app and widget are configured for iOS 26, and the widget targets both iPhone and iPad as required for app extensions.

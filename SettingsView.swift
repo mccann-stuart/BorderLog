@@ -26,6 +26,7 @@ struct SettingsView: View {
     @State private var locationStatus: CLAuthorizationStatus = CLLocationManager().authorizationStatus
     @State private var photoStatus: PHAuthorizationStatus = PHPhotoLibrary.authorizationStatus(for: .readWrite)
     @State private var calendarStatus: EKAuthorizationStatus = EKEventStore.authorizationStatus(for: .event)
+    @State private var calendarSelection: CalendarSourceSelection = .all
     @State private var isIngestingPhotos = false
     @State private var isIngestingCalendar = false
     @State private var ingestionError: String?
@@ -207,6 +208,17 @@ struct SettingsView: View {
                     calendarActionRow
 
                     if calendarHasReadAccess {
+                        NavigationLink {
+                            CalendarSourcesSettingsView(selection: $calendarSelection)
+                        } label: {
+                            HStack {
+                                Label("Calendars", systemImage: "calendar.badge.checkmark")
+                                Spacer()
+                                Text(calendarSelection.summary)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+
                         Button {
                             rescanCalendar()
                         } label: {
@@ -234,7 +246,7 @@ struct SettingsView: View {
                 } header: {
                     Text("Data Sources")
                 } footer: {
-                    Text("Location and read-only calendar events help determine which country you were in each day. Verified photo metadata is shown only as non-scoring review context. BorderLog stores this data locally and may use Apple system services such as MapKit geocoding to resolve countries.")
+                    Text("Location and read-only events from your selected calendars help determine which country you were in each day. Verified photo metadata is shown only as non-scoring review context. BorderLog stores this data locally and may use Apple system services such as MapKit geocoding to resolve countries.")
                 }
 
       
@@ -525,6 +537,7 @@ struct SettingsView: View {
         locationStatus = CLLocationManager().authorizationStatus
         photoStatus = PHPhotoLibrary.authorizationStatus(for: .readWrite)
         calendarStatus = EKEventStore.authorizationStatus(for: .event)
+        calendarSelection = CalendarSourceSelectionStore().load()
     }
 
     private func requestPhotosAccess() {

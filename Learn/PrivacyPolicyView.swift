@@ -23,7 +23,7 @@ struct PrivacyPolicyView: View {
                 )
                 PrivacyPolicyRow(
                     title: "Calendar",
-                    detail: "Optional Calendar access is read-only and is used to infer travel days from events such as flights. BorderLog never writes to the user's calendar."
+                    detail: "Optional Calendar access is read-only and is used to infer travel days from events such as flights. Calendar access defaults to all calendars, and you can choose which calendars BorderLog uses in Settings. BorderLog never writes to the user's calendar."
                 )
                 PrivacyPolicyRow(
                     title: "Profile",

@@ -18,9 +18,10 @@ actor CalendarSignalIngestor {
     private static let originSignalSuffix = "#origin"
     private static let legacyEndSignalSuffix = "#end"
 
-    enum IngestMode {
+    enum IngestMode: Equatable {
         case auto
         case manualFullScan
+        case selectionRebuild
     }
 
     struct ResolvedCalendarSignal: Sendable {
@@ -43,18 +44,21 @@ actor CalendarSignalIngestor {
 
     private var resolver: CountryResolving?
     private var recoveryStore: LedgerRecomputeRecoveryStore = .shared
+    private var calendarSelectionStore: CalendarSourceSelectionStore = .shared
     internal var saveContextOverride: (@Sendable () throws -> Void)?
 
     init(
         modelContainer: ModelContainer,
         resolver: CountryResolving,
-        recoveryStore: LedgerRecomputeRecoveryStore = .shared
+        recoveryStore: LedgerRecomputeRecoveryStore = .shared,
+        calendarSelectionStore: CalendarSourceSelectionStore = CalendarSourceSelectionStore()
     ) {
         self.modelContainer = modelContainer
         let context = ModelContext(modelContainer)
         self.modelExecutor = DefaultSerialModelExecutor(modelContext: context)
         self.resolver = resolver
         self.recoveryStore = recoveryStore
+        self.calendarSelectionStore = calendarSelectionStore
     }
 
     func ingest(mode: IngestMode) async throws -> Int {
@@ -71,21 +75,45 @@ actor CalendarSignalIngestor {
             return 0
         }
 
+        let availableCalendars = store.calendars(for: .event)
+        let storedSelection = calendarSelectionStore.load()
+        let availableReferences = availableCalendars.map(calendarReference(for:))
+        let selectionResolution = storedSelection.resolve(available: availableReferences)
+        if selectionResolution.migratedSelection != storedSelection {
+            try calendarSelectionStore.save(selectionResolution.migratedSelection, markingRebuild: false)
+        }
+        let selectedCalendars = availableCalendars.filter {
+            selectionResolution.selectedIdentifiers.contains($0.calendarIdentifier)
+        }
+
+        let effectiveMode = effectiveIngestMode(for: mode)
+
         let calendar = Calendar.current
         let now = Date()
 
         let ingestStartDate: Date
         let ingestEndDate = now
 
-        switch mode {
+        switch effectiveMode {
         case .manualFullScan:
             ingestStartDate = calendar.date(byAdding: .year, value: -2, to: now) ?? now
         case .auto:
             ingestStartDate = calendar.date(byAdding: .month, value: -1, to: now) ?? now
+        case .selectionRebuild:
+            ingestStartDate = calendar.date(byAdding: .year, value: -2, to: now) ?? now
         }
 
-        let predicate = store.predicateForEvents(withStart: ingestStartDate, end: ingestEndDate, calendars: nil)
-        let events = store.events(matching: predicate)
+        let events: [EKEvent]
+        if selectedCalendars.isEmpty {
+            events = []
+        } else {
+            let predicate = store.predicateForEvents(
+                withStart: ingestStartDate,
+                end: ingestEndDate,
+                calendars: selectedCalendars
+            )
+            events = store.events(matching: predicate)
+        }
         let totalEvents = events.count
         let progressUpdateEvery = 10
         var didBeginScan = false
@@ -108,13 +136,18 @@ actor CalendarSignalIngestor {
         var touchedDayKeys: Set<String> = []
 
         let staleWindowEnd = calendar.date(byAdding: .day, value: 1, to: ingestEndDate) ?? ingestEndDate
-        let existingSignals = try modelContext.fetch(
-            FetchDescriptor<CalendarSignal>(
-                predicate: #Predicate { signal in
-                    signal.timestamp >= ingestStartDate && signal.timestamp <= staleWindowEnd
-                }
+        let existingSignals: [CalendarSignal]
+        if effectiveMode == .selectionRebuild {
+            existingSignals = try modelContext.fetch(FetchDescriptor<CalendarSignal>())
+        } else {
+            existingSignals = try modelContext.fetch(
+                FetchDescriptor<CalendarSignal>(
+                    predicate: #Predicate { signal in
+                        signal.timestamp >= ingestStartDate && signal.timestamp <= staleWindowEnd
+                    }
+                )
             )
-        )
+        }
 
         var existingSignalByIdentifier: [String: CalendarSignal] = [:]
         for signal in existingSignals {
@@ -271,13 +304,11 @@ actor CalendarSignalIngestor {
             }
         }
 
-        var orphanDeletes = 0
-        for (identifier, signal) in existingSignalByIdentifier {
-            guard !seenIdentifiers.contains(identifier) else { continue }
-            touchedDayKeys.insert(signal.dayKey)
-            modelContext.delete(signal)
-            orphanDeletes += 1
-        }
+        let orphanDeletes = deleteOrphanedSignals(
+            existingSignalByIdentifier: &existingSignalByIdentifier,
+            seenIdentifiers: seenIdentifiers,
+            touchedDayKeys: &touchedDayKeys
+        )
         if orphanDeletes > 0 {
             processed += orphanDeletes
         }
@@ -291,7 +322,42 @@ actor CalendarSignalIngestor {
             try await recomputeService.recompute(dayKeys: Array(touchedDayKeys))
         }
 
+        if effectiveMode == .selectionRebuild {
+            calendarSelectionStore.markRebuildCompleted()
+        }
+
         return processed
+    }
+
+    private func effectiveIngestMode(for requestedMode: IngestMode) -> IngestMode {
+        calendarSelectionStore.needsRebuild ? .selectionRebuild : requestedMode
+    }
+
+    private func deleteOrphanedSignals(
+        existingSignalByIdentifier: inout [String: CalendarSignal],
+        seenIdentifiers: Set<String>,
+        touchedDayKeys: inout Set<String>
+    ) -> Int {
+        let orphanIdentifiers = existingSignalByIdentifier.keys.filter {
+            !seenIdentifiers.contains($0)
+        }
+        for identifier in orphanIdentifiers {
+            guard let signal = existingSignalByIdentifier.removeValue(forKey: identifier) else {
+                continue
+            }
+            touchedDayKeys.insert(signal.dayKey)
+            modelContext.delete(signal)
+        }
+        return orphanIdentifiers.count
+    }
+
+    private func calendarReference(for calendar: EKCalendar) -> CalendarSourceReference {
+        CalendarSourceReference(
+            identifier: calendar.calendarIdentifier,
+            title: calendar.title,
+            sourceIdentifier: calendar.source.sourceIdentifier,
+            sourceTitle: calendar.source.title
+        )
     }
 
     private func eventSnapshot(for event: EKEvent) -> CalendarEventTextSnapshot {
@@ -593,6 +659,45 @@ actor CalendarSignalIngestor {
             touchedDayKeys: &touchedDayKeys
         )
         return (deleted: deleted, touchedDayKeys: touchedDayKeys.sorted(), remaining: map.count)
+    }
+
+    func testEffectiveIngestMode(requestedMode: IngestMode) -> IngestMode {
+        effectiveIngestMode(for: requestedMode)
+    }
+
+    func testOrphanCleanup(
+        existingDayKeys: [String],
+        seenIdentifiers: Set<String>
+    ) -> (deleted: Int, touchedDayKeys: [String], remainingIdentifiers: [String]) {
+        var existingSignalByIdentifier: [String: CalendarSignal] = [:]
+        for (index, dayKey) in existingDayKeys.enumerated() {
+            let identifier = "event-\(index)"
+            existingSignalByIdentifier[identifier] = CalendarSignal(
+                timestamp: Date(timeIntervalSince1970: TimeInterval(index)),
+                dayKey: dayKey,
+                latitude: 0,
+                longitude: 0,
+                countryCode: "GB",
+                countryName: "United Kingdom",
+                timeZoneId: "UTC",
+                bucketingTimeZoneId: "UTC",
+                eventIdentifier: identifier,
+                title: "Event \(index)",
+                source: "Calendar"
+            )
+        }
+
+        var touchedDayKeys = Set<String>()
+        let deleted = deleteOrphanedSignals(
+            existingSignalByIdentifier: &existingSignalByIdentifier,
+            seenIdentifiers: seenIdentifiers,
+            touchedDayKeys: &touchedDayKeys
+        )
+        return (
+            deleted: deleted,
+            touchedDayKeys: touchedDayKeys.sorted(),
+            remainingIdentifiers: existingSignalByIdentifier.keys.sorted()
+        )
     }
 
     func testPrimarySignalSelection(

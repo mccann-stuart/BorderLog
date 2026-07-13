@@ -10,10 +10,16 @@ final class CalendarSignalIngestorCoreTests: XCTestCase {
         }
     }
 
-    private func makeIngestor() throws -> CalendarSignalIngestor {
+    private func makeIngestor(
+        calendarSelectionStore: CalendarSourceSelectionStore = .shared
+    ) throws -> CalendarSignalIngestor {
         let config = ModelConfiguration(isStoredInMemoryOnly: true)
         let container = try ModelContainer(for: CalendarSignal.self, configurations: config)
-        return CalendarSignalIngestor(modelContainer: container, resolver: StubResolver())
+        return CalendarSignalIngestor(
+            modelContainer: container,
+            resolver: StubResolver(),
+            calendarSelectionStore: calendarSelectionStore
+        )
     }
 
     func testUpsertScenarioUpdatesExistingSignalAndTouchesOldAndNewDayKeys() async throws {
@@ -48,6 +54,34 @@ final class CalendarSignalIngestorCoreTests: XCTestCase {
         XCTAssertEqual(result.deleted, 1)
         XCTAssertEqual(result.touchedDayKeys, ["2026-03-03"])
         XCTAssertEqual(result.remaining, 0)
+    }
+
+    func testPendingSelectionRebuildUpgradesRequestedScanUntilCompleted() async throws {
+        let suiteName = "CalendarSignalIngestorCoreTests.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let selectionStore = CalendarSourceSelectionStore(defaults: defaults)
+        try selectionStore.save(.selected([]), markingRebuild: true)
+        let ingestor = try makeIngestor(calendarSelectionStore: selectionStore)
+
+        let pendingMode = await ingestor.testEffectiveIngestMode(requestedMode: .auto)
+        XCTAssertEqual(pendingMode, .selectionRebuild)
+
+        selectionStore.markRebuildCompleted()
+        let completedMode = await ingestor.testEffectiveIngestMode(requestedMode: .auto)
+        XCTAssertEqual(completedMode, .auto)
+    }
+
+    func testSelectionRebuildOrphanCleanupDeletesAllFetchedSignals() async throws {
+        let ingestor = try makeIngestor()
+        let result = await ingestor.testOrphanCleanup(
+            existingDayKeys: ["2024-01-01", "2025-02-02", "2026-03-03"],
+            seenIdentifiers: []
+        )
+
+        XCTAssertEqual(result.deleted, 3)
+        XCTAssertEqual(result.touchedDayKeys, ["2024-01-01", "2025-02-02", "2026-03-03"])
+        XCTAssertTrue(result.remainingIdentifiers.isEmpty)
     }
 
     func testPrimarySignalSelectionUsesDestinationAndEndDateWhenDestinationExists() async throws {

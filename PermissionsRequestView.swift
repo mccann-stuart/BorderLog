@@ -70,7 +70,7 @@ struct PermissionsRequestView: View {
                         PermissionCard(
                             icon: "calendar",
                             title: "Calendar Access",
-                            description: "Reads flight events (e.g. from Flighty) to infer travel dates. BorderLog never writes to your calendar.",
+                            description: "Reads travel events (e.g. from Flighty) to infer travel dates. You can limit which calendars are used in Settings, and BorderLog never writes to your calendar.",
                             buttonTitle: calendarButtonTitle
                         ) {
                             requestCalendarAccess()
