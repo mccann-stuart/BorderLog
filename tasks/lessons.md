@@ -87,3 +87,7 @@
 ## Same-Day Evidence Fetch Assumption
 - **Pattern**: Fixed flight-day inference but left the day-detail evidence loader fetching calendar rows only by the selected day’s `dayKey`, so adjacent inferred days still rendered `No calendar evidence` even though their calendar-derived evidence existed on the neighboring flight day.
 - **Lesson**: When a day can inherit calendar evidence from an adjacent flight signal, day-detail evidence loading must resolve linked adjacent-day signals instead of assuming all supporting `CalendarSignal` rows share the selected day’s key.
+
+## Physical Device UI Verification
+- **Pattern**: Tried to verify the connected iPhone through generic simulator and mirroring surfaces after the device launch initially reported a lock.
+- **Lesson**: For a connected device already available to Xcode, open Device Hub from the run-destination menu and use its live device screen for visual and interaction checks before falling back to a simulator.

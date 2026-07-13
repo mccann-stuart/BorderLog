@@ -18,12 +18,17 @@
 
 # Xcode run diagnostics validation
 
-- [ ] Run the focused airport-resource and model-container recovery tests using isolated Derived Data.
-- [ ] Build the app for a generic iOS Simulator without changing project or scheme settings.
-- [ ] Inspect the signed device app and widget entitlements for the shared App Group.
-- [ ] Clear and filter the live Xcode console, then verify launch, App Group storage, and Dashboard map behaviour on Stu iP.
-- [ ] Review the final diff and confirm the existing Xcode 27 project and scheme changes were preserved.
+- [x] Run the focused airport-resource and model-container recovery tests using isolated Derived Data.
+- [x] Build the app for a generic iOS Simulator without changing project or scheme settings.
+- [x] Inspect the signed device app and widget entitlements for the shared App Group.
+- [x] Clear and filter the live Xcode console, then verify launch, App Group storage, and Dashboard map behaviour on Stu iP.
+- [x] Review the final diff and confirm the existing Xcode 27 project and scheme changes were preserved.
 
 ## Review
 
-- Pending verification.
+- Focused `AirportCodeResolverTests` and `ModelContainerProviderRecoveryTests` passed: 8 tests, 0 failures, on the iPhone 17 iOS 27.0 simulator with isolated Derived Data.
+- The generic iOS Simulator build succeeded with `CODE_SIGNING_ALLOWED=NO`; no project or scheme settings were changed for diagnostic suppression.
+- The 17:53 device artefacts passed strict code-signature verification. Both `Learn.app` and `BorderLogWidget.appex` contain `group.com.MCCANN.Border`, and neither the file nor string `default.csv` exists in the app bundle.
+- Device Hub showed BorderLog running on Stu iP with persisted travel data and a fully rendered, responsive Dashboard map.
+- Filtering the corresponding Xcode run to `subsystem:com.MCCANN.Border` left only `Using App Group store at group: group.com.MCCANN.Border`; no BorderLog-owned warning or error remained.
+- The Apple framework diagnostics were left unsuppressed in the raw console, and the pre-existing Xcode 27 project/scheme updates were preserved.
