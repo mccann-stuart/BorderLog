@@ -59,7 +59,7 @@ struct PermissionsRequestView: View {
                         PermissionCard(
                             icon: "photo.fill",
                             title: "Photos Access",
-                            description: "Reads photo location metadata to determine the countries you visited.",
+                            description: "Reads photo location and camera metadata to show likely direct camera captures as review context.",
                             buttonTitle: photoButtonTitle
                         ) {
                             requestPhotosAccess()

@@ -234,7 +234,7 @@ struct SettingsView: View {
                 } header: {
                     Text("Data Sources")
                 } footer: {
-                    Text("Location, photo metadata, and read-only calendar events are used to determine which country you were in each day. BorderLog stores this data locally and may use Apple system services such as MapKit geocoding to resolve countries.")
+                    Text("Location and read-only calendar events help determine which country you were in each day. Verified photo metadata is shown only as non-scoring review context. BorderLog stores this data locally and may use Apple system services such as MapKit geocoding to resolve countries.")
                 }
 
       

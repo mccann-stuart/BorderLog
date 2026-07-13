@@ -3,7 +3,7 @@ Product Requirements Document (PRD)
 BorderLog (Working Title) — Local‑first Country Presence + Schengen Tracker for Expats
 
 Document status: Draft v0.3, living PRD plus weekly changelog
-Last updated: 12 Jul 2026
+Last updated: 13 Jul 2026
 Platforms: iOS (primary), iPadOS (nice-to-have)
 Distribution: App Store
 Pricing: Free (no subscriptions, no paid tiers)
@@ -13,7 +13,7 @@ Current implementation notes:
 - CloudKit sync is implemented behind `AppConfig.isCloudKitFeatureEnabled == false`; local SwiftData/App Group storage is the active persistence path.
 - Debug data export is compiled and surfaced only in `DEBUG` builds because it intentionally contains full-fidelity diagnostics.
 - Derived-ledger mutations persist generation-tagged dirty day keys before source saves; launch reconciliation retries interrupted work and refreshes source-backed days once for existing installs.
-- Photo ingestion performs the historical bootstrap once, then uses a hash-deduplicated incremental scan with a one-day overlap. Previously unresolved photo geocodes are retried on launch.
+- Photo ingestion accepts only likely direct camera captures: recognised MakerNote data, timezone-aware EXIF capture/digitisation timestamps, and Photos creation/addition dates must agree within a short capture window. Retained photo metadata remains non-scoring review context because metadata cannot prove who pressed the shutter. The historical bootstrap is rebuilt once under this policy, then uses a hash-deduplicated incremental scan with a one-day overlap. Previously unresolved photo geocodes are retried on launch.
 - High confidence is withheld from disputed, contextual/inferred, weak-location-only, and decisive correlated location-burst results unless independent strong evidence supports the day.
 - Debug support exports include unresolved-photo ratios, aggregate scan/rejection/error and geocode-retry counts, the last successful ledger recompute, and a validated build commit.
 - Reset All Data clears SwiftData models, keychain-backed local profile/session values, and pending widget location snapshots.
@@ -169,9 +169,9 @@ Key PRs:
 
 BorderLog is a privacy-first iOS app that helps expatriates and frequent travelers track days in/out of countries and remain compliant with zone rules like Schengen’s 90/180. Version 1.0 stores user data on-device using SwiftData and does not require an account. CloudKit code exists for a possible later release but is disabled and is not part of the launch product.
 
-Unlike manual spreadsheet approaches, BorderLog infers daily country presence by combining:
+Unlike manual spreadsheet approaches, BorderLog builds daily country presence from:
 	1.	Location snapshots written into a local table (captured opportunistically by an iOS Widget extension)
-	2.	Photo location metadata (GPS in photo EXIF, exposed via Photos/PhotoKit asset location)
+	2.	Non-scoring photo location metadata shown as review context after conservative provenance checks
 	3.	Manual entries & user corrections, which override inference
 
 Photo and location permissions are strictly opt-in; the app remains usable in “manual-only” mode.
@@ -321,6 +321,10 @@ FR-Loc-3 — Minimal storage
 FR-Photo-1 — Read photo location metadata only
 	•	With user permission, scan photo library for assets that include location metadata and creation time.
 	•	PhotoKit exposes asset location via PHAsset.location.  ￼
+	•	Ignore screenshots, Shared Album assets, and photos whose original camera MakerNote, timezone-aware EXIF capture dates, Photos creation date, and Photos library-addition date do not consistently indicate a direct camera capture.
+	•	Do not download iCloud-only originals during automatic scans; if original metadata is unavailable locally, ignore the asset rather than weakening the provenance check.
+	•	Treat this provenance check as a conservative heuristic, not proof of who pressed the shutter; received originals saved immediately after capture can retain valid camera metadata.
+	•	Keep retained photo metadata as visible review context only; it must not resolve a country, select a timezone, or contribute to presence scoring.
 
 FR-Photo-2 — Permission handling
 	•	Request Photos authorization using PHPhotoLibrary.requestAuthorization and respect access level.  ￼
@@ -328,6 +332,7 @@ FR-Photo-2 — Permission handling
 
 FR-Photo-3 — Minimize retained data
 	•	Store derived signals (timestamp + coordinate + localIdentifier hash); do not copy images.
+	•	Inspect original image metadata on device for capture provenance, but do not retain MakerNote dictionaries or image bytes.
 
 6.2.3 Manual Entries & Corrections
 FR-Manual-1 — Manual trip entry
@@ -369,7 +374,7 @@ The core engine produces a Daily Presence Ledger: for each date, which country (
 
 6.4.1 Inputs
 	•	Location samples (widget/app)
-	•	Photo signals (location + creationDate)
+	•	Photo context (location + creationDate, non-scoring)
 	•	Manual stays and day overrides
 	•	Country/zone definitions & rule configs (from bundled + remote updates)
 
@@ -386,7 +391,7 @@ Step 2: Candidate country scoring
 	•	Manual day override: score = ∞ (wins)
 	•	Manual stay segment: very high weight
 	•	Location samples: high weight, adjusted by accuracy and number of samples
-	•	Photo signals: medium weight (users tend to take photos where they are)
+	•	Photo metadata: zero weight; visible as review context only because capture ownership cannot be proven
 	•	Calendar signals: lower weight (helpful but less reliable)
 
 Step 3: Select day country

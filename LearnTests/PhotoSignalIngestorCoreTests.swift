@@ -9,6 +9,7 @@ private struct StubResolver: CountryResolving {
     }
 }
 
+@MainActor
 final class PhotoSignalIngestorCoreTests: XCTestCase {
     private enum ForcedSaveError: Error {
         case failed
@@ -91,6 +92,175 @@ final class PhotoSignalIngestorCoreTests: XCTestCase {
         XCTAssertEqual(state.lastAssetCreationDate, newestScannedDate)
         XCTAssertEqual(state.lastAssetIdHash, "older-geotagged")
         XCTAssertEqual(state.lastIngestedAt, importedAt)
+    }
+
+    func testCaptureProvenanceAcceptsDirectCameraCapture() {
+        let captureDate = Date(timeIntervalSince1970: 1_700_000_000)
+        let metadata = PhotoCaptureMetadata(
+            exifOriginalDate: captureDate,
+            exifDigitizedDate: captureDate.addingTimeInterval(1),
+            hasCameraMakerNote: true
+        )
+
+        XCTAssertNil(
+            PhotoSignalIngestor.captureRejectionReason(
+                creationDate: captureDate.addingTimeInterval(1),
+                addedDate: captureDate.addingTimeInterval(30),
+                metadata: metadata
+            )
+        )
+    }
+
+    func testCaptureProvenanceRejectsPhotoAddedLongAfterCapture() {
+        let captureDate = Date(timeIntervalSince1970: 1_700_000_000)
+        let metadata = PhotoCaptureMetadata(
+            exifOriginalDate: captureDate,
+            exifDigitizedDate: captureDate,
+            hasCameraMakerNote: true
+        )
+
+        XCTAssertEqual(
+            PhotoSignalIngestor.captureRejectionReason(
+                creationDate: captureDate,
+                addedDate: captureDate.addingTimeInterval(
+                    PhotoSignalIngestor.maximumCaptureToLibraryDelay + 1
+                ),
+                metadata: metadata
+            ),
+            .implausibleLibraryAdditionDate
+        )
+    }
+
+    func testCaptureProvenanceRejectsMissingMakerNote() {
+        let captureDate = Date(timeIntervalSince1970: 1_700_000_000)
+
+        XCTAssertEqual(
+            PhotoSignalIngestor.captureRejectionReason(
+                creationDate: captureDate,
+                addedDate: captureDate,
+                metadata: PhotoCaptureMetadata(
+                    exifOriginalDate: captureDate,
+                    exifDigitizedDate: captureDate,
+                    hasCameraMakerNote: false
+                )
+            ),
+            .missingCameraMakerNote
+        )
+    }
+
+    func testCaptureProvenanceRejectsMissingTimezoneAwareEXIFDate() {
+        let captureDate = Date(timeIntervalSince1970: 1_700_000_000)
+
+        XCTAssertEqual(
+            PhotoSignalIngestor.captureRejectionReason(
+                creationDate: captureDate,
+                addedDate: captureDate,
+                metadata: PhotoCaptureMetadata(
+                    exifOriginalDate: nil,
+                    exifDigitizedDate: captureDate,
+                    hasCameraMakerNote: true
+                )
+            ),
+            .missingTimezoneAwareEXIFDates
+        )
+    }
+
+    func testCaptureProvenanceRejectsEXIFCreationDateMismatch() {
+        let captureDate = Date(timeIntervalSince1970: 1_700_000_000)
+
+        XCTAssertEqual(
+            PhotoSignalIngestor.captureRejectionReason(
+                creationDate: captureDate.addingTimeInterval(
+                    PhotoSignalIngestor.timestampTolerance + 1
+                ),
+                addedDate: captureDate.addingTimeInterval(30),
+                metadata: PhotoCaptureMetadata(
+                    exifOriginalDate: captureDate,
+                    exifDigitizedDate: captureDate,
+                    hasCameraMakerNote: true
+                )
+            ),
+            .creationDateMismatch
+        )
+    }
+
+    func testCaptureProvenanceAcceptsLibraryDelayBoundary() {
+        let captureDate = Date(timeIntervalSince1970: 1_700_000_000)
+
+        XCTAssertNil(
+            PhotoSignalIngestor.captureRejectionReason(
+                creationDate: captureDate,
+                addedDate: captureDate.addingTimeInterval(
+                    PhotoSignalIngestor.maximumCaptureToLibraryDelay
+                ),
+                metadata: PhotoCaptureMetadata(
+                    exifOriginalDate: captureDate,
+                    exifDigitizedDate: captureDate,
+                    hasCameraMakerNote: true
+                )
+            )
+        )
+    }
+
+    func testEXIFDateParserAppliesRecordedOffset() throws {
+        let date = try XCTUnwrap(
+            PhotoSignalIngestor.parseEXIFDate(
+                value: "2026:07:13 12:34:56",
+                offset: "+02:00"
+            )
+        )
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+        let components = calendar.dateComponents(
+            [.year, .month, .day, .hour, .minute, .second],
+            from: date
+        )
+
+        XCTAssertEqual(components.year, 2026)
+        XCTAssertEqual(components.month, 7)
+        XCTAssertEqual(components.day, 13)
+        XCTAssertEqual(components.hour, 10)
+        XCTAssertEqual(components.minute, 34)
+        XCTAssertEqual(components.second, 56)
+    }
+
+    func testEXIFDateParserRejectsTimestampWithoutOffset() {
+        XCTAssertNil(
+            PhotoSignalIngestor.parseEXIFDate(
+                value: "2026:07:13 12:34:56",
+                offset: nil
+            )
+        )
+    }
+
+    func testProvenanceRebuildDeletesExistingSignalsAndResetsCheckpoint() async throws {
+        let container = try makeContainer()
+        let ingestor = PhotoSignalIngestor(modelContainer: container, resolver: StubResolver())
+        let firstDate = makeDate(2026, 1, 1)
+        let secondDate = makeDate(2026, 1, 2)
+
+        await ingestor.addTestSignal(assetIdHash: "old-photo-1", timestamp: firstDate)
+        await ingestor.addTestSignal(assetIdHash: "old-photo-2", timestamp: secondDate)
+        try await ingestor.saveContextIfNeeded()
+
+        let removedDayKeys = try await ingestor.prepareForProvenanceRebuildForTesting()
+        try await ingestor.saveContextIfNeeded()
+
+        let context = ModelContext(container)
+        let remainingSignals = try context.fetch(FetchDescriptor<PhotoSignal>())
+        let states = try context.fetch(FetchDescriptor<PhotoIngestState>())
+
+        XCTAssertEqual(
+            removedDayKeys,
+            Set([
+                DayKey.make(from: firstDate, timeZone: .current),
+                DayKey.make(from: secondDate, timeZone: .current)
+            ])
+        )
+        XCTAssertTrue(remainingSignals.isEmpty)
+        XCTAssertEqual(states.count, 1)
+        XCTAssertNil(states[0].lastAssetCreationDate)
+        XCTAssertFalse(states[0].fullScanCompleted)
     }
 
     private func makeDate(_ year: Int, _ month: Int, _ day: Int) -> Date {

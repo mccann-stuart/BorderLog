@@ -7,9 +7,24 @@
 
 import Foundation
 import Photos
+import ImageIO
 import CryptoKit
 import SwiftData
 import CoreLocation
+
+nonisolated struct PhotoCaptureMetadata: Equatable, Sendable {
+    let exifOriginalDate: Date?
+    let exifDigitizedDate: Date?
+    let hasCameraMakerNote: Bool
+}
+
+nonisolated enum PhotoCaptureRejectionReason: Equatable, Sendable {
+    case implausibleLibraryAdditionDate
+    case missingCameraMakerNote
+    case missingTimezoneAwareEXIFDates
+    case inconsistentEXIFDates
+    case creationDateMismatch
+}
 
 @ModelActor
 actor PhotoSignalIngestor {
@@ -21,7 +36,14 @@ actor PhotoSignalIngestor {
 
     private var resolver: CountryResolving?
     private var recoveryStore: LedgerRecomputeRecoveryStore = .shared
+    private var provenanceDefaults: UserDefaults = AppConfig.sharedDefaults
     internal var saveContextOverride: (@Sendable () throws -> Void)?
+
+    nonisolated static let maximumCaptureToLibraryDelay: TimeInterval = 10 * 60
+    nonisolated static let timestampTolerance: TimeInterval = 2 * 60
+    private nonisolated static let provenancePolicyDefaultsKey =
+        "borderLog.photoCaptureProvenancePolicyVersion"
+    private nonisolated static let provenancePolicyVersion = 1
 
     struct IngestQueryConfig {
         let startDate: Date
@@ -29,16 +51,23 @@ actor PhotoSignalIngestor {
         let sortAscending: Bool
     }
 
+    private struct ProvenanceRebuild {
+        let affectedDayKeys: Set<String>
+        let earliestSignalDate: Date?
+    }
+
     init(
         modelContainer: ModelContainer,
         resolver: CountryResolving,
-        recoveryStore: LedgerRecomputeRecoveryStore = .shared
+        recoveryStore: LedgerRecomputeRecoveryStore = .shared,
+        provenanceDefaults: UserDefaults = AppConfig.sharedDefaults
     ) {
         self.modelContainer = modelContainer
         let context = ModelContext(modelContainer)
         self.modelExecutor = DefaultSerialModelExecutor(modelContext: context)
         self.resolver = resolver
         self.recoveryStore = recoveryStore
+        self.provenanceDefaults = provenanceDefaults
     }
 
     func ingest(mode: IngestMode) async throws -> Int {
@@ -67,11 +96,38 @@ actor PhotoSignalIngestor {
         }
 
         let state = fetchOrCreateState()
+        let requiresProvenanceRebuild = provenanceDefaults.integer(
+            forKey: Self.provenancePolicyDefaultsKey
+        ) < Self.provenancePolicyVersion
+        let provenanceRebuild = try prepareForProvenanceRebuildIfNeeded(
+            state: state,
+            required: requiresProvenanceRebuild
+        )
 
         let calendar = Calendar.current
         let now = Date()
 
-        let config = Self.ingestQueryConfig(mode: mode, state: state, now: now, calendar: calendar)
+        let effectiveMode: IngestMode
+        if requiresProvenanceRebuild {
+            switch mode {
+            case .manualFullScan:
+                effectiveMode = .manualFullScan
+            case .auto, .sequenced:
+                effectiveMode = .sequenced
+            }
+        } else {
+            effectiveMode = mode
+        }
+        let baseConfig = Self.ingestQueryConfig(
+            mode: effectiveMode,
+            state: state,
+            now: now,
+            calendar: calendar
+        )
+        let config = Self.expandingForProvenanceRebuild(
+            baseConfig,
+            earliestSignalDate: provenanceRebuild.earliestSignalDate
+        )
 
         let options = PHFetchOptions()
         options.includeAssetSourceTypes = [.typeUserLibrary]
@@ -88,7 +144,9 @@ actor PhotoSignalIngestor {
 
         let assets = PHAsset.fetchAssets(with: .image, options: options)
         let assetCount = assets.count
-        var existingAssetHashes = try fetchExistingAssetIdHashes(config: config)
+        var existingAssetHashes: Set<String> = requiresProvenanceRebuild
+            ? []
+            : try fetchExistingAssetIdHashes(config: config)
 
         if assetCount > 0 {
             await MainActor.run {
@@ -98,10 +156,11 @@ actor PhotoSignalIngestor {
         }
 
         var processed = 0
-        var touchedDayKeys: Set<String> = []
+        var touchedDayKeys = provenanceRebuild.affectedDayKeys
         var rejectedMissingCreationDate = 0
         var rejectedMissingLocation = 0
         var rejectedDuplicateAsset = 0
+        var rejectedUnverifiedCapture = 0
         var unresolvedCountrySignals = 0
         let saveEvery = 25
         let progressUpdateEvery = 25
@@ -130,6 +189,25 @@ actor PhotoSignalIngestor {
 
                 if existingAssetHashes.contains(assetIdHash) {
                     rejectedDuplicateAsset += 1
+                    continue
+                }
+
+                guard !asset.mediaSubtypes.contains(.photoScreenshot),
+                      Self.hasPlausibleLibraryAdditionTiming(
+                          creationDate: creationDate,
+                          addedDate: asset.addedDate
+                      ) else {
+                    rejectedUnverifiedCapture += 1
+                    continue
+                }
+
+                guard let captureMetadata = await Self.loadCaptureMetadata(for: asset),
+                      Self.captureRejectionReason(
+                          creationDate: creationDate,
+                          addedDate: asset.addedDate,
+                          metadata: captureMetadata
+                      ) == nil else {
+                    rejectedUnverifiedCapture += 1
                     continue
                 }
 
@@ -183,7 +261,7 @@ actor PhotoSignalIngestor {
             }
         }
 
-        if mode == .sequenced || mode == .manualFullScan {
+        if effectiveMode == .sequenced || effectiveMode == .manualFullScan {
             state.fullScanCompleted = true
             state.lastFullScanAt = now
         }
@@ -203,6 +281,7 @@ actor PhotoSignalIngestor {
             rejectedMissingCreationDate: rejectedMissingCreationDate,
             rejectedMissingLocation: rejectedMissingLocation,
             rejectedDuplicateAsset: rejectedDuplicateAsset,
+            rejectedUnverifiedCapture: rejectedUnverifiedCapture,
             unresolvedCountrySignals: unresolvedCountrySignals
         )
 
@@ -212,7 +291,133 @@ actor PhotoSignalIngestor {
             try await recomputeService.recompute(dayKeys: Array(touchedDayKeys))
         }
 
+        if requiresProvenanceRebuild {
+            provenanceDefaults.set(
+                Self.provenancePolicyVersion,
+                forKey: Self.provenancePolicyDefaultsKey
+            )
+        }
+
         return processed
+    }
+
+    nonisolated static func hasPlausibleLibraryAdditionTiming(
+        creationDate: Date,
+        addedDate: Date
+    ) -> Bool {
+        let delay = addedDate.timeIntervalSince(creationDate)
+        return delay >= -timestampTolerance && delay <= maximumCaptureToLibraryDelay
+    }
+
+    nonisolated static func captureRejectionReason(
+        creationDate: Date,
+        addedDate: Date,
+        metadata: PhotoCaptureMetadata
+    ) -> PhotoCaptureRejectionReason? {
+        // This is deliberately a fail-closed provenance heuristic, not proof of ownership.
+        // An original received immediately after capture can still retain matching metadata.
+        guard hasPlausibleLibraryAdditionTiming(
+            creationDate: creationDate,
+            addedDate: addedDate
+        ) else {
+            return .implausibleLibraryAdditionDate
+        }
+        guard metadata.hasCameraMakerNote else {
+            return .missingCameraMakerNote
+        }
+        guard let originalDate = metadata.exifOriginalDate,
+              let digitizedDate = metadata.exifDigitizedDate else {
+            return .missingTimezoneAwareEXIFDates
+        }
+        guard abs(digitizedDate.timeIntervalSince(originalDate)) <= timestampTolerance else {
+            return .inconsistentEXIFDates
+        }
+        guard abs(creationDate.timeIntervalSince(originalDate)) <= timestampTolerance else {
+            return .creationDateMismatch
+        }
+        let additionDelay = addedDate.timeIntervalSince(originalDate)
+        guard additionDelay >= -timestampTolerance,
+              additionDelay <= maximumCaptureToLibraryDelay else {
+            return .implausibleLibraryAdditionDate
+        }
+        return nil
+    }
+
+    private nonisolated static func loadCaptureMetadata(for asset: PHAsset) async -> PhotoCaptureMetadata? {
+        let options = PHImageRequestOptions()
+        options.version = .original
+        options.deliveryMode = .highQualityFormat
+        // Do not turn an automatic historical scan into an implicit iCloud-original download.
+        // Assets whose original metadata is not local remain unverified and are ignored.
+        options.isNetworkAccessAllowed = false
+
+        return await withCheckedContinuation { continuation in
+            PHImageManager.default().requestImageDataAndOrientation(
+                for: asset,
+                options: options
+            ) { data, _, _, info in
+                if info?[PHImageResultIsDegradedKey] as? Bool == true {
+                    return
+                }
+                continuation.resume(returning: data.flatMap(Self.captureMetadata(from:)))
+            }
+        }
+    }
+
+    private nonisolated static func captureMetadata(from imageData: Data) -> PhotoCaptureMetadata? {
+        guard let source = CGImageSourceCreateWithData(imageData as CFData, nil),
+              let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any],
+              let exif = properties[kCGImagePropertyExifDictionary] as? [CFString: Any] else {
+            return nil
+        }
+
+        let makerDictionaries: [CFString] = [
+            kCGImagePropertyMakerAppleDictionary,
+            kCGImagePropertyMakerCanonDictionary,
+            kCGImagePropertyMakerNikonDictionary,
+            kCGImagePropertyMakerMinoltaDictionary,
+            kCGImagePropertyMakerFujiDictionary,
+            kCGImagePropertyMakerOlympusDictionary,
+            kCGImagePropertyMakerPentaxDictionary
+        ]
+        let hasMakerDictionary = makerDictionaries.contains { key in
+            guard let dictionary = properties[key] as? [AnyHashable: Any] else { return false }
+            return !dictionary.isEmpty
+        }
+        let tiff = properties[kCGImagePropertyTIFFDictionary] as? [CFString: Any]
+        let cameraMake = (tiff?[kCGImagePropertyTIFFMake] as? String)?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let cameraModel = (tiff?[kCGImagePropertyTIFFModel] as? String)?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let hasGenericMakerNote =
+            (exif[kCGImagePropertyExifMakerNote] as? Data)?.isEmpty == false &&
+            cameraMake?.isEmpty == false &&
+            cameraModel?.isEmpty == false
+
+        return PhotoCaptureMetadata(
+            exifOriginalDate: parseEXIFDate(
+                value: exif[kCGImagePropertyExifDateTimeOriginal],
+                offset: exif[kCGImagePropertyExifOffsetTimeOriginal]
+            ),
+            exifDigitizedDate: parseEXIFDate(
+                value: exif[kCGImagePropertyExifDateTimeDigitized],
+                offset: exif[kCGImagePropertyExifOffsetTimeDigitized]
+            ),
+            hasCameraMakerNote: hasMakerDictionary || hasGenericMakerNote
+        )
+    }
+
+    nonisolated static func parseEXIFDate(value: Any?, offset: Any?) -> Date? {
+        guard let value = value as? String,
+              let offset = offset as? String else {
+            return nil
+        }
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.calendar = Calendar(identifier: .gregorian)
+        formatter.dateFormat = "yyyy:MM:dd HH:mm:ssXXXXX"
+        formatter.isLenient = false
+        return formatter.date(from: value + offset)
     }
 
     static func ingestQueryConfig(
@@ -243,6 +448,20 @@ actor PhotoSignalIngestor {
         }
     }
 
+    nonisolated static func expandingForProvenanceRebuild(
+        _ config: IngestQueryConfig,
+        earliestSignalDate: Date?
+    ) -> IngestQueryConfig {
+        guard let earliestSignalDate, earliestSignalDate < config.startDate else {
+            return config
+        }
+        return IngestQueryConfig(
+            startDate: earliestSignalDate,
+            endDate: config.endDate,
+            sortAscending: config.sortAscending
+        )
+    }
+
     private func fetchOrCreateState() -> PhotoIngestState {
         let descriptor = FetchDescriptor<PhotoIngestState>()
         if let existing = try? modelContext.fetch(descriptor).first {
@@ -251,6 +470,31 @@ actor PhotoSignalIngestor {
         let state = PhotoIngestState()
         modelContext.insert(state)
         return state
+    }
+
+    private func prepareForProvenanceRebuildIfNeeded(
+        state: PhotoIngestState,
+        required: Bool
+    ) throws -> ProvenanceRebuild {
+        guard required else {
+            return ProvenanceRebuild(affectedDayKeys: [], earliestSignalDate: nil)
+        }
+
+        let existingSignals = try modelContext.fetch(FetchDescriptor<PhotoSignal>())
+        let affectedDayKeys = Set(existingSignals.map(\.dayKey))
+        let earliestSignalDate = existingSignals.lazy.map(\.timestamp).min()
+        for signal in existingSignals {
+            modelContext.delete(signal)
+        }
+        state.lastIngestedAt = nil
+        state.lastAssetCreationDate = nil
+        state.lastAssetIdHash = nil
+        state.fullScanCompleted = false
+        state.lastFullScanAt = nil
+        return ProvenanceRebuild(
+            affectedDayKeys: affectedDayKeys,
+            earliestSignalDate: earliestSignalDate
+        )
     }
 
     internal func fetchExistingAssetIdHashes(config: IngestQueryConfig) throws -> Set<String> {
@@ -317,6 +561,14 @@ actor PhotoSignalIngestor {
 
     internal func setSaveOverride(_ override: (@Sendable () throws -> Void)?) {
         saveContextOverride = override
+    }
+
+    internal func prepareForProvenanceRebuildForTesting() throws -> Set<String> {
+        let state = fetchOrCreateState()
+        return try prepareForProvenanceRebuildIfNeeded(
+            state: state,
+            required: true
+        ).affectedDayKeys
     }
 
     private static func hashAssetId(_ identifier: String) -> String {

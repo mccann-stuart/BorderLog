@@ -17,6 +17,7 @@ nonisolated struct PhotoScanDiagnostics: Codable, Equatable, Sendable {
     var rejectedMissingCreationDate: Int = 0
     var rejectedMissingLocation: Int = 0
     var rejectedDuplicateAsset: Int = 0
+    var rejectedUnverifiedCapture: Int?
     var unresolvedCountrySignals: Int = 0
     var errors: Int = 0
     var lastStartedAt: Date?
@@ -82,12 +83,14 @@ actor DiagnosticsStore {
         rejectedMissingCreationDate: Int,
         rejectedMissingLocation: Int,
         rejectedDuplicateAsset: Int,
+        rejectedUnverifiedCapture: Int,
         unresolvedCountrySignals: Int,
         at date: Date = Date()
     ) {
         let missingCreationDate = max(0, rejectedMissingCreationDate)
         let missingLocation = max(0, rejectedMissingLocation)
         let duplicateAsset = max(0, rejectedDuplicateAsset)
+        let unverifiedCapture = max(0, rejectedUnverifiedCapture)
 
         state.photoScanning.runsCompleted += 1
         state.photoScanning.assetsScanned += max(0, assetsScanned)
@@ -95,7 +98,10 @@ actor DiagnosticsStore {
         state.photoScanning.rejectedMissingCreationDate += missingCreationDate
         state.photoScanning.rejectedMissingLocation += missingLocation
         state.photoScanning.rejectedDuplicateAsset += duplicateAsset
-        state.photoScanning.assetsRejected += missingCreationDate + missingLocation + duplicateAsset
+        state.photoScanning.rejectedUnverifiedCapture =
+            (state.photoScanning.rejectedUnverifiedCapture ?? 0) + unverifiedCapture
+        state.photoScanning.assetsRejected +=
+            missingCreationDate + missingLocation + duplicateAsset + unverifiedCapture
         state.photoScanning.unresolvedCountrySignals += max(0, unresolvedCountrySignals)
         state.photoScanning.lastCompletedAt = date
         persist()
