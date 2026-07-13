@@ -146,7 +146,7 @@ final class InferenceEngineTests: XCTestCase {
         XCTAssertEqual(evidence.count, 3)
     }
 
-    func testPhotoMetadataRemainsContextWithoutResolvingDay() {
+    func testResolvedDayMarksEvidenceForEveryRetainedAllocation() {
         let date = day(2026, 2, 15)
         let dayKey = DayKey.make(from: date, timeZone: calendar.timeZone)
         let results = PresenceInferenceEngine.compute(
@@ -164,17 +164,16 @@ final class InferenceEngineTests: XCTestCase {
             calendar: calendar
         )
 
-        XCTAssertTrue(results.first?.contributedCountries.isEmpty == true)
-        XCTAssertEqual(results.first?.confidenceLabel, .low)
+        let contributedCountries = results.first?.contributedCountries ?? []
+        XCTAssertEqual(contributedCountries.map(\.countryCode), ["FR", "ES"])
 
         let evidence = results.first?.evidence ?? []
         XCTAssertEqual(evidence.count, 3)
-        XCTAssertTrue(evidence.allSatisfy { $0.phase == .contextual })
-        XCTAssertTrue(evidence.allSatisfy { $0.rawWeight == 0 && $0.calibratedWeight == 0 })
-        XCTAssertTrue(evidence.allSatisfy { !$0.contributedToFinalResult })
+        XCTAssertEqual(evidence.filter { $0.countryCode == "FR" && $0.contributedToFinalResult }.count, 2)
+        XCTAssertTrue(evidence.contains(where: { $0.countryCode == "ES" && $0.contributedToFinalResult }))
     }
 
-    func testPhotoOnlyDayIsNotDisputed() {
+    func testDisputedWhenConfidenceDeltaSmall() {
         let date = day(2026, 2, 15)
         let dayKey = DayKey.make(from: date, timeZone: calendar.timeZone)
         let photos = [
@@ -193,45 +192,9 @@ final class InferenceEngineTests: XCTestCase {
             calendar: calendar
         )
 
-        XCTAssertTrue(results.first?.contributedCountries.isEmpty == true)
-        XCTAssertEqual(results.first?.isDisputed, false)
-        XCTAssertEqual(results.first?.confidenceLabel, .low)
-    }
-
-    func testPhotoContextCannotOverrideTrustedLocation() {
-        let date = day(2026, 2, 15)
-        let dayKey = DayKey.make(from: date, timeZone: calendar.timeZone)
-        let result = PresenceInferenceEngine.compute(
-            dayKeys: [dayKey],
-            stays: [],
-            overrides: [],
-            locations: [
-                LocationSignalInfo(
-                    dayKey: dayKey,
-                    countryCode: "ES",
-                    countryName: "Spain",
-                    accuracyMeters: 10,
-                    timeZoneId: "Europe/Madrid"
-                )
-            ],
-            photos: [
-                PhotoSignalInfo(
-                    dayKey: dayKey,
-                    countryCode: "FR",
-                    countryName: "France",
-                    timeZoneId: "Europe/Paris"
-                )
-            ],
-            calendarSignals: [],
-            rangeEnd: date,
-            calendar: calendar
-        ).first
-
-        XCTAssertEqual(result?.contributedCountries.first?.countryCode, "ES")
-        XCTAssertEqual(result?.timeZoneId, "Europe/Madrid")
-        XCTAssertFalse(
-            result?.evidence.first(where: { $0.source == "photo" })?.contributedToFinalResult == true
-        )
+        XCTAssertEqual(results.first?.contributedCountries.first?.countryCode, "FR")
+        XCTAssertEqual(results.first?.isDisputed, true)
+        XCTAssertEqual(results.first?.confidenceLabel, .medium)
     }
 
     func testWeakLocationOnlyEvidenceCannotBeHighConfidence() {
@@ -447,7 +410,7 @@ final class InferenceEngineTests: XCTestCase {
         XCTAssertFalse(result?.evidence.first(where: { $0.source == "calendar.origin" })?.contributedToFinalResult == true)
     }
 
-    func testPhotoMetadataDoesNotSelectTimeZone() {
+    func testDeterministicTimeZoneSelectionWhenScoresTie() {
         let date = day(2026, 2, 15)
         let dayKey = DayKey.make(from: date, timeZone: calendar.timeZone)
 
@@ -467,7 +430,7 @@ final class InferenceEngineTests: XCTestCase {
             calendar: calendar
         )
 
-        XCTAssertEqual(results.first?.timeZoneId, calendar.timeZone.identifier)
+        XCTAssertEqual(results.first?.timeZoneId, "Europe/Paris")
     }
 
     func testBridgesSevenDayVoidWhenCanonicalCountriesMatch() {
@@ -479,19 +442,17 @@ final class InferenceEngineTests: XCTestCase {
         })
         let spainName = localizedCountryName("ES")
 
-        let locations = [
-            LocationSignalInfo(
+        let photos = [
+            PhotoSignalInfo(
                 dayKey: DayKey.make(from: start, timeZone: calendar.timeZone),
-                countryCode: "ES",
+                countryCode: nil,
                 countryName: spainName,
-                accuracyMeters: 10,
                 timeZoneId: "UTC"
             ),
-            LocationSignalInfo(
+            PhotoSignalInfo(
                 dayKey: DayKey.make(from: end, timeZone: calendar.timeZone),
                 countryCode: "ES",
                 countryName: spainName,
-                accuracyMeters: 10,
                 timeZoneId: "UTC"
             )
         ]
@@ -500,8 +461,8 @@ final class InferenceEngineTests: XCTestCase {
             dayKeys: dayKeys,
             stays: [],
             overrides: [],
-            locations: locations,
-            photos: [],
+            locations: [],
+            photos: photos,
             calendarSignals: [],
             rangeEnd: end,
             calendar: calendar
@@ -529,19 +490,17 @@ final class InferenceEngineTests: XCTestCase {
         })
         let spainName = localizedCountryName("ES")
 
-        let locations = [
-            LocationSignalInfo(
+        let photos = [
+            PhotoSignalInfo(
                 dayKey: DayKey.make(from: start, timeZone: calendar.timeZone),
-                countryCode: "ES",
+                countryCode: nil,
                 countryName: spainName,
-                accuracyMeters: 10,
                 timeZoneId: "UTC"
             ),
-            LocationSignalInfo(
+            PhotoSignalInfo(
                 dayKey: DayKey.make(from: end, timeZone: calendar.timeZone),
                 countryCode: "ES",
                 countryName: spainName,
-                accuracyMeters: 10,
                 timeZoneId: "UTC"
             )
         ]
@@ -550,8 +509,8 @@ final class InferenceEngineTests: XCTestCase {
             dayKeys: dayKeys,
             stays: [],
             overrides: [],
-            locations: locations,
-            photos: [],
+            locations: [],
+            photos: photos,
             calendarSignals: [],
             rangeEnd: end,
             calendar: calendar

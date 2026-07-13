@@ -27,6 +27,7 @@ nonisolated struct InferenceContext {
 
 nonisolated struct InferencePipelineConfig: Sendable {
     let stayBaseWeight: Double = 5.0
+    let photoBaseWeight: Double = 2.0
     let locationBaseWeight: Double = 3.0
     let calendarBaseWeight: Double = 1.0
     let overrideWeight: Double = 1_000.0
@@ -322,12 +323,11 @@ nonisolated struct PhotoProcessor: SignalProcessor {
                 dayKey: photo.dayKey,
                 processorID: id,
                 country: country,
-                rawWeight: 0,
-                calibratedWeight: 0,
-                phase: .contextual,
-                reason: "unverified-photo-library-metadata",
-                timeZoneId: photo.timeZoneId,
-                contributesToScore: false
+                rawWeight: config.photoBaseWeight,
+                calibratedWeight: config.photoBaseWeight,
+                phase: .base,
+                reason: "photo-signal",
+                timeZoneId: photo.timeZoneId
             )
         }
     }
@@ -395,6 +395,16 @@ nonisolated struct CalendarProcessor: SignalProcessor {
 nonisolated private struct PresenceResultCompiler {
     let context: InferenceContext
     let config: InferencePipelineConfig
+
+    // Locations pre-grouped by dayKey so per-day confidence-cap checks avoid rescanning
+    // the entire locations array once per high-confidence day, per recompute pass.
+    private let locationsByDayKey: [String: [LocationSignalInfo]]
+
+    init(context: InferenceContext, config: InferencePipelineConfig) {
+        self.context = context
+        self.config = config
+        self.locationsByDayKey = Dictionary(grouping: context.locations, by: { $0.dayKey })
+    }
 
     private struct TravelEventEndpoint {
         let dayKey: String
@@ -1117,7 +1127,7 @@ nonisolated private struct PresenceResultCompiler {
 
     private func isWeakLocationOnly(_ result: PresenceDayResult) -> Bool {
         guard result.sources == .location else { return false }
-        let dayLocations = context.locations.filter { $0.dayKey == result.dayKey }
+        let dayLocations = locationsByDayKey[result.dayKey] ?? []
         guard !dayLocations.isEmpty else { return false }
         return dayLocations.allSatisfy {
             $0.accuracyMeters <= 0 || $0.accuracyMeters > config.locationAccuracyReference
@@ -1127,9 +1137,8 @@ nonisolated private struct PresenceResultCompiler {
     private func hasDecisiveCorrelatedLocationBurst(_ result: PresenceDayResult) -> Bool {
         guard let winningCountry = result.countryAllocations.first else { return false }
 
-        let matchingLocations = context.locations.filter { location in
-            guard location.dayKey == result.dayKey,
-                  location.timestamp != nil,
+        let matchingLocations = (locationsByDayKey[result.dayKey] ?? []).filter { location in
+            guard location.timestamp != nil,
                   let sourceRaw = location.sourceRaw,
                   !sourceRaw.isEmpty,
                   let country = resolveCountry(

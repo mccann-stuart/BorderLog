@@ -13,7 +13,9 @@ struct CountryDetailView: View {
 
     @Environment(\.modelContext) private var modelContext
     @Query(sort: [SortDescriptor(\PresenceDay.date, order: .reverse)]) private var allPresenceDays: [PresenceDay]
-    @Query private var allCountryConfigs: [CountryConfig]
+    // Filtered at the store level to the single config for this country, rather than
+    // fetching every CountryConfig and scanning in memory on each access.
+    @Query private var matchingCountryConfigs: [CountryConfig]
     @AppStorage(CountryDayCountingMode.storageKey, store: AppConfig.sharedDefaults) private var countryDayCountingModeRaw = CountryDayCountingMode.defaultMode.rawValue
 
     @State private var maxAllowedDaysText: String = ""
@@ -24,6 +26,19 @@ struct CountryDetailView: View {
         case timeframe = "Timeframe"
         case allTime = "All time"
         var id: String { rawValue }
+    }
+
+    init(countryName: String, countryCode: String?, selectedTimeframe: VisitedCountriesTimeframe) {
+        self.countryName = countryName
+        self.countryCode = countryCode
+        self.selectedTimeframe = selectedTimeframe
+        let configKey = CountryCodeNormalizer.canonicalCode(
+            countryCode: countryCode,
+            countryName: countryName
+        ) ?? countryName
+        _matchingCountryConfigs = Query(
+            filter: #Predicate<CountryConfig> { $0.countryCode == configKey }
+        )
     }
 
     private var countryDayCountingMode: CountryDayCountingMode {
@@ -80,11 +95,8 @@ struct CountryDetailView: View {
     }
 
     private var countryConfig: CountryConfig? {
-        let key = CountryCodeNormalizer.canonicalCode(
-            countryCode: countryCode,
-            countryName: countryName
-        ) ?? countryName
-        return allCountryConfigs.first { $0.countryCode == key }
+        // countryCode is @Attribute(.unique), so the predicated query yields at most one row.
+        matchingCountryConfigs.first
     }
 
     var body: some View {
