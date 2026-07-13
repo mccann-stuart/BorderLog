@@ -15,3 +15,15 @@
 - Targeted calendar tests passed: 20 tests, 0 failures. Host-side preference checks also passed.
 - The complete simulator test bundle built successfully. The full run passed 235 of 237 unit tests and all 4 UI tests; two `LedgerRecomputeServiceTests` disputed-country tests still fail with four assertions in code outside the calendar-selection change set.
 - `git diff --check` passed and the final diff was reviewed for scope.
+
+# Xcode run diagnostics validation
+
+- [ ] Run the focused airport-resource and model-container recovery tests using isolated Derived Data.
+- [ ] Build the app for a generic iOS Simulator without changing project or scheme settings.
+- [ ] Inspect the signed device app and widget entitlements for the shared App Group.
+- [ ] Clear and filter the live Xcode console, then verify launch, App Group storage, and Dashboard map behaviour on Stu iP.
+- [ ] Review the final diff and confirm the existing Xcode 27 project and scheme changes were preserved.
+
+## Review
+
+- Pending verification.
