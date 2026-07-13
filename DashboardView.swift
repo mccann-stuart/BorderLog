@@ -184,19 +184,6 @@ private struct InferenceProgressSection: View {
     let isLocationBatching: Bool
     let isGeoLookupPaused: Bool
 
-    private var locationStatusText: String? {
-        if isLocationBatching && isGeoLookupPaused {
-            return "Paused: waiting for location batch and geo lookup capacity."
-        }
-        if isLocationBatching {
-            return "Capturing location samples."
-        }
-        if isGeoLookupPaused {
-            return "Paused: waiting for geo lookup capacity."
-        }
-        return nil
-    }
-
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Inference progress")
@@ -218,46 +205,76 @@ private struct InferenceProgressSection: View {
                 isActive: isCalendarScanning
             )
 
-            VStack(alignment: .leading, spacing: 6) {
-                HStack {
-                    Label("Location inference", systemImage: "location")
-                        .font(.system(.subheadline, design: .rounded))
-                    Spacer()
-                    if isInferenceRunning {
-                        Text(progressPercent(scanned: inferenceProgress, total: inferenceTotal))
-                            .font(.system(.caption, design: .rounded))
-                            .foregroundStyle(.secondary)
-                    }
-                }
-                if isInferenceRunning {
-                    ProgressView(value: progressFraction(scanned: inferenceProgress, total: inferenceTotal), total: 1)
-                        .progressViewStyle(.linear)
-                        .tint(.accentColor)
-                } else if locationStatusText != nil {
-                    ProgressView()
-                        .controlSize(.small)
-                }
-                if let locationStatusText {
-                    Text(locationStatusText)
-                        .font(.system(.caption, design: .rounded))
-                        .foregroundStyle(.secondary)
-                }
-            }
+            LocationInferenceRow(
+                isInferenceRunning: isInferenceRunning,
+                isLocationBatching: isLocationBatching,
+                isGeoLookupPaused: isGeoLookupPaused,
+                inferenceProgress: inferenceProgress,
+                inferenceTotal: inferenceTotal
+            )
         }
         .padding()
         .cardShell()
         .padding(.horizontal)
     }
+}
 
-    private func progressFraction(scanned: Int, total: Int) -> Double {
-        guard total > 0 else { return 0 }
-        let clamped = min(max(scanned, 0), total)
-        return Double(clamped) / Double(total)
+private struct LocationInferenceRow: View {
+    let isInferenceRunning: Bool
+    let isLocationBatching: Bool
+    let isGeoLookupPaused: Bool
+    let inferenceProgress: Int
+    let inferenceTotal: Int
+
+    private var locationStatusText: String? {
+        if isLocationBatching && isGeoLookupPaused {
+            return "Paused: waiting for location batch and geo lookup capacity."
+        }
+        if isLocationBatching {
+            return "Capturing location samples."
+        }
+        if isGeoLookupPaused {
+            return "Paused: waiting for geo lookup capacity."
+        }
+        return nil
     }
 
-    private func progressPercent(scanned: Int, total: Int) -> String {
-        let fraction = progressFraction(scanned: scanned, total: total)
-        return "\(Int((fraction * 100).rounded()))%"
+    private var progressFraction: Double {
+        guard inferenceTotal > 0 else { return 0 }
+        let clamped = min(max(inferenceProgress, 0), inferenceTotal)
+        return Double(clamped) / Double(inferenceTotal)
+    }
+
+    private var progressPercent: String {
+        "\(Int((progressFraction * 100).rounded()))%"
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                Label("Location inference", systemImage: "location")
+                    .font(.system(.subheadline, design: .rounded))
+                Spacer()
+                if isInferenceRunning {
+                    Text(progressPercent)
+                        .font(.system(.caption, design: .rounded))
+                        .foregroundStyle(.secondary)
+                }
+            }
+            if isInferenceRunning {
+                ProgressView(value: progressFraction, total: 1)
+                    .progressViewStyle(.linear)
+                    .tint(.accentColor)
+            } else if locationStatusText != nil {
+                ProgressView()
+                    .controlSize(.small)
+            }
+            if let locationStatusText {
+                Text(locationStatusText)
+                    .font(.system(.caption, design: .rounded))
+                    .foregroundStyle(.secondary)
+            }
+        }
     }
 }
 
