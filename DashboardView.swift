@@ -87,19 +87,7 @@ struct DashboardView: View {
             }
 
             for country in countedCountries {
-                if countryDict[country.id] != nil {
-                    // ⚡ Bolt: Mutate the struct in-place to avoid reallocating new IDs and structs during aggregation
-                    countryDict[country.id]?.totalDays += 1
-                } else {
-                    let maxDays = configDict[country.countryCode ?? ""] ?? nil
-                    countryDict[country.id] = CountryDaysInfo(
-                        countryName: country.countryName,
-                        countryCode: country.countryCode,
-                        totalDays: 1,
-                        region: Region(rawValue: country.regionRaw) ?? .other,
-                        maxAllowedDays: maxDays
-                    )
-                }
+                recordPresence(for: country, in: &countryDict, maxDaysConfig: configDict)
             }
         }
 
@@ -107,6 +95,22 @@ struct DashboardView: View {
             countries: countryDict.values.sorted { $0.totalDays > $1.totalDays },
             unknownDays: unknownDays
         )
+    }
+
+    private func recordPresence(for country: CountedPresenceCountry, in dict: inout [String: CountryDaysInfo], maxDaysConfig: [String: Int]) {
+        if dict[country.id] != nil {
+            // ⚡ Bolt: Mutate the struct in-place to avoid reallocating new IDs and structs during aggregation
+            dict[country.id]?.totalDays += 1
+        } else {
+            let maxDays = maxDaysConfig[country.countryCode ?? ""] ?? nil
+            dict[country.id] = CountryDaysInfo(
+                countryName: country.countryName,
+                countryCode: country.countryCode,
+                totalDays: 1,
+                region: Region(rawValue: country.regionRaw) ?? .other,
+                maxAllowedDays: maxDays
+            )
+        }
     }
     
     var body: some View {
