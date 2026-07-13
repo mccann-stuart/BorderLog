@@ -32,3 +32,17 @@
 - Device Hub showed BorderLog running on Stu iP with persisted travel data and a fully rendered, responsive Dashboard map.
 - Filtering the corresponding Xcode run to `subsystem:com.MCCANN.Border` left only `Using App Group store at group: group.com.MCCANN.Border`; no BorderLog-owned warning or error remained.
 - The Apple framework diagnostics were left unsuppressed in the raw console, and the pre-existing Xcode 27 project/scheme updates were preserved.
+
+# Code Health Improvement: UserAccountView Refactor
+
+- [x] Extract `accountSection` from `body` in `UserAccountView.swift`.
+- [x] Extract `dataSyncSection` from `body` in `UserAccountView.swift`.
+- [x] Extract `signOutSection` from `body` in `UserAccountView.swift`.
+- [x] Update `body` to use these new `@ViewBuilder` computed properties.
+- [x] Verify changes visually and with basic structure script.
+
+## Review
+
+- Refactored `UserAccountView.swift` to extract deeply nested conditionals in the `Form` into separate `@ViewBuilder` computed properties (`accountSection`, `dataSyncSection`, and `signOutSection`).
+- This change improves the readability and maintainability of the `body` property by reducing nesting.
+- Basic structure verification passed, confirming the view's integrity.
