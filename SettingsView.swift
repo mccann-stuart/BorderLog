@@ -403,13 +403,9 @@ struct SettingsView: View {
                 isPresented: $isPresentingDebugExport,
                 document: debugExportDocument,
                 contentTypes: DebugDataStoreExportDocument.readableContentTypes,
-                defaultFilename: debugExportDefaultFilename
-            ) { result in
-                if case .failure(let error) = result {
-                    Self.logger.error("Debug export file handoff failed: \(error, privacy: .private)")
-                    debugExportError = "Failed to hand off the debug export file. Please try again."
-                }
-            }
+                defaultFilename: debugExportDefaultFilename,
+                onCompletion: handleDebugExportResult
+            )
 #endif
             .onAppear {
                 refreshPermissions()
@@ -628,6 +624,12 @@ struct SettingsView: View {
                 }
             }
         }
+    }
+
+    private func handleDebugExportResult(_ result: Result<URL, Error>) {
+        guard case .failure(let error) = result else { return }
+        Self.logger.error("Debug export file handoff failed: \(error, privacy: .private)")
+        debugExportError = "Failed to hand off the debug export file. Please try again."
     }
 #endif
 
