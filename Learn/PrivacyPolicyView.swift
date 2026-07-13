@@ -19,7 +19,7 @@ struct PrivacyPolicyView: View {
                 )
                 PrivacyPolicyRow(
                     title: "Photos",
-                    detail: "Optional Photos access is used to read photo location metadata. BorderLog does not upload photos."
+                    detail: "Optional Photos access is used to read photo location and original camera metadata, including capture and library-addition dates, so likely imported or received photos can be ignored. Retained photo metadata is non-scoring review context. BorderLog does not retain or upload photos or camera MakerNote data."
                 )
                 PrivacyPolicyRow(
                     title: "Calendar",

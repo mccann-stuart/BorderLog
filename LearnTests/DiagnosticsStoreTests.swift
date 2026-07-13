@@ -29,6 +29,7 @@ final class DiagnosticsStoreTests: XCTestCase {
             rejectedMissingCreationDate: 1,
             rejectedMissingLocation: 4,
             rejectedDuplicateAsset: 2,
+            rejectedUnverifiedCapture: 3,
             unresolvedCountrySignals: 1,
             at: completedAt
         )
@@ -51,10 +52,11 @@ final class DiagnosticsStoreTests: XCTestCase {
         XCTAssertEqual(snapshot.photoScanning.runsFailed, 1)
         XCTAssertEqual(snapshot.photoScanning.assetsScanned, 10)
         XCTAssertEqual(snapshot.photoScanning.signalsImported, 3)
-        XCTAssertEqual(snapshot.photoScanning.assetsRejected, 7)
+        XCTAssertEqual(snapshot.photoScanning.assetsRejected, 10)
         XCTAssertEqual(snapshot.photoScanning.rejectedMissingCreationDate, 1)
         XCTAssertEqual(snapshot.photoScanning.rejectedMissingLocation, 4)
         XCTAssertEqual(snapshot.photoScanning.rejectedDuplicateAsset, 2)
+        XCTAssertEqual(snapshot.photoScanning.rejectedUnverifiedCapture, 3)
         XCTAssertEqual(snapshot.photoScanning.unresolvedCountrySignals, 1)
         XCTAssertEqual(snapshot.photoScanning.errors, 2)
         XCTAssertEqual(snapshot.photoScanning.lastStartedAt, startedAt)

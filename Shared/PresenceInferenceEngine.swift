@@ -27,7 +27,6 @@ nonisolated struct InferenceContext {
 
 nonisolated struct InferencePipelineConfig: Sendable {
     let stayBaseWeight: Double = 5.0
-    let photoBaseWeight: Double = 2.0
     let locationBaseWeight: Double = 3.0
     let calendarBaseWeight: Double = 1.0
     let overrideWeight: Double = 1_000.0
@@ -323,11 +322,12 @@ nonisolated struct PhotoProcessor: SignalProcessor {
                 dayKey: photo.dayKey,
                 processorID: id,
                 country: country,
-                rawWeight: config.photoBaseWeight,
-                calibratedWeight: config.photoBaseWeight,
-                phase: .base,
-                reason: "photo-signal",
-                timeZoneId: photo.timeZoneId
+                rawWeight: 0,
+                calibratedWeight: 0,
+                phase: .contextual,
+                reason: "unverified-photo-library-metadata",
+                timeZoneId: photo.timeZoneId,
+                contributesToScore: false
             )
         }
     }

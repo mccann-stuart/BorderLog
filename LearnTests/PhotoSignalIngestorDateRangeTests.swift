@@ -57,6 +57,29 @@ final class PhotoSignalIngestorDateRangeTests: XCTestCase {
         XCTAssertNil(config.endDate)
         XCTAssertEqual(config.sortAscending, true)
     }
+
+    func testProvenanceRebuildExpandsSequencedWindowToOldestDeletedSignal() {
+        let calendar = makeUTCcalendar()
+        let now = calendar.date(from: DateComponents(year: 2026, month: 7, day: 13))!
+        let oldestDeletedSignal = calendar.date(
+            from: DateComponents(year: 2020, month: 1, day: 2)
+        )!
+        let baseConfig = PhotoSignalIngestor.ingestQueryConfig(
+            mode: .sequenced,
+            state: PhotoIngestState(),
+            now: now,
+            calendar: calendar
+        )
+
+        let expandedConfig = PhotoSignalIngestor.expandingForProvenanceRebuild(
+            baseConfig,
+            earliestSignalDate: oldestDeletedSignal
+        )
+
+        XCTAssertEqual(expandedConfig.startDate, oldestDeletedSignal)
+        XCTAssertEqual(expandedConfig.endDate, now)
+        XCTAssertEqual(expandedConfig.sortAscending, false)
+    }
 }
 
 private func makeUTCcalendar() -> Calendar {
