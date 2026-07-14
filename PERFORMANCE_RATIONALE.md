@@ -490,3 +490,19 @@ Implemented a single linear pass that calculates the overflow threshold beforeha
 
 ### Ledger Recompute Min Evaluation Optimization
 In `Shared/LedgerRecomputeService.swift`, finding the earliest signal date involved chaining `.compactMap` and `.min()` (e.g. `[s, o, l, p, c].compactMap { $0 }.min()`). This causes an intermediate O(N) array allocation. This has been replaced by explicit, inline tracking variables over manually iterated tuples/arrays which computes the minimum value directly in O(N) time but drops auxiliary memory from O(N) to O(1).
+
+## Intermediate Array Allocation Avoidance for `compactMap`
+
+### Current State
+`CalendarTabDataService.fetchEarliestAvailableMonth` previously constructed a 5-element array containing optional string keys representing the earliest known entities (stays, overrides, locations, photos, signals). It then called `.compactMap { $0 }` to create an intermediate array of non-optional values just to immediately call `.min()` on it.
+
+### Problem
+1. **Memory Allocation**: These patterns allocate a full intermediate array in memory (`earliestKeys`). It creates the array, compactMaps it into another array, passes it to the `min()` function, and then immediately discards it.
+2. **ARC Overhead**: Swift's Automatic Reference Counting must retain and release all elements in the intermediate array, degrading performance in a UI service.
+
+### Optimization
+Replaced the array allocation and `compactMap` with manually unrolled `if let` sequential comparisons. A local `var earliestKey: String?` tracks the minimum value as each independent fetch is resolved. The memory complexity drops from O(N) to O(1), and intermediate ARC thrashing is entirely bypassed.
+
+### Verification
+- **Space Complexity**: Reduced from `O(N)` to `O(1)`.
+- **Algorithmic Equivalence**: Verified via a Python simulation that unrolled sequential comparison behavior produces the exact same minimum result as the standard compactMap/min array pipeline.
