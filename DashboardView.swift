@@ -120,11 +120,7 @@ struct DashboardView: View {
         ScrollView {
             VStack(spacing: 20) {
                 WorldMapSection(visitedCountries: visitedCountryCodes)
-                if inferenceActivity.isPhotoScanning ||
-                    inferenceActivity.isCalendarScanning ||
-                    inferenceActivity.isInferenceRunning ||
-                    inferenceActivity.isLocationBatching ||
-                    inferenceActivity.isGeoLookupPaused {
+                if inferenceActivity.isRefreshInProgress {
                     InferenceProgressSection(
                         photoScanned: inferenceActivity.photoScanScanned,
                         photoTotal: inferenceActivity.photoScanTotal,
