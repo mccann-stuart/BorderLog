@@ -562,12 +562,17 @@ actor CalendarTabDataService {
                     maxAllowedDays: configByID[entry.country.id] ?? nil
                 )
             }
-            .sorted { lhs, rhs in
-                if lhs.totalDays == rhs.totalDays {
-                    return lhs.countryName.localizedCaseInsensitiveCompare(rhs.countryName) == .orderedAscending
-                }
-                return lhs.totalDays > rhs.totalDays
-            }
+            .sorted(by: Self.compareCountrySummaries)
+    }
+
+    private nonisolated static func compareCountrySummaries(
+        lhs: CalendarCountryDaysSummary,
+        rhs: CalendarCountryDaysSummary
+    ) -> Bool {
+        if lhs.totalDays == rhs.totalDays {
+            return lhs.countryName.localizedCaseInsensitiveCompare(rhs.countryName) == .orderedAscending
+        }
+        return lhs.totalDays > rhs.totalDays
     }
 
     private func makeSummaryUnknownDayKeys(
@@ -735,15 +740,7 @@ actor CalendarTabDataService {
         // Keep intermediate countries in journey order after the headline origin and destination.
         let routeCandidates = (
             accumulator.flightOriginCandidates + accumulator.flightDestinationCandidates
-        ).sorted { lhs, rhs in
-            if lhs.timestamp != rhs.timestamp {
-                return lhs.timestamp < rhs.timestamp
-            }
-            if lhs.eventIdentifier != rhs.eventIdentifier {
-                return lhs.eventIdentifier.localizedCaseInsensitiveCompare(rhs.eventIdentifier) == .orderedAscending
-            }
-            return lhs.country.id.localizedCaseInsensitiveCompare(rhs.country.id) == .orderedAscending
-        }
+        ).sorted(by: Self.compareRouteCandidates)
         for candidate in routeCandidates {
             append(candidate.country)
         }
@@ -757,6 +754,19 @@ actor CalendarTabDataService {
         }
 
         return countries
+    }
+
+    private nonisolated static func compareRouteCandidates(
+        lhs: FlightCountryCandidate,
+        rhs: FlightCountryCandidate
+    ) -> Bool {
+        if lhs.timestamp != rhs.timestamp {
+            return lhs.timestamp < rhs.timestamp
+        }
+        if lhs.eventIdentifier != rhs.eventIdentifier {
+            return lhs.eventIdentifier.localizedCaseInsensitiveCompare(rhs.eventIdentifier) == .orderedAscending
+        }
+        return lhs.country.id.localizedCaseInsensitiveCompare(rhs.country.id) == .orderedAscending
     }
 
     nonisolated fileprivate static func sortedCountries<S: Sequence>(
