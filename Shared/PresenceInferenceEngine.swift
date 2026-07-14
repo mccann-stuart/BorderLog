@@ -455,93 +455,95 @@ nonisolated private struct PresenceResultCompiler {
             .map(applyingConservativeConfidenceCap)
     }
 
-    private func baseResult(for dayKey: String, date: Date, timeZoneId: String?, dayState: DayInferenceState) -> PresenceDayResult {
-        let sourceSummary = SignalSourceMask.from(processorIDs: dayState.evidenceEntries.map(\.processorID))
-
-        if let overrideInfo = dayState.overrideInfo,
-           let country = resolveCountry(countryCode: overrideInfo.countryCode, countryName: overrideInfo.countryName) {
-            return PresenceDayResult(
-                dayKey: dayKey,
-                date: date,
-                timeZoneId: timeZoneId,
-                countryAllocations: [PresenceCountryAllocation(countryCode: country.code, countryName: country.name, normalizedShare: 1.0)],
-                zoneOverlays: [],
-                evidenceEntries: dayState.evidenceEntries,
-                confidenceBreakdown: PresenceConfidenceBreakdown(
-                    score: config.overrideWeight,
-                    runnerUpScore: 0,
-                    margin: 1,
-                    normalizedWinningShare: 1,
-                    label: .high,
-                    calibrationSummary: "manual override"
-                ),
-                sourceSummary: sourceSummary,
-                isOverride: true,
-                isDisputed: false,
-                stayCount: dayState.counts.stayCount,
-                photoCount: dayState.counts.photoCount,
-                locationCount: dayState.counts.locationCount,
-                calendarCount: dayState.counts.calendarCount
-            )
-        }
-
-        // ⚡ Bolt: Replace O(N log N) sorting + reduce + multiple passes with a single O(N) loop
+    private struct DayScoring {
         var totalScore: Double = 0
         var winner: (country: ResolvedCountry, score: Double)?
         var runnerUp: (country: ResolvedCountry, score: Double)?
+    }
 
+    private static func computeScoring(for dayState: DayInferenceState) -> DayScoring {
+        // ⚡ Bolt: Replace O(N log N) sorting + reduce + multiple passes with a single O(N) loop
+        var scoring = DayScoring()
         for (key, score) in dayState.countryScores {
             guard let country = dayState.countries[key] else { continue }
-            totalScore += score
+            scoring.totalScore += score
 
             let current = (country: country, score: score)
-            if let w = winner {
+            if let w = scoring.winner {
                 if score > w.score || (score == w.score && country.id < w.country.id) {
-                    runnerUp = winner
-                    winner = current
-                } else if let r = runnerUp {
+                    scoring.runnerUp = scoring.winner
+                    scoring.winner = current
+                } else if let r = scoring.runnerUp {
                     if score > r.score || (score == r.score && country.id < r.country.id) {
-                        runnerUp = current
+                        scoring.runnerUp = current
                     }
                 } else {
-                    runnerUp = current
+                    scoring.runnerUp = current
                 }
             } else {
-                winner = current
+                scoring.winner = current
             }
         }
+        return scoring
+    }
 
-        guard let winner = winner, winner.score >= config.resolutionThreshold, totalScore > 0 else {
-            return PresenceDayResult(
-                dayKey: dayKey,
-                date: date,
-                timeZoneId: timeZoneId,
-                countryAllocations: [],
-                zoneOverlays: [],
-                evidenceEntries: dayState.evidenceEntries,
-                confidenceBreakdown: PresenceConfidenceBreakdown(
-                    score: winner?.score ?? 0,
-                    runnerUpScore: runnerUp?.score ?? 0,
-                    margin: 0,
-                    normalizedWinningShare: 0,
-                    label: .low,
-                    calibrationSummary: "below-threshold"
-                ),
-                sourceSummary: sourceSummary,
-                isOverride: false,
-                isDisputed: false,
-                stayCount: dayState.counts.stayCount,
-                photoCount: dayState.counts.photoCount,
-                locationCount: dayState.counts.locationCount,
-                calendarCount: dayState.counts.calendarCount
-            )
+    private func overrideResult(for dayKey: String, date: Date, timeZoneId: String?, dayState: DayInferenceState, sourceSummary: SignalSourceMask) -> PresenceDayResult? {
+        guard let overrideInfo = dayState.overrideInfo,
+              let country = resolveCountry(countryCode: overrideInfo.countryCode, countryName: overrideInfo.countryName) else {
+            return nil
         }
+        return PresenceDayResult(
+            dayKey: dayKey,
+            date: date,
+            timeZoneId: timeZoneId,
+            countryAllocations: [PresenceCountryAllocation(countryCode: country.code, countryName: country.name, normalizedShare: 1.0)],
+            zoneOverlays: [],
+            evidenceEntries: dayState.evidenceEntries,
+            confidenceBreakdown: PresenceConfidenceBreakdown(
+                score: config.overrideWeight,
+                runnerUpScore: 0,
+                margin: 1,
+                normalizedWinningShare: 1,
+                label: .high,
+                calibrationSummary: "manual override"
+            ),
+            sourceSummary: sourceSummary,
+            isOverride: true,
+            isDisputed: false,
+            stayCount: dayState.counts.stayCount,
+            photoCount: dayState.counts.photoCount,
+            locationCount: dayState.counts.locationCount,
+            calendarCount: dayState.counts.calendarCount
+        )
+    }
 
-        let runnerUpScore = runnerUp?.score ?? 0
-        let winningShare = winner.score / totalScore
-        let runnerUpShare = runnerUpScore / totalScore
-        let margin = max(0, winningShare - runnerUpShare)
+    private func belowThresholdResult(for dayKey: String, date: Date, timeZoneId: String?, dayState: DayInferenceState, sourceSummary: SignalSourceMask, scoring: DayScoring) -> PresenceDayResult {
+        return PresenceDayResult(
+            dayKey: dayKey,
+            date: date,
+            timeZoneId: timeZoneId,
+            countryAllocations: [],
+            zoneOverlays: [],
+            evidenceEntries: dayState.evidenceEntries,
+            confidenceBreakdown: PresenceConfidenceBreakdown(
+                score: scoring.winner?.score ?? 0,
+                runnerUpScore: scoring.runnerUp?.score ?? 0,
+                margin: 0,
+                normalizedWinningShare: 0,
+                label: .low,
+                calibrationSummary: "below-threshold"
+            ),
+            sourceSummary: sourceSummary,
+            isOverride: false,
+            isDisputed: false,
+            stayCount: dayState.counts.stayCount,
+            photoCount: dayState.counts.photoCount,
+            locationCount: dayState.counts.locationCount,
+            calendarCount: dayState.counts.calendarCount
+        )
+    }
 
+    private func computeAllocations(for dayState: DayInferenceState, totalScore: Double) -> [PresenceCountryAllocation] {
         // ⚡ Bolt: Use a single compactMap pass to generate allocations above the floor without O(N) intermediate filtering
         let allocationFloor = config.allocationFloor
         let countries = dayState.countries
@@ -555,7 +557,7 @@ nonisolated private struct PresenceResultCompiler {
                 normalizedShare: normalizedShare
             )
         }
-        let allocations = unsortedAllocations.sorted { lhs, rhs in
+        return unsortedAllocations.sorted { lhs, rhs in
             if lhs.normalizedShare == rhs.normalizedShare {
                 let lhsCode = lhs.countryCode ?? ""
                 let rhsCode = rhs.countryCode ?? ""
@@ -563,6 +565,27 @@ nonisolated private struct PresenceResultCompiler {
             }
             return lhs.normalizedShare > rhs.normalizedShare
         }
+    }
+
+    private func baseResult(for dayKey: String, date: Date, timeZoneId: String?, dayState: DayInferenceState) -> PresenceDayResult {
+        let sourceSummary = SignalSourceMask.from(processorIDs: dayState.evidenceEntries.map(\.processorID))
+
+        if let result = overrideResult(for: dayKey, date: date, timeZoneId: timeZoneId, dayState: dayState, sourceSummary: sourceSummary) {
+            return result
+        }
+
+        let scoring = Self.computeScoring(for: dayState)
+
+        guard let winner = scoring.winner, winner.score >= config.resolutionThreshold, scoring.totalScore > 0 else {
+            return belowThresholdResult(for: dayKey, date: date, timeZoneId: timeZoneId, dayState: dayState, sourceSummary: sourceSummary, scoring: scoring)
+        }
+
+        let runnerUpScore = scoring.runnerUp?.score ?? 0
+        let winningShare = winner.score / scoring.totalScore
+        let runnerUpShare = runnerUpScore / scoring.totalScore
+        let margin = max(0, winningShare - runnerUpShare)
+
+        let allocations = computeAllocations(for: dayState, totalScore: scoring.totalScore)
 
         return PresenceDayResult(
             dayKey: dayKey,
