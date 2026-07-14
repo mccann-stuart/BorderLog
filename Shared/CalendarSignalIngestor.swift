@@ -149,7 +149,7 @@ actor CalendarSignalIngestor {
             )
         }
 
-        var existingSignalByIdentifier: [String: CalendarSignal] = [:]
+        var existingSignalByIdentifier = [String: CalendarSignal](minimumCapacity: existingSignals.count)
         for signal in existingSignals {
             existingSignalByIdentifier[signal.eventIdentifier] = signal
         }
@@ -669,7 +669,7 @@ actor CalendarSignalIngestor {
         existingDayKeys: [String],
         seenIdentifiers: Set<String>
     ) -> (deleted: Int, touchedDayKeys: [String], remainingIdentifiers: [String]) {
-        var existingSignalByIdentifier: [String: CalendarSignal] = [:]
+        var existingSignalByIdentifier = [String: CalendarSignal](minimumCapacity: existingDayKeys.count)
         for (index, dayKey) in existingDayKeys.enumerated() {
             let identifier = "event-\(index)"
             existingSignalByIdentifier[identifier] = CalendarSignal(
