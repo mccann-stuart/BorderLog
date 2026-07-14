@@ -3,6 +3,26 @@ import XCTest
 
 final class CountryCodeNormalizerTests: XCTestCase {
 
+    func testCountryCodeToEmoji() {
+        XCTAssertEqual(CountryCodeNormalizer.countryCodeToEmoji("US"), "🇺🇸")
+        XCTAssertEqual(CountryCodeNormalizer.countryCodeToEmoji("us"), "🇺🇸")
+        XCTAssertEqual(CountryCodeNormalizer.countryCodeToEmoji("FR"), "🇫🇷")
+        XCTAssertEqual(CountryCodeNormalizer.countryCodeToEmoji("UK"), "🇬🇧")
+        XCTAssertEqual(CountryCodeNormalizer.countryCodeToEmoji("uk"), "🇬🇧")
+        XCTAssertEqual(CountryCodeNormalizer.countryCodeToEmoji(""), "🌍")
+    }
+
+    func testNormalize() {
+        XCTAssertEqual(CountryCodeNormalizer.normalize("US"), "US")
+        XCTAssertEqual(CountryCodeNormalizer.normalize("us"), "US")
+        XCTAssertEqual(CountryCodeNormalizer.normalize("UK"), "GB")
+        XCTAssertEqual(CountryCodeNormalizer.normalize("uk"), "GB")
+        XCTAssertEqual(CountryCodeNormalizer.normalize("  fr  "), "FR")
+        XCTAssertNil(CountryCodeNormalizer.normalize(nil))
+        XCTAssertNil(CountryCodeNormalizer.normalize(""))
+        XCTAssertNil(CountryCodeNormalizer.normalize("   "))
+    }
+
     func testCanonicalCodeWithCountryCode() {
         XCTAssertEqual(CountryCodeNormalizer.canonicalCode(countryCode: "US", countryName: nil), "US")
         XCTAssertEqual(CountryCodeNormalizer.canonicalCode(countryCode: "us", countryName: nil), "US")
