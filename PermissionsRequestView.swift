@@ -222,18 +222,20 @@ struct PermissionsRequestView: View {
         locationStatusRefreshTask?.cancel()
         locationStatusRefreshTask = Task { @MainActor in
             for _ in 0..<50 {
-                refreshStatus()
-                if locationStatus != .notDetermined {
-                    hasPromptedLocation = true
-                    return
-                }
+                if checkAuthorizationResolved() { return }
                 try? await Task.sleep(nanoseconds: 200_000_000)
             }
-            refreshStatus()
-            if locationStatus != .notDetermined {
-                hasPromptedLocation = true
-            }
+            _ = checkAuthorizationResolved()
         }
+    }
+
+    private func checkAuthorizationResolved() -> Bool {
+        refreshStatus()
+        if locationStatus != .notDetermined {
+            hasPromptedLocation = true
+            return true
+        }
+        return false
     }
 
     private func openAppSettings() {
