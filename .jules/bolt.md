@@ -1,0 +1,3 @@
+## 2026-02-18 - LedgerRecomputeService Dictionary Allocation Optimization
+**Learning:** Initializing dictionaries by looping and manually assigning keys to an empty dictionary `var existingMap: [String: PresenceDay] = [:]` incurs continuous ARC thrashing and O(N log N) reallocation overhead because the dictionary must resize dynamically as elements are added.
+**Action:** Use `.reduce(into: [Key: Value](minimumCapacity: count)) { $0[$1.key] = $1 }` when transforming an array of unique elements into a dictionary to statically preallocate exactly the required memory, ensuring a strict O(N) pass with O(1) auxiliary overhead beyond the dictionary itself.
