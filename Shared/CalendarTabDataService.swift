@@ -344,15 +344,35 @@ actor CalendarTabDataService {
         fallback: Date,
         calendar: Calendar
     ) throws -> Date {
-        let earliestKeys = try [
-            fetchEarliestStayKey(),
-            fetchEarliestOverrideKey(),
-            fetchEarliestLocationKey(),
-            fetchEarliestPhotoKey(),
-            fetchEarliestCalendarSignalKey()
-        ].compactMap { $0 }
+        var earliestKey: String?
 
-        guard let earliestKey = earliestKeys.min(),
+        if let key = try fetchEarliestStayKey() { earliestKey = key }
+
+        if let key = try fetchEarliestOverrideKey() {
+            if let current = earliestKey {
+                if key < current { earliestKey = key }
+            } else { earliestKey = key }
+        }
+
+        if let key = try fetchEarliestLocationKey() {
+            if let current = earliestKey {
+                if key < current { earliestKey = key }
+            } else { earliestKey = key }
+        }
+
+        if let key = try fetchEarliestPhotoKey() {
+            if let current = earliestKey {
+                if key < current { earliestKey = key }
+            } else { earliestKey = key }
+        }
+
+        if let key = try fetchEarliestCalendarSignalKey() {
+            if let current = earliestKey {
+                if key < current { earliestKey = key }
+            } else { earliestKey = key }
+        }
+
+        guard let earliestKey = earliestKey,
               let earliestDate = DayKey.date(for: earliestKey, timeZone: calendar.timeZone) else {
             return fallback
         }
