@@ -149,9 +149,8 @@ actor CalendarSignalIngestor {
             )
         }
 
-        var existingSignalByIdentifier: [String: CalendarSignal] = [:]
-        for signal in existingSignals {
-            existingSignalByIdentifier[signal.eventIdentifier] = signal
+        var existingSignalByIdentifier = existingSignals.reduce(into: [String: CalendarSignal](minimumCapacity: existingSignals.count)) { result, signal in
+            result[signal.eventIdentifier] = signal
         }
 
         var seenIdentifiers = Set<String>()
