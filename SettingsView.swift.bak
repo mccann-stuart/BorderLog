@@ -110,7 +110,35 @@ struct SettingsView: View {
                     Text("Privacy")
                 }
 
-                cloudKitSection
+                if AppConfig.isCloudKitFeatureEnabled {
+                    // MARK: – iCloud Sync
+                    Section {
+                        Toggle(isOn: $cloudKitSyncEnabled) {
+                            Label("iCloud Sync", systemImage: "icloud")
+                        }
+
+                        Button(role: .destructive) {
+                            isConfirmingCloudKitDelete = true
+                        } label: {
+                            HStack {
+                                Label(
+                                    isDeletingCloudKitData ? "Deleting…" : "Delete iCloud Data",
+                                    systemImage: isDeletingCloudKitData ? "arrow.triangle.2.circlepath" : "trash"
+                                )
+                                if isDeletingCloudKitData {
+                                    Spacer()
+                                    ProgressView()
+                                }
+                            }
+                        }
+                        .disabled(isDeletingCloudKitData)
+                    } header: {
+                        Text("iCloud Sync")
+                    } footer: {
+                        Text("Sync uses your iCloud private database. Changes take effect after restarting the app.")
+                    }
+                }
+
 
                 // MARK: – Data Sources
                 Section {
@@ -221,7 +249,7 @@ struct SettingsView: View {
                     Text("Location and read-only events from your selected calendars help determine which country you were in each day. Verified photo metadata is shown only as non-scoring review context. BorderLog stores this data locally and may use Apple system services such as MapKit geocoding to resolve countries.")
                 }
 
-      
+
 
                 // MARK: – Setup
                 Section {
@@ -375,48 +403,18 @@ struct SettingsView: View {
                 isPresented: $isPresentingDebugExport,
                 document: debugExportDocument,
                 contentTypes: DebugDataStoreExportDocument.readableContentTypes,
-                defaultFilename: debugExportDefaultFilename,
-                onCompletion: handleDebugExportResult
-            )
+                defaultFilename: debugExportDefaultFilename
+            ) { result in
+                if case .failure(let error) = result {
+                    Self.logger.error("Debug export file handoff failed: \(error, privacy: .private)")
+                    debugExportError = "Failed to hand off the debug export file. Please try again."
+                }
+            }
 #endif
             .onAppear {
                 refreshPermissions()
                 refreshWidgetLastWriteDate()
             }
-    }
-
-    // MARK: – CloudKit Section
-
-    @ViewBuilder
-    private var cloudKitSection: some View {
-        if AppConfig.isCloudKitFeatureEnabled {
-            // MARK: – iCloud Sync
-            Section {
-                Toggle(isOn: $cloudKitSyncEnabled) {
-                    Label("iCloud Sync", systemImage: "icloud")
-                }
-
-                Button(role: .destructive) {
-                    isConfirmingCloudKitDelete = true
-                } label: {
-                    HStack {
-                        Label(
-                            isDeletingCloudKitData ? "Deleting…" : "Delete iCloud Data",
-                            systemImage: isDeletingCloudKitData ? "arrow.triangle.2.circlepath" : "trash"
-                        )
-                        if isDeletingCloudKitData {
-                            Spacer()
-                            ProgressView()
-                        }
-                    }
-                }
-                .disabled(isDeletingCloudKitData)
-            } header: {
-                Text("iCloud Sync")
-            } footer: {
-                Text("Sync uses your iCloud private database. Changes take effect after restarting the app.")
-            }
-        }
     }
 
     // MARK: – Smart Location Row
@@ -630,12 +628,6 @@ struct SettingsView: View {
                 }
             }
         }
-    }
-
-    private func handleDebugExportResult(_ result: Result<URL, Error>) {
-        guard case .failure(let error) = result else { return }
-        Self.logger.error("Debug export file handoff failed: \(error, privacy: .private)")
-        debugExportError = "Failed to hand off the debug export file. Please try again."
     }
 #endif
 
@@ -898,18 +890,13 @@ struct SettingsView: View {
         }
     }
 
-    // ⚡ Bolt: Cached DateFormatter to avoid expensive instantiation on every export
-    private static let debugExportDateFormatter: DateFormatter = {
+    private static func debugExportFilename(for date: Date) -> String {
         let formatter = DateFormatter()
         formatter.calendar = Calendar(identifier: .gregorian)
         formatter.locale = Locale(identifier: "en_US_POSIX")
         formatter.timeZone = TimeZone.current
         formatter.dateFormat = "yyyy-MM-dd-HHmmss"
-        return formatter
-    }()
-
-    private static func debugExportFilename(for date: Date) -> String {
-        return "borderlog-debug-export-\(debugExportDateFormatter.string(from: date))"
+        return "borderlog-debug-export-\(formatter.string(from: date))"
     }
 #endif
 
