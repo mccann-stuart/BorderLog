@@ -70,12 +70,15 @@ struct CalendarEvidenceResolver {
             seen.insert(signal.eventIdentifier).inserted
         }
 
-        return deduplicated.sorted { lhs, rhs in
-            if lhs.timestamp == rhs.timestamp {
-                return lhs.eventIdentifier < rhs.eventIdentifier
-            }
-            return lhs.timestamp < rhs.timestamp
+        return deduplicated.sorted(by: isEarlier)
+    }
+
+
+    private static func isEarlier(_ lhs: CalendarSignal, _ rhs: CalendarSignal) -> Bool {
+        if lhs.timestamp == rhs.timestamp {
+            return lhs.eventIdentifier < rhs.eventIdentifier
         }
+        return lhs.timestamp < rhs.timestamp
     }
 
     private static func countryIdentity(
@@ -126,15 +129,8 @@ struct CalendarEvidenceResolver {
         // We use .min(by:) which performs a single O(N) pass and O(1) memory, avoiding
         // the need for deduplication entirely since we only extract the absolute minimum.
         if limit == 1 {
-            if let best = candidates.min(by: { lhs, rhs in
-                if lhs.timestamp == rhs.timestamp {
-                    return lhs.eventIdentifier < rhs.eventIdentifier
-                }
-                return lhs.timestamp < rhs.timestamp
-            }) {
-                return [best]
-            }
-            return []
+            guard let best = candidates.min(by: isEarlier) else { return [] }
+            return [best]
         }
 
         return Array(sortedDeduplicated(signals: candidates).prefix(limit))
