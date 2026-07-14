@@ -64,44 +64,17 @@ actor CalendarSignalIngestor {
     func ingest(mode: IngestMode) async throws -> Int {
         let store = EKEventStore()
 
-        let status = EKEventStore.authorizationStatus(for: .event)
-        let hasReadAccess: Bool
-        if #available(iOS 17.0, *) {
-            hasReadAccess = status == .fullAccess
-        } else {
-            hasReadAccess = status == .authorized
-        }
-        guard hasReadAccess else {
+        guard hasReadAccess() else {
             return 0
         }
 
-        let availableCalendars = store.calendars(for: .event)
-        let storedSelection = calendarSelectionStore.load()
-        let availableReferences = availableCalendars.map(calendarReference(for:))
-        let selectionResolution = storedSelection.resolve(available: availableReferences)
-        if selectionResolution.migratedSelection != storedSelection {
-            try calendarSelectionStore.save(selectionResolution.migratedSelection, markingRebuild: false)
-        }
-        let selectedCalendars = availableCalendars.filter {
-            selectionResolution.selectedIdentifiers.contains($0.calendarIdentifier)
-        }
+        let selectedCalendars = try fetchSelectedCalendars(from: store)
 
         let effectiveMode = effectiveIngestMode(for: mode)
 
-        let calendar = Calendar.current
         let now = Date()
-
-        let ingestStartDate: Date
         let ingestEndDate = now
-
-        switch effectiveMode {
-        case .manualFullScan:
-            ingestStartDate = calendar.date(byAdding: .year, value: -2, to: now) ?? now
-        case .auto:
-            ingestStartDate = calendar.date(byAdding: .month, value: -1, to: now) ?? now
-        case .selectionRebuild:
-            ingestStartDate = calendar.date(byAdding: .year, value: -2, to: now) ?? now
-        }
+        let ingestStartDate = ingestStartDate(for: effectiveMode, now: now)
 
         let events: [EKEvent]
         if selectedCalendars.isEmpty {
@@ -135,7 +108,7 @@ actor CalendarSignalIngestor {
         var processed = 0
         var touchedDayKeys: Set<String> = []
 
-        let staleWindowEnd = calendar.date(byAdding: .day, value: 1, to: ingestEndDate) ?? ingestEndDate
+        let staleWindowEnd = Calendar.current.date(byAdding: .day, value: 1, to: ingestEndDate) ?? ingestEndDate
         let existingSignals: [CalendarSignal]
         if effectiveMode == .selectionRebuild {
             existingSignals = try modelContext.fetch(FetchDescriptor<CalendarSignal>())
@@ -172,129 +145,14 @@ actor CalendarSignalIngestor {
                 }
             }
 
-            let id = event.eventIdentifier ?? event.calendarItemIdentifier
-            let originId = id + Self.originSignalSuffix
-            let endId = id + Self.legacyEndSignalSuffix
-            var eventMutations = 0
-            let snapshot = eventSnapshot(for: event)
-            let ingestability = classify(snapshot)
-
-            guard ingestability.shouldIngest else {
-                eventMutations += deleteSignalIfExists(
-                    identifier: id,
-                    existingSignalByIdentifier: &existingSignalByIdentifier,
-                    touchedDayKeys: &touchedDayKeys
-                )
-                eventMutations += deleteSignalIfExists(
-                    identifier: originId,
-                    existingSignalByIdentifier: &existingSignalByIdentifier,
-                    touchedDayKeys: &touchedDayKeys
-                )
-                eventMutations += deleteSignalIfExists(
-                    identifier: endId,
-                    existingSignalByIdentifier: &existingSignalByIdentifier,
-                    touchedDayKeys: &touchedDayKeys
-                )
-                seenIdentifiers.insert(id)
-                seenIdentifiers.insert(originId)
-                seenIdentifiers.insert(endId)
-
-                if eventMutations > 0 {
-                    processed += 1
-                    if processed % 10 == 0 {
-                        recoveryStore.markDirty(dayKeys: touchedDayKeys)
-                        try saveContextIfNeeded()
-                    }
-                }
-                continue
-            }
-
-            guard let eventStartDate = event.startDate else { continue }
-            let (parsedFrom, parsedTo) = parseFlightInfo(snapshot)
-            let primarySelection = selectPrimarySignalInput(
-                parsedFrom: parsedFrom,
-                parsedTo: parsedTo,
-                eventStartDate: eventStartDate,
-                eventEndDate: event.endDate,
-                structuredLocationTitle: event.structuredLocation?.title,
-                structuredCoordinate: event.structuredLocation?.geoLocation?.coordinate,
-                eventLocation: event.location
-            )
-
-            let startResolved = await resolveSignal(
-                locationString: primarySelection.locationString,
-                coordinate: primarySelection.coordinate,
-                date: primarySelection.date,
-                event: event,
-                activeResolver: activeResolver
-            )
-
-            let originResolved: ResolvedCalendarSignal?
-            if ingestability.shouldDecorateAsFlight,
-               primarySelection.usesDestinationRule,
-               let originLocation = nonEmptyLocation(parsedFrom) {
-                originResolved = await resolveSignal(
-                    locationString: originLocation,
-                    coordinate: nil,
-                    date: eventStartDate,
-                    event: event,
-                    activeResolver: activeResolver
-                )
-            } else {
-                originResolved = nil
-            }
-
-            seenIdentifiers.insert(id)
-            if let startResolved {
-                if upsertSignal(
-                    identifier: id,
-                    resolved: startResolved,
-                    title: event.title,
-                    source: ingestability.shouldDecorateAsFlight ? Self.flightPrimarySignalSource : Self.primarySignalSource,
-                    existingSignalByIdentifier: &existingSignalByIdentifier,
-                    touchedDayKeys: &touchedDayKeys
-                ) {
-                    eventMutations += 1
-                }
-            } else {
-                eventMutations += deleteSignalIfExists(
-                    identifier: id,
-                    existingSignalByIdentifier: &existingSignalByIdentifier,
-                    touchedDayKeys: &touchedDayKeys
-                )
-            }
-
-            seenIdentifiers.insert(originId)
-            let shouldPersistOriginSignal = shouldPersistOriginSignal(
-                originResolved: originResolved
-            )
-            if shouldPersistOriginSignal, let originResolved {
-                if upsertSignal(
-                    identifier: originId,
-                    resolved: originResolved,
-                    title: event.title,
-                    source: Self.flightOriginSignalSource,
-                    existingSignalByIdentifier: &existingSignalByIdentifier,
-                    touchedDayKeys: &touchedDayKeys
-                ) {
-                    eventMutations += 1
-                }
-            } else {
-                eventMutations += deleteSignalIfExists(
-                    identifier: originId,
-                    existingSignalByIdentifier: &existingSignalByIdentifier,
-                    touchedDayKeys: &touchedDayKeys
-                )
-            }
-
-            seenIdentifiers.insert(endId)
-            eventMutations += deleteSignalIfExists(
-                identifier: endId,
+            let mutated = await processEvent(
+                event,
+                activeResolver: activeResolver,
                 existingSignalByIdentifier: &existingSignalByIdentifier,
+                seenIdentifiers: &seenIdentifiers,
                 touchedDayKeys: &touchedDayKeys
             )
-
-            if eventMutations > 0 {
+            if mutated {
                 processed += 1
                 if processed % 10 == 0 {
                     recoveryStore.markDirty(dayKeys: touchedDayKeys)
@@ -330,6 +188,163 @@ actor CalendarSignalIngestor {
 
     private func effectiveIngestMode(for requestedMode: IngestMode) -> IngestMode {
         calendarSelectionStore.needsRebuild ? .selectionRebuild : requestedMode
+    }
+
+    private func processEvent(
+        _ event: EKEvent,
+        activeResolver: CountryResolving,
+        existingSignalByIdentifier: inout [String: CalendarSignal],
+        seenIdentifiers: inout Set<String>,
+        touchedDayKeys: inout Set<String>
+    ) async -> Bool {
+        let id = event.eventIdentifier ?? event.calendarItemIdentifier
+        let originId = id + Self.originSignalSuffix
+        let endId = id + Self.legacyEndSignalSuffix
+        var eventMutations = 0
+        let snapshot = eventSnapshot(for: event)
+        let ingestability = classify(snapshot)
+
+        guard ingestability.shouldIngest else {
+            eventMutations += deleteSignalIfExists(
+                identifier: id,
+                existingSignalByIdentifier: &existingSignalByIdentifier,
+                touchedDayKeys: &touchedDayKeys
+            )
+            eventMutations += deleteSignalIfExists(
+                identifier: originId,
+                existingSignalByIdentifier: &existingSignalByIdentifier,
+                touchedDayKeys: &touchedDayKeys
+            )
+            eventMutations += deleteSignalIfExists(
+                identifier: endId,
+                existingSignalByIdentifier: &existingSignalByIdentifier,
+                touchedDayKeys: &touchedDayKeys
+            )
+            seenIdentifiers.insert(id)
+            seenIdentifiers.insert(originId)
+            seenIdentifiers.insert(endId)
+
+            return eventMutations > 0
+        }
+
+        guard let eventStartDate = event.startDate else { return false }
+        let (parsedFrom, parsedTo) = parseFlightInfo(snapshot)
+        let primarySelection = selectPrimarySignalInput(
+            parsedFrom: parsedFrom,
+            parsedTo: parsedTo,
+            eventStartDate: eventStartDate,
+            eventEndDate: event.endDate,
+            structuredLocationTitle: event.structuredLocation?.title,
+            structuredCoordinate: event.structuredLocation?.geoLocation?.coordinate,
+            eventLocation: event.location
+        )
+
+        let startResolved = await resolveSignal(
+            locationString: primarySelection.locationString,
+            coordinate: primarySelection.coordinate,
+            date: primarySelection.date,
+            event: event,
+            activeResolver: activeResolver
+        )
+
+        let originResolved: ResolvedCalendarSignal?
+        if ingestability.shouldDecorateAsFlight,
+           primarySelection.usesDestinationRule,
+           let originLocation = nonEmptyLocation(parsedFrom) {
+            originResolved = await resolveSignal(
+                locationString: originLocation,
+                coordinate: nil,
+                date: eventStartDate,
+                event: event,
+                activeResolver: activeResolver
+            )
+        } else {
+            originResolved = nil
+        }
+
+        seenIdentifiers.insert(id)
+        if let startResolved {
+            if upsertSignal(
+                identifier: id,
+                resolved: startResolved,
+                title: event.title,
+                source: ingestability.shouldDecorateAsFlight ? Self.flightPrimarySignalSource : Self.primarySignalSource,
+                existingSignalByIdentifier: &existingSignalByIdentifier,
+                touchedDayKeys: &touchedDayKeys
+            ) {
+                eventMutations += 1
+            }
+        } else {
+            eventMutations += deleteSignalIfExists(
+                identifier: id,
+                existingSignalByIdentifier: &existingSignalByIdentifier,
+                touchedDayKeys: &touchedDayKeys
+            )
+        }
+
+        seenIdentifiers.insert(originId)
+        let shouldPersistOriginSignal = shouldPersistOriginSignal(
+            originResolved: originResolved
+        )
+        if shouldPersistOriginSignal, let originResolved {
+            if upsertSignal(
+                identifier: originId,
+                resolved: originResolved,
+                title: event.title,
+                source: Self.flightOriginSignalSource,
+                existingSignalByIdentifier: &existingSignalByIdentifier,
+                touchedDayKeys: &touchedDayKeys
+            ) {
+                eventMutations += 1
+            }
+        } else {
+            eventMutations += deleteSignalIfExists(
+                identifier: originId,
+                existingSignalByIdentifier: &existingSignalByIdentifier,
+                touchedDayKeys: &touchedDayKeys
+            )
+        }
+
+        seenIdentifiers.insert(endId)
+        eventMutations += deleteSignalIfExists(
+            identifier: endId,
+            existingSignalByIdentifier: &existingSignalByIdentifier,
+            touchedDayKeys: &touchedDayKeys
+        )
+
+        return eventMutations > 0
+    }
+
+    private func ingestStartDate(for mode: IngestMode, now: Date) -> Date {
+        let calendar = Calendar.current
+        switch mode {
+        case .manualFullScan, .selectionRebuild:
+            return calendar.date(byAdding: .year, value: -2, to: now) ?? now
+        case .auto:
+            return calendar.date(byAdding: .month, value: -1, to: now) ?? now
+        }
+    }
+
+    private func fetchSelectedCalendars(from store: EKEventStore) throws -> [EKCalendar] {
+        let availableCalendars = store.calendars(for: .event)
+        let storedSelection = calendarSelectionStore.load()
+        let availableReferences = availableCalendars.map(calendarReference(for:))
+        let selectionResolution = storedSelection.resolve(available: availableReferences)
+        if selectionResolution.migratedSelection != storedSelection {
+            try calendarSelectionStore.save(selectionResolution.migratedSelection, markingRebuild: false)
+        }
+        return availableCalendars.filter {
+            selectionResolution.selectedIdentifiers.contains($0.calendarIdentifier)
+        }
+    }
+
+    private func hasReadAccess() -> Bool {
+        let status = EKEventStore.authorizationStatus(for: .event)
+        if #available(iOS 17.0, *) {
+            return status == .fullAccess
+        } else {
+            return status == .authorized
+        }
     }
 
     private func deleteOrphanedSignals(
