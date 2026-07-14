@@ -350,10 +350,7 @@ public actor LedgerRecomputeService {
     private func upsertPresenceDays(_ results: [PresenceDayResult], originalKeys: [String]) throws {
         let keys = results.map { $0.dayKey }
         let existing = try dataFetcher.fetchPresenceDays(keys: keys)
-        var existingMap: [String: PresenceDay] = [:]
-        for item in existing {
-            existingMap[item.dayKey] = item
-        }
+        let existingMap = existing.reduce(into: [String: PresenceDay](minimumCapacity: existing.count)) { $0[$1.dayKey] = $1 }
 
         for result in results {
             if let existing = existingMap[result.dayKey] {
