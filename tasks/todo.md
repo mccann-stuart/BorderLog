@@ -4,3 +4,5 @@
 - [x] <!-- id: 3 --> Verify Changes using bash tools.
 - [x] <!-- id: 4 --> Run Tests (Swift toolchain not available, fallback to semantic equivalence verified in step 1).
 - [x] <!-- id: 5 --> Complete pre commit steps (tests bypassed, code reviewed, learnings recorded).
+<!-- id: 10 -->
+- [x] Unrolled `fetchEarliestAvailableMonth` intermediate array compactMap comparison to O(1) tracking logic to reduce allocation and ARC overhead.
