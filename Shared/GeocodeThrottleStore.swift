@@ -35,6 +35,10 @@ nonisolated final class GeocodeThrottleStore {
         }
     }
 
+    internal init(defaults: UserDefaults?) {
+        self.defaults = defaults
+    }
+
     nonisolated func loadState() -> GeocodeThrottleState {
         guard let defaults else { return GeocodeThrottleState() }
         guard let data = defaults.data(forKey: Self.stateKey) else { return GeocodeThrottleState() }
