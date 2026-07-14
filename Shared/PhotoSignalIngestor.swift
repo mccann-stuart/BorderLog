@@ -463,7 +463,8 @@ actor PhotoSignalIngestor {
     }
 
     private func fetchOrCreateState() -> PhotoIngestState {
-        let descriptor = FetchDescriptor<PhotoIngestState>()
+        var descriptor = FetchDescriptor<PhotoIngestState>()
+        descriptor.fetchLimit = 1
         if let existing = try? modelContext.fetch(descriptor).first {
             return existing
         }
