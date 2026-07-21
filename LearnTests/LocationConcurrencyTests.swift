@@ -13,6 +13,74 @@ import SwiftData
 @MainActor
 final class LocationConcurrencyTests: XCTestCase {
 
+    func testSingleCaptureLocationSuccess() async throws {
+        var requestCount = 0
+        let coordinator = LocationCaptureCoordinator(
+            requestSingleLocation: { requestCount += 1 }
+        )
+
+        let single = Task { await coordinator.captureLocation() }
+
+        await waitUntil { coordinator.pendingWaiterCount == 1 }
+
+        XCTAssertEqual(requestCount, 1)
+
+        let location = makeLocation(latitude: 48.8566, accuracy: 12)
+        coordinator.receive(locations: [location])
+
+        let result = await single.value
+
+        XCTAssertEqual(result?.coordinate.latitude, location.coordinate.latitude)
+        XCTAssertEqual(coordinator.pendingWaiterCount, 0)
+    }
+
+    func testConcurrentSingleCaptureRequestsShareOneRequest() async throws {
+        var requestCount = 0
+        let coordinator = LocationCaptureCoordinator(
+            requestSingleLocation: { requestCount += 1 }
+        )
+
+        let first = Task { await coordinator.captureLocation() }
+        let second = Task { await coordinator.captureLocation() }
+        let third = Task { await coordinator.captureLocation() }
+
+        await waitUntil { coordinator.pendingWaiterCount == 3 }
+
+        XCTAssertEqual(requestCount, 1)
+
+        let location = makeLocation(latitude: 52.5200, accuracy: 10)
+        coordinator.receive(locations: [location])
+
+        let firstResult = await first.value
+        let secondResult = await second.value
+        let thirdResult = await third.value
+
+        XCTAssertEqual(firstResult?.coordinate.latitude, location.coordinate.latitude)
+        XCTAssertEqual(secondResult?.coordinate.latitude, location.coordinate.latitude)
+        XCTAssertEqual(thirdResult?.coordinate.latitude, location.coordinate.latitude)
+        XCTAssertEqual(coordinator.pendingWaiterCount, 0)
+    }
+
+    func testSingleCaptureLocationFailure() async throws {
+        var requestCount = 0
+        let coordinator = LocationCaptureCoordinator(
+            requestSingleLocation: { requestCount += 1 }
+        )
+
+        let single = Task { await coordinator.captureLocation() }
+
+        await waitUntil { coordinator.pendingWaiterCount == 1 }
+
+        XCTAssertEqual(requestCount, 1)
+
+        coordinator.fail()
+
+        let result = await single.value
+
+        XCTAssertNil(result)
+        XCTAssertEqual(coordinator.pendingWaiterCount, 0)
+    }
+
     func testConcurrentBurstWaitersCompleteFromOneBatch() async throws {
         let coordinator = LocationCaptureCoordinator()
         let first = Task { await coordinator.captureLocations(maxSamples: 2, maxDuration: 30, maxSampleAge: 120) }
