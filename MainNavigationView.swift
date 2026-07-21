@@ -96,7 +96,7 @@ struct MainNavigationView: View {
     
 
     @MainActor
-    private func performCaptureTodayLocationIfNeeded() async {
+    internal func performCaptureTodayLocationIfNeeded(customContext: ModelContext? = nil) async {
         guard hasCompletedOnboarding else { return }
         guard !didAttemptLaunchLocationCapture else { return }
         didAttemptLaunchLocationCapture = true
@@ -105,13 +105,15 @@ struct MainNavigationView: View {
         let startOfDay = calendar.startOfDay(for: Date())
         guard let endOfDay = calendar.date(byAdding: .day, value: 1, to: startOfDay) else { return }
 
+        let contextToUse = customContext ?? modelContext
+
         do {
             let predicate = #Predicate<LocationSample> { sample in
                 sample.timestamp >= startOfDay && sample.timestamp < endOfDay
             }
             var fetch = FetchDescriptor<LocationSample>(predicate: predicate)
             fetch.fetchLimit = 1
-            let existing = try modelContext.fetch(fetch)
+            let existing = try contextToUse.fetch(fetch)
             if !existing.isEmpty {
                 return
             }
@@ -122,7 +124,7 @@ struct MainNavigationView: View {
         do {
             _ = try await locationService.captureAndStoreBurst(
                 source: .app,
-                modelContext: modelContext
+                modelContext: contextToUse
             )
         } catch {
             // Keep launch flow resilient if location persistence fails.
