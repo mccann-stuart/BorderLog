@@ -16,7 +16,11 @@ struct MainNavigationView: View {
     @State private var selectedTab = 0
 
     @AppStorage("didBootstrapInference") private var didBootstrapInference = false
-    @State private var locationService = LocationSampleService()
+    @State var locationService: LocationSampleService
+
+    internal init(locationService: LocationSampleService = LocationSampleService()) {
+        self._locationService = State(initialValue: locationService)
+    }
     @State private var didAttemptLaunchLocationCapture = false
     @State private var isBootstrappingInference = false
     @State private var isBootstrappingPhotoScan = false
@@ -76,7 +80,7 @@ struct MainNavigationView: View {
         }
         .task(id: hasCompletedOnboarding) {
             await LedgerRefreshCoordinator.shared.run {
-                await performCaptureTodayLocationIfNeeded()
+                await performCaptureTodayLocationIfNeeded(context: modelContext)
             }
         }
         .task(id: hasCompletedOnboarding) {
@@ -96,7 +100,7 @@ struct MainNavigationView: View {
     
 
     @MainActor
-    private func performCaptureTodayLocationIfNeeded() async {
+    internal func performCaptureTodayLocationIfNeeded(context: ModelContext) async {
         guard hasCompletedOnboarding else { return }
         guard !didAttemptLaunchLocationCapture else { return }
         didAttemptLaunchLocationCapture = true
@@ -111,7 +115,7 @@ struct MainNavigationView: View {
             }
             var fetch = FetchDescriptor<LocationSample>(predicate: predicate)
             fetch.fetchLimit = 1
-            let existing = try modelContext.fetch(fetch)
+            let existing = try context.fetch(fetch)
             if !existing.isEmpty {
                 return
             }
@@ -122,7 +126,7 @@ struct MainNavigationView: View {
         do {
             _ = try await locationService.captureAndStoreBurst(
                 source: .app,
-                modelContext: modelContext
+                modelContext: context
             )
         } catch {
             // Keep launch flow resilient if location persistence fails.
