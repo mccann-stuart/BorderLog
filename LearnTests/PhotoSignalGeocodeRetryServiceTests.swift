@@ -111,4 +111,33 @@ final class PhotoSignalGeocodeRetryServiceTests: XCTestCase {
         XCTAssertNil(unresolved.countryName)
         XCTAssertEqual(unresolved.dayKey, "2026-03-01")
     }
+
+    func testRetryFailureRecordsDiagnosticsAndThrows() async throws {
+        let suiteName = "PhotoSignalGeocodeRetryServiceTests.Failure.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let recoveryStore = LedgerRecomputeRecoveryStore(defaults: defaults)
+        let diagnosticsStore = DiagnosticsStore(defaults: defaults, storageKey: "retry-diagnostics")
+
+        let configuration = ModelConfiguration(isStoredInMemoryOnly: true)
+        let container = try ModelContainer(for: LocationSample.self, configurations: configuration)
+
+        let service = PhotoSignalGeocodeRetryService(
+            modelContainer: container,
+            resolver: RetryStubCountryResolver(),
+            recoveryStore: recoveryStore,
+            diagnosticsStore: diagnosticsStore
+        )
+
+        do {
+            _ = try await service.retryUnresolved()
+            XCTFail("Expected retryUnresolved() to throw due to schema mismatch")
+        } catch {
+            // Expected path
+        }
+
+        let diagnostics = await diagnosticsStore.snapshot()
+        XCTAssertEqual(diagnostics.photoGeocodeRetries.runsFailed, 1)
+        XCTAssertEqual(diagnostics.photoGeocodeRetries.errors, 1)
+    }
 }
