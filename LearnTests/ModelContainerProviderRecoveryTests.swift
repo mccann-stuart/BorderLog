@@ -87,6 +87,47 @@ final class ModelContainerProviderRecoveryTests: XCTestCase {
         }
     }
 
+    func testMakeContainerLocalStoreFailureRecoveryFallbackToMemory() throws {
+        let fm = FileManager.default
+        let root = fm.temporaryDirectory.appendingPathComponent("LocalFailureTests-\(UUID().uuidString)")
+        let appSupport = root.appendingPathComponent("Library/Application Support")
+        try fm.createDirectory(at: appSupport, withIntermediateDirectories: true)
+        defer { try? fm.removeItem(at: root) }
+
+        // We corrupt the store
+        let storeNames = ["BorderLog.store"]
+        for storeName in storeNames {
+            let storeURL = appSupport.appendingPathComponent(storeName)
+            try Data("corrupted data".utf8).write(to: storeURL)
+        }
+
+        var attempts = 0
+        let containerBuilder: (Schema, ModelConfiguration) throws -> ModelContainer = { schema, config in
+            attempts += 1
+            if attempts == 1 {
+                // Initial open fails with corruption
+                throw StubError(description: "database disk image is malformed")
+            }
+            if attempts == 2 {
+                // Recovery open fails with a different error
+                throw StubError(description: "i/o error")
+            }
+            // Memory fallback shouldn't be called through the builder, it directly calls makeInMemoryContainer
+            throw StubError(description: "unexpected call")
+        }
+
+        let container = ModelContainerProvider.makeContainer(
+            isAppGroupAvailable: false,
+            appGroupId: nil,
+            appGroupContainerURL: nil,
+            appSupportDirectory: appSupport,
+            containerBuilder: containerBuilder
+        )
+
+        XCTAssertNotNil(container, "Expected final fallback to in-memory store to succeed and return a container")
+        XCTAssertEqual(attempts, 2, "Expected exactly 2 initialization attempts via builder (1st fails open, 2nd fails recovery)")
+    }
+
     private struct StubError: Error, CustomStringConvertible {
         let description: String
     }
