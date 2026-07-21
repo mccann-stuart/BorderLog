@@ -15,7 +15,7 @@ const HTML_CONTENT_SECURITY_POLICY = [
   "media-src 'none'",
   "object-src 'none'",
   "script-src 'none'",
-  "style-src 'unsafe-inline'",
+  "style-src 'sha256-yDaLZ1//UNB/Fa8RYQ+SRaSNZ0izp15WVhJm+0zlBx0='",
   "worker-src 'none'"
 ].join("; ");
 const SUPPORT_URL = "https://github.com/mccann-stuart/BorderLog/issues";
