@@ -894,5 +894,174 @@ final class InferenceEngineTests: XCTestCase {
             XCTAssertFalse(result?.evidence.contains(where: { $0.source == "CalendarTransitionInfill" }) == true)
         }
     }
+
+    func testStayProcessorBasicCoverage() {
+        let calendar = self.calendar
+        let start = day(2026, 4, 1)
+        let end = day(2026, 4, 5)
+        let startKey = DayKey.make(from: start, timeZone: calendar.timeZone)
+        let endKey = DayKey.make(from: end, timeZone: calendar.timeZone)
+
+        let dayKeys = Set((1...5).map { day in
+            DayKey.make(from: self.day(2026, 4, day), timeZone: calendar.timeZone)
+        })
+
+        let stay = StayPresenceInfo(
+            entryDayKey: startKey,
+            exitDayKey: endKey,
+            dayTimeZoneId: calendar.timeZone.identifier,
+            countryCode: "US",
+            countryName: "United States"
+        )
+
+        let results = PresenceInferenceEngine.compute(
+            dayKeys: dayKeys,
+            stays: [stay],
+            overrides: [],
+            locations: [],
+            photos: [],
+            calendarSignals: [],
+            rangeEnd: end,
+            calendar: calendar
+        )
+
+        XCTAssertEqual(results.count, 5)
+        for result in results {
+            XCTAssertEqual(result.contributedCountries.first?.countryCode, "US")
+            XCTAssertTrue(result.sources.contains(.stay))
+            XCTAssertEqual(result.stayCount, 1)
+            XCTAssertTrue(result.evidence.contains(where: { $0.source == "stay-coverage" }))
+        }
+    }
+
+    func testStayProcessorClampsToRangeEnd() {
+        let calendar = self.calendar
+        let start = day(2026, 4, 1)
+        let end = day(2026, 4, 10)
+        let rangeEnd = day(2026, 4, 5)
+
+        let startKey = DayKey.make(from: start, timeZone: calendar.timeZone)
+        let endKey = DayKey.make(from: end, timeZone: calendar.timeZone)
+
+        let dayKeys = Set((1...10).map { day in
+            DayKey.make(from: self.day(2026, 4, day), timeZone: calendar.timeZone)
+        })
+
+        let stay = StayPresenceInfo(
+            entryDayKey: startKey,
+            exitDayKey: endKey,
+            dayTimeZoneId: calendar.timeZone.identifier,
+            countryCode: "FR",
+            countryName: "France"
+        )
+
+        let results = PresenceInferenceEngine.compute(
+            dayKeys: dayKeys,
+            stays: [stay],
+            overrides: [],
+            locations: [],
+            photos: [],
+            calendarSignals: [],
+            rangeEnd: rangeEnd,
+            calendar: calendar
+        )
+
+        let upToRangeEnd = results.filter {
+            guard let date = DayKey.date(for: $0.dayKey, timeZone: calendar.timeZone) else { return false }
+            return date <= rangeEnd
+        }
+
+        let pastRangeEnd = results.filter {
+            guard let date = DayKey.date(for: $0.dayKey, timeZone: calendar.timeZone) else { return false }
+            return date > rangeEnd
+        }
+
+        XCTAssertEqual(upToRangeEnd.count, 5)
+        for result in upToRangeEnd {
+            XCTAssertEqual(result.contributedCountries.first?.countryCode, "FR")
+            XCTAssertTrue(result.sources.contains(.stay))
+        }
+
+        XCTAssertEqual(pastRangeEnd.count, 5)
+        for result in pastRangeEnd {
+            XCTAssertTrue(result.contributedCountries.isEmpty)
+            XCTAssertFalse(result.sources.contains(.stay))
+        }
+    }
+
+    func testStayProcessorSkipsDaysOutsideContextKeys() {
+        let calendar = self.calendar
+        let start = day(2026, 4, 1)
+        let end = day(2026, 4, 5)
+
+        let startKey = DayKey.make(from: start, timeZone: calendar.timeZone)
+        let endKey = DayKey.make(from: end, timeZone: calendar.timeZone)
+
+        let dayKeys = Set([1, 5].map { day in
+            DayKey.make(from: self.day(2026, 4, day), timeZone: calendar.timeZone)
+        })
+
+        let stay = StayPresenceInfo(
+            entryDayKey: startKey,
+            exitDayKey: endKey,
+            dayTimeZoneId: calendar.timeZone.identifier,
+            countryCode: "ES",
+            countryName: "Spain"
+        )
+
+        let results = PresenceInferenceEngine.compute(
+            dayKeys: dayKeys,
+            stays: [stay],
+            overrides: [],
+            locations: [],
+            photos: [],
+            calendarSignals: [],
+            rangeEnd: end,
+            calendar: calendar
+        )
+
+        XCTAssertEqual(results.count, 2)
+        for result in results {
+            XCTAssertEqual(result.contributedCountries.first?.countryCode, "ES")
+            XCTAssertTrue(result.sources.contains(.stay))
+        }
+    }
+
+    func testStayProcessorInvalidCountry() {
+        let calendar = self.calendar
+        let start = day(2026, 4, 1)
+        let end = day(2026, 4, 5)
+
+        let startKey = DayKey.make(from: start, timeZone: calendar.timeZone)
+        let endKey = DayKey.make(from: end, timeZone: calendar.timeZone)
+
+        let dayKeys = Set((1...5).map { day in
+            DayKey.make(from: self.day(2026, 4, day), timeZone: calendar.timeZone)
+        })
+
+        let stay = StayPresenceInfo(
+            entryDayKey: startKey,
+            exitDayKey: endKey,
+            dayTimeZoneId: calendar.timeZone.identifier,
+            countryCode: nil, // invalid country
+            countryName: ""
+        )
+
+        let results = PresenceInferenceEngine.compute(
+            dayKeys: dayKeys,
+            stays: [stay],
+            overrides: [],
+            locations: [],
+            photos: [],
+            calendarSignals: [],
+            rangeEnd: end,
+            calendar: calendar
+        )
+
+        for result in results {
+            XCTAssertTrue(result.contributedCountries.isEmpty)
+            XCTAssertFalse(result.sources.contains(.stay))
+        }
+    }
 }
 #endif
