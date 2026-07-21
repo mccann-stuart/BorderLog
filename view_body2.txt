@@ -1,0 +1,121 @@
+   300	                Section {
+   301	                    Picker("Map Display", selection: $usePolygonMapView) {
+   302	                        Text("Dots").tag(false)
+   303	                        Text("Coloured Countries").tag(true)
+   304	                    }
+   305	                    .pickerStyle(.segmented)
+   306	                } header: {
+   307	                    Text("Map Display")
+   308	                } footer: {
+   309	                    Text("Choose how visited countries are displayed on the map.")
+   310	                }
+   311
+   312	                // MARK: – Configuration
+   313	                Section {
+   314	                    Picker("Day Counting", selection: $countryDayCountingModeRaw) {
+   315	                        ForEach(CountryDayCountingMode.allCases) { mode in
+   316	                            Text(mode.label).tag(mode.rawValue)
+   317	                        }
+   318	                    }
+   319
+   320	                    Toggle(isOn: $showSchengenDashboardSection) {
+   321	                        Label("Schengen Zone", systemImage: "map")
+   322	                    }
+   323	                } header: {
+   324	                    Text("Configuration")
+   325	                } footer: {
+   326	                    Text("Double Count Days counts every resolved country for travel days where immigration-style rules count both entry and exit dates. Schengen country list is built-in and updates automatically.")
+   327	                }
+   328	            }
+   329	            .scrollContentBackground(.hidden)
+   330	            .background {
+   331	                ZStack {
+   332	                    Color(UIColor.systemGroupedBackground)
+   333	                    LinearGradient(
+   334	                        colors: [.blue.opacity(0.05), .purple.opacity(0.05)],
+   335	                        startPoint: .topLeading,
+   336	                        endPoint: .bottomTrailing
+   337	                    )
+   338	                }
+   339	                .ignoresSafeArea()
+   340	            }
+   341	            .navigationTitle("Settings")
+   342	            .navigationBarTitleDisplayMode(.large)
+   343	            .confirmationDialog("Delete all local data?", isPresented: $isConfirmingReset) {
+   344	                Button("Delete All", role: .destructive) { resetAllData() }
+   345	            } message: {
+   346	                Text("This will remove local travel data, profile values, and pending widget samples from this device. This cannot be undone.")
+   347	            }
+   348	            .confirmationDialog("Delete iCloud data?", isPresented: $isConfirmingCloudKitDelete) {
+   349	                Button("Delete iCloud Data", role: .destructive) { deleteCloudKitData() }
+   350	            } message: {
+   351	                Text("This removes BorderLog data stored in iCloud. Local data stays on this device.")
+   352	            }
+   353	            .alert("Sample data unavailable", isPresented: $isShowingSeedAlert) {
+   354	                Button("OK", role: .cancel) {}
+   355	            } message: {
+   356	                Text("Reset all data before seeding the sample dataset.")
+   357	            }
+   358	            .alert("Unable to delete iCloud data", isPresented: cloudKitDeleteErrorPresented) {
+   359	                Button("OK", role: .cancel) {}
+   360	            } message: {
+   361	                Text(cloudKitDeleteError ?? "Unknown error.")
+   362	            }
+   363	            .alert("Ingestion failed", isPresented: ingestionErrorPresented) {
+   364	                Button("OK", role: .cancel) {}
+   365	            } message: {
+   366	                Text(ingestionError ?? "Unknown error.")
+   367	            }
+   368	#if DEBUG
+   369	            .alert("Unable to export debug data", isPresented: debugExportErrorPresented) {
+   370	                Button("OK", role: .cancel) {}
+   371	            } message: {
+   372	                Text(debugExportError ?? "Unknown error.")
+   373	            }
+   374	            .fileExporter(
+   375	                isPresented: $isPresentingDebugExport,
+   376	                document: debugExportDocument,
+   377	                contentTypes: DebugDataStoreExportDocument.readableContentTypes,
+   378	                defaultFilename: debugExportDefaultFilename,
+   379	                onCompletion: handleDebugExportResult
+   380	            )
+   381	#endif
+   382	            .onAppear {
+   383	                refreshPermissions()
+   384	                refreshWidgetLastWriteDate()
+   385	            }
+   386	    }
+   387
+   388	    // MARK: – CloudKit Section
+   389
+   390	    @ViewBuilder
+   391	    private var cloudKitSection: some View {
+   392	        if AppConfig.isCloudKitFeatureEnabled {
+   393	            // MARK: – iCloud Sync
+   394	            Section {
+   395	                Toggle(isOn: $cloudKitSyncEnabled) {
+   396	                    Label("iCloud Sync", systemImage: "icloud")
+   397	                }
+   398
+   399	                Button(role: .destructive) {
+   400	                    isConfirmingCloudKitDelete = true
+   401	                } label: {
+   402	                    HStack {
+   403	                        Label(
+   404	                            isDeletingCloudKitData ? "Deleting…" : "Delete iCloud Data",
+   405	                            systemImage: isDeletingCloudKitData ? "arrow.triangle.2.circlepath" : "trash"
+   406	                        )
+   407	                        if isDeletingCloudKitData {
+   408	                            Spacer()
+   409	                            ProgressView()
+   410	                        }
+   411	                    }
+   412	                }
+   413	                .disabled(isDeletingCloudKitData)
+   414	            } header: {
+   415	                Text("iCloud Sync")
+   416	            } footer: {
+   417	                Text("Sync uses your iCloud private database. Changes take effect after restarting the app.")
+   418	            }
+   419	        }
+   420	    }
