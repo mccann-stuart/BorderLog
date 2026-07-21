@@ -18,8 +18,9 @@ struct MainNavigationView: View {
     @AppStorage("didBootstrapInference") private var didBootstrapInference = false
     @State var locationService: LocationSampleService
 
-    internal init(locationService: LocationSampleService = LocationSampleService()) {
-        self._locationService = State(initialValue: locationService)
+    @MainActor
+    internal init(locationService: LocationSampleService? = nil) {
+        self._locationService = State(initialValue: locationService ?? LocationSampleService())
     }
     @State private var didAttemptLaunchLocationCapture = false
     @State private var isBootstrappingInference = false
