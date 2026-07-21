@@ -532,6 +532,26 @@ final class DebugDataStoreExportServiceTests: XCTestCase {
         XCTAssertEqual(presenceSummary["suggestedCountryCode2"] as? String, "BE")
         XCTAssertEqual(presenceSummary["confidenceLabelRaw"] as? String, "high")
     }
+
+    func testDebugExportUserDataEncoding() throws {
+        let userData = DebugExportUserData(
+            passportNationality: "US",
+            homeCountry: "UK",
+            appleUserId: "user123",
+            appleSignInEnabled: true
+        )
+
+        let encoder = JSONEncoder()
+        let data = try encoder.encode(userData)
+
+        let decodedDict = try JSONSerialization.jsonObject(with: data) as? [String: Any]
+        let json = try XCTUnwrap(decodedDict)
+
+        XCTAssertEqual(json["passportNationality"] as? String, "US")
+        XCTAssertEqual(json["homeCountry"] as? String, "UK")
+        XCTAssertEqual(json["appleUserId"] as? String, "user123")
+        XCTAssertEqual(json["appleSignInEnabled"] as? Bool, true)
+    }
 }
 
 #endif
