@@ -915,6 +915,7 @@ final class CalendarTabDataServiceTests: XCTestCase {
 
         let visibleMonthStart = makeDate(2026, 3, 1)
         let now = makeDate(2026, 3, 19)
+        let expectedMonthStart = Calendar.current.startOfDay(for: visibleMonthStart)
 
         let snapshot = try await service.snapshot(
             visibleMonthStart: visibleMonthStart,
@@ -922,7 +923,7 @@ final class CalendarTabDataServiceTests: XCTestCase {
             now: now
         )
 
-        XCTAssertEqual(snapshot.visibleMonthStart, visibleMonthStart)
+        XCTAssertEqual(snapshot.visibleMonthStart, expectedMonthStart)
         XCTAssertEqual(snapshot.daySummaries.count, 31) // March has 31 days
         XCTAssertTrue(snapshot.countrySummaries.isEmpty)
         XCTAssertTrue(snapshot.summaryUnknownDayKeys.isEmpty)
@@ -945,6 +946,7 @@ final class CalendarTabDataServiceTests: XCTestCase {
 
         var calendar = Calendar.current
         calendar.timeZone = TimeZone(secondsFromGMT: 0) ?? .current
+        let expectedMonthStart = calendar.startOfDay(for: visibleMonthStart)
 
         let snapshot = CalendarTabSnapshot.placeholder(
             visibleMonthStart: visibleMonthStart,
@@ -953,8 +955,8 @@ final class CalendarTabDataServiceTests: XCTestCase {
             now: now
         )
 
-        XCTAssertEqual(snapshot.visibleMonthStart, visibleMonthStart)
-        XCTAssertEqual(snapshot.earliestAvailableMonth, visibleMonthStart)
+        XCTAssertEqual(snapshot.visibleMonthStart, expectedMonthStart)
+        XCTAssertEqual(snapshot.earliestAvailableMonth, expectedMonthStart)
         XCTAssertEqual(snapshot.latestAvailableMonth, latestMonth)
         XCTAssertEqual(snapshot.daySummaries.count, 31) // March has 31 days
         XCTAssertTrue(snapshot.countrySummaries.isEmpty)
