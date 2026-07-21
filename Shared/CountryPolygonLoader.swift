@@ -172,7 +172,10 @@ extension Data {
 
         let decodedSize = try self.withUnsafeBytes { ptr -> Int in
             var stream = z_stream()
-            stream.next_in = UnsafeMutablePointer(mutating: ptr.bindMemory(to: UInt8.self).baseAddress!)
+            guard let baseAddress = ptr.bindMemory(to: UInt8.self).baseAddress else {
+                throw NSError(domain: "Zlib", code: -1)
+            }
+            stream.next_in = UnsafeMutablePointer(mutating: baseAddress)
             stream.avail_in = UInt32(self.count)
             stream.next_out = buffer
             stream.avail_out = UInt32(size)
