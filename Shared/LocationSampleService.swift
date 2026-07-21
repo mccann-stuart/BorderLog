@@ -133,8 +133,6 @@ final class LocationCaptureCoordinator {
         let batchWaiters = batchContinuations
         batchLocations = []
         batchContinuations = []
-        batchTargetCount = 0
-        batchMaxSampleAge = 0
 
         for continuation in batchWaiters {
             continuation.resume(returning: locations)
