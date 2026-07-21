@@ -308,6 +308,30 @@ final class LedgerRecomputeServiceTests: XCTestCase {
         XCTAssertEqual(inserted?.isDisputed, true)
     }
 
+
+    func testRecomputeThrowsNoValidDayKeysErrorForInvalidKeys() async throws {
+        let mock = MockLedgerDataFetcher()
+        await service.setMock(mock)
+
+        let invalidKeys = ["invalid-key-1", "invalid-key-2"]
+        var caughtError: Error?
+
+        do {
+            try await service.recompute(dayKeys: invalidKeys)
+            XCTFail("Expected recompute to throw LedgerRecomputeError.noValidDayKeys")
+        } catch {
+            caughtError = error
+        }
+
+        XCTAssertNotNil(caughtError)
+        if let recomputeError = caughtError as? LedgerRecomputeError,
+           case .noValidDayKeys(let keys) = recomputeError {
+            XCTAssertEqual(Set(keys), Set(invalidKeys))
+        } else {
+            XCTFail("Expected LedgerRecomputeError.noValidDayKeys, got \(String(describing: caughtError))")
+        }
+    }
+
     private func makeDayKeys(from start: Date, to end: Date, calendar: Calendar) -> [String] {
         let timeZone = calendar.timeZone
         let startDay = calendar.startOfDay(for: start)

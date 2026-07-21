@@ -557,7 +557,8 @@ actor CalendarTabDataService {
                 guard !countedCountries.isEmpty else {
                     continue
                 }
-                for country in countedCountries.map({ Self.calendarCountry(from: $0) }) {
+                for countedCountry in countedCountries {
+                    let country = Self.calendarCountry(from: countedCountry)
                     let current = counts[country.id] ?? (country, 0)
                     counts[country.id] = (country: current.country, totalDays: current.totalDays + 1)
                 }

@@ -16,7 +16,12 @@ struct MainNavigationView: View {
     @State private var selectedTab = 0
 
     @AppStorage("didBootstrapInference") private var didBootstrapInference = false
-    @State private var locationService = LocationSampleService()
+    @State var locationService: LocationSampleService
+
+    @MainActor
+    internal init(locationService: LocationSampleService? = nil) {
+        self._locationService = State(initialValue: locationService ?? LocationSampleService())
+    }
     @State private var didAttemptLaunchLocationCapture = false
     @State private var isBootstrappingInference = false
     @State private var isBootstrappingPhotoScan = false
@@ -76,7 +81,7 @@ struct MainNavigationView: View {
         }
         .task(id: hasCompletedOnboarding) {
             await LedgerRefreshCoordinator.shared.run {
-                await performCaptureTodayLocationIfNeeded()
+                await performCaptureTodayLocationIfNeeded(context: modelContext)
             }
         }
         .task(id: hasCompletedOnboarding) {
@@ -96,7 +101,7 @@ struct MainNavigationView: View {
     
 
     @MainActor
-    internal func performCaptureTodayLocationIfNeeded(customContext: ModelContext? = nil) async {
+    internal func performCaptureTodayLocationIfNeeded(context: ModelContext) async {
         guard hasCompletedOnboarding else { return }
         guard !didAttemptLaunchLocationCapture else { return }
         didAttemptLaunchLocationCapture = true
@@ -105,15 +110,13 @@ struct MainNavigationView: View {
         let startOfDay = calendar.startOfDay(for: Date())
         guard let endOfDay = calendar.date(byAdding: .day, value: 1, to: startOfDay) else { return }
 
-        let contextToUse = customContext ?? modelContext
-
         do {
             let predicate = #Predicate<LocationSample> { sample in
                 sample.timestamp >= startOfDay && sample.timestamp < endOfDay
             }
             var fetch = FetchDescriptor<LocationSample>(predicate: predicate)
             fetch.fetchLimit = 1
-            let existing = try contextToUse.fetch(fetch)
+            let existing = try context.fetch(fetch)
             if !existing.isEmpty {
                 return
             }
@@ -124,7 +127,7 @@ struct MainNavigationView: View {
         do {
             _ = try await locationService.captureAndStoreBurst(
                 source: .app,
-                modelContext: contextToUse
+                modelContext: context
             )
         } catch {
             // Keep launch flow resilient if location persistence fails.
