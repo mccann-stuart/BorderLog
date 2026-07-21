@@ -173,7 +173,11 @@ extension Data {
         let decodedSize = try self.withUnsafeBytes { ptr -> Int in
             var stream = z_stream()
             guard let baseAddress = ptr.bindMemory(to: UInt8.self).baseAddress else {
-                throw NSError(domain: "Zlib", code: -3, userInfo: [NSLocalizedDescriptionKey: "Empty data buffer"])
+                throw NSError(
+                    domain: "Zlib",
+                    code: Int(Z_DATA_ERROR),
+                    userInfo: [NSLocalizedDescriptionKey: "Cannot decompress an empty data buffer"]
+                )
             }
             stream.next_in = UnsafeMutablePointer(mutating: baseAddress)
             stream.avail_in = UInt32(self.count)
