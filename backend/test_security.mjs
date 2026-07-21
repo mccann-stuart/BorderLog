@@ -1,5 +1,6 @@
 import worker from './src/index.js';
 import assert from 'node:assert';
+import { createHash } from 'node:crypto';
 
 const API_CONTENT_SECURITY_POLICY = "default-src 'none'; frame-ancestors 'none'; sandbox";
 const HTML_CONTENT_SECURITY_POLICY = [
@@ -60,6 +61,18 @@ function assertNoExecutableOrExternalAssets(html) {
   assert.ok(!/\s(?:src|srcset)\s*=/i.test(html), "Policy pages must not reference external assets");
 }
 
+function assertInlineStyleMatchesCsp(html, res) {
+  const match = html.match(/<style>([\s\S]*?)<\/style>/);
+  assert.ok(match, "Policy pages must include the expected inline style block");
+
+  const hash = createHash("sha256").update(match[1]).digest("base64");
+  assert.match(
+    res.headers.get("Content-Security-Policy") ?? "",
+    new RegExp(`(?:^|; )style-src 'sha256-${hash.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}'(?:;|$)`),
+    "The CSP style hash must match the rendered inline styles"
+  );
+}
+
 // Helper to run test
 async function runTest(name, fn) {
   try {
@@ -103,6 +116,7 @@ async function runTest(name, fn) {
       assert.match(html, new RegExp(`href="${SUPPORT_URL.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}"`));
       assert.match(html, new RegExp(`href="mailto:${SUPPORT_EMAIL}"`));
       assertNoExecutableOrExternalAssets(html);
+      assertInlineStyleMatchesCsp(html, res);
     });
 
     await runTest(`HEAD ${route} returns HTML headers and no body`, async () => {
