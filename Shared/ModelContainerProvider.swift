@@ -362,7 +362,7 @@ enum ModelContainerProvider {
     internal static var storeEpochKeyForTests: String { storeEpochDefaultsKey }
     internal static var currentStoreEpochForTests: Int { currentStoreEpoch }
 
-    static func makeContainer() -> ModelContainer {
+    static func makeContainer() throws -> ModelContainer {
         _ = enforceStoreEpoch()
         let schema = Schema(versionedSchema: BorderLogSchemaV7.self)
         let cloudKitDatabase: ModelConfiguration.CloudKitDatabase =
@@ -405,7 +405,7 @@ enum ModelContainerProvider {
         // an App Group entitlement, even without a groupContainer configuration).
         guard let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first else {
             logger.critical("Cannot locate Application Support directory — using in-memory store.")
-            return makeInMemoryContainer(schema: schema)
+            return try makeInMemoryContainer(schema: schema)
         }
 
         let storeURL = appSupport.appendingPathComponent("BorderLog.store")
@@ -429,7 +429,7 @@ enum ModelContainerProvider {
         }
 
         logger.critical("All persistent store options failed. Falling back to in-memory store.")
-        return makeInMemoryContainer(schema: schema)
+        return try makeInMemoryContainer(schema: schema)
     }
 
     @discardableResult
@@ -472,7 +472,7 @@ enum ModelContainerProvider {
         return true
     }
 
-    private static func makeInMemoryContainer(schema: Schema) -> ModelContainer {
+    private static func makeInMemoryContainer(schema: Schema) throws -> ModelContainer {
         let memConfig = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
         do {
             return try ModelContainer(for: schema, configurations: [memConfig])
@@ -482,7 +482,7 @@ enum ModelContainerProvider {
                 return try makeTemporaryFallbackContainer(schema: schema)
             } catch {
                 logger.critical("Unable to initialize any SwiftData container: \(error, privacy: .private)")
-                fatalError("App initialization failed due to a critical storage error. Please restart the application.")
+                throw error
             }
         }
     }

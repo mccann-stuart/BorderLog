@@ -66,7 +66,11 @@ struct BorderLogWidgetProvider: TimelineProvider {
 
     func getTimeline(in context: Context, completion: @escaping (Timeline<BorderLogWidgetEntry>) -> Void) {
         Task { @MainActor in
-            let container = ModelContainerProvider.makeContainer()
+            guard let container = try? ModelContainerProvider.makeContainer() else {
+                let entry = BorderLogWidgetEntry(date: Date(), country: "Storage Error", timestamp: nil)
+                completion(Timeline(entries: [entry], policy: .after(Date().addingTimeInterval(3600))))
+                return
+            }
             let modelContext = ModelContext(container)
 
             await captureWidgetLocationIfAuthorized(modelContext: modelContext)
@@ -160,7 +164,10 @@ struct TopCountriesWidgetProvider: TimelineProvider {
 
     func getTimeline(in context: Context, completion: @escaping (Timeline<TopCountriesEntry>) -> Void) {
         Task { @MainActor in
-            let container = ModelContainerProvider.makeContainer()
+            guard let container = try? ModelContainerProvider.makeContainer() else {
+                completion(Timeline(entries: [TopCountriesEntry(date: Date(), topCountries: [])], policy: .after(Date().addingTimeInterval(3600))))
+                return
+            }
             let modelContext = ModelContext(container)
 
             var descriptor = FetchDescriptor<PresenceDay>()
@@ -320,7 +327,18 @@ struct SchengenWidgetProvider: TimelineProvider {
 
     func getTimeline(in context: Context, completion: @escaping (Timeline<SchengenEntry>) -> Void) {
         Task { @MainActor in
-            let container = ModelContainerProvider.makeContainer()
+            guard let container = try? ModelContainerProvider.makeContainer() else {
+                let dummySummary = SchengenLedgerSummary(
+                    usedDays: 0,
+                    remainingDays: 0,
+                    overstayDays: 0,
+                    unknownDays: 0,
+                    windowStart: Date(),
+                    windowEnd: Date()
+                )
+                completion(Timeline(entries: [SchengenEntry(date: Date(), summary: dummySummary)], policy: .after(Date().addingTimeInterval(3600))))
+                return
+            }
             let modelContext = ModelContext(container)
 
             let now = Date()
