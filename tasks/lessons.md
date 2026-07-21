@@ -1,0 +1,3 @@
+## 2024-05-18 - Concurrent SwiftData Fetches Inside a ModelActor
+**Learning:** Sequential, independent database fetches inside a ModelActor run on a single thread and block the actor. Simply wrapping fetches in `TaskGroup` child tasks is unsafe because `ModelContext` is not `Sendable` and cannot cross task boundaries.
+**Action:** Extract the concurrent fetches into `withThrowingTaskGroup`. Pass the actor's `modelContainer` (which *is* `Sendable`) into each child task, create a new `ModelContext(container)` within the task, and map the fetched `@Model` objects into `Sendable` structs before returning them to the main task scope.

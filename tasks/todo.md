@@ -6,3 +6,11 @@
 - [x] <!-- id: 5 --> Complete pre commit steps (tests bypassed, code reviewed, learnings recorded).
 <!-- id: 10 -->
 - [x] Unrolled `fetchEarliestAvailableMonth` intermediate array compactMap comparison to O(1) tracking logic to reduce allocation and ARC overhead.
+<!-- id: 11 -->
+- [x] Defined `ExportResult` Enum to pass values between task group boundary.
+<!-- id: 12 -->
+- [x] Refactored `buildPayload` and `exportJSON` for concurrency.
+<!-- id: 13 -->
+- [x] Handled ModelActor thread-safety rules with new SwiftData contexts for tasks.
+<!-- id: 14 -->
+- [x] Verified code differences semantically since Swift toolchain is unavailable.
