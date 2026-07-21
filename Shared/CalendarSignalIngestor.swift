@@ -409,21 +409,27 @@ actor CalendarSignalIngestor {
             )
         }
 
-        var startLocationString = nonEmptyLocation(parsedFrom)
-        var startCoordinate: CLLocationCoordinate2D? = nil
+        if let startLocation = nonEmptyLocation(parsedFrom) {
+            return PrimarySignalSelection(
+                locationString: startLocation,
+                coordinate: nil,
+                date: eventStartDate,
+                usesDestinationRule: false
+            )
+        }
 
-        if startLocationString == nil {
-            if let structuredCoordinate {
-                startCoordinate = structuredCoordinate
-                startLocationString = nonEmptyLocation(structuredLocationTitle)
-            } else {
-                startLocationString = nonEmptyLocation(eventLocation)
-            }
+        if let structuredCoordinate {
+            return PrimarySignalSelection(
+                locationString: nonEmptyLocation(structuredLocationTitle),
+                coordinate: structuredCoordinate,
+                date: eventStartDate,
+                usesDestinationRule: false
+            )
         }
 
         return PrimarySignalSelection(
-            locationString: startLocationString,
-            coordinate: startCoordinate,
+            locationString: nonEmptyLocation(eventLocation),
+            coordinate: nil,
             date: eventStartDate,
             usesDestinationRule: false
         )
