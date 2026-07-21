@@ -1,0 +1,241 @@
+    60	        case temporary
+    61	    }
+    62
+    63	    var body: some View {
+    64	            Form {
+    65	                // MARK: – Profile / About
+    66	                SwiftUI.Section {
+    67	                    NavigationLink {
+    68	                        ProfileEditView()
+    69	                    } label: {
+    70	                        HStack(spacing: 14) {
+    71	                            ZStack {
+    72	                                Circle()
+    73	                                    .fill(Color.blue.opacity(0.15))
+    74	                                    .frame(width: 46, height: 46)
+    75	                                Image(systemName: "person.circle.fill")
+    76	                                    .font(.system(size: 28))
+    77	                                    .foregroundStyle(.blue)
+    78	                            }
+    79	                            VStack(alignment: .leading, spacing: 2) {
+    80	                                Text("Your Profile")
+    81	                                    .font(.headline)
+    82	                                Text("Passport nationality, home country")
+    83	                                    .font(.caption)
+    84	                                    .foregroundStyle(.secondary)
+    85	                            }
+    86	                        }
+    87	                        .padding(.vertical, 6)
+    88	                    }
+    89	                } header: {
+    90	                    Text("Profile")
+    91	                }
+    92
+    93	                // MARK: – Privacy
+    94	                Section {
+    95	                    VStack(alignment: .leading, spacing: 10) {
+    96	                        Label("Local-First Storage", systemImage: "lock.shield.fill")
+    97	                            .font(.headline)
+    98
+    99	                        Text("Your travel data is stored on this device. BorderLog does not run analytics, tracking, or app-owned user-data servers.")
+   100	                            .font(.callout)
+   101	                            .foregroundStyle(.secondary)
+   102	                            .fixedSize(horizontal: false, vertical: true)
+   103	                    }
+   104	                    .padding(.vertical, 4)
+   105
+   106	                    Toggle(isOn: $requireBiometrics) {
+   107	                        Label("Require Face ID / Touch ID", systemImage: "faceid")
+   108	                    }
+   109	                } header: {
+   110	                    Text("Privacy")
+   111	                }
+   112
+   113	                cloudKitSection
+   114
+   115	                // MARK: – Data Sources
+   116	                Section {
+   117	                    // Location
+   118	                    HStack {
+   119	                        Label("Location", systemImage: "location.fill")
+   120	                        Spacer()
+   121	                        Text(locationStatusText)
+   122	                            .foregroundStyle(locationStatusColor)
+   123	                            .font(.subheadline)
+   124	                    }
+   125
+   126	                    locationActionRow
+   127
+   128	                    HStack {
+   129	                        Label("Widget", systemImage: "square.grid.2x2")
+   130	                        Spacer()
+   131	                        if let widgetLastWriteDate {
+   132	                            Text(widgetLastWriteDate, style: .relative)
+   133	                                .foregroundStyle(.secondary)
+   134	                                .font(.subheadline)
+   135	                        } else {
+   136	                            Text("No recent write")
+   137	                                .foregroundStyle(.secondary)
+   138	                                .font(.subheadline)
+   139	                        }
+   140	                    }
+   141
+   142	                    // Photos
+   143	                    HStack {
+   144	                        Label("Photos", systemImage: "photo.fill")
+   145	                        Spacer()
+   146	                        Text(photoStatusText)
+   147	                            .foregroundStyle(photoStatusColor)
+   148	                            .font(.subheadline)
+   149	                    }
+   150
+   151	                    photoActionRow
+   152
+   153	                    if photoStatus == .authorized || photoStatus == .limited {
+   154	                        Button {
+   155	                            rescanPhotos()
+   156	                        } label: {
+   157	                            HStack {
+   158	                                Label(
+   159	                                    isIngestingPhotos ? "Scanning…" : "Scan Last 2 Years",
+   160	                                    systemImage: isIngestingPhotos ? "arrow.triangle.2.circlepath" : "arrow.clockwise"
+   161	                                )
+   162	                                if isIngestingPhotos {
+   163	                                    Spacer()
+   164	                                    ProgressView()
+   165	                                }
+   166	                            }
+   167	                        }
+   168	                        .disabled(isIngestingPhotos)
+   169	                    }
+   170
+   171	                    // Calendar
+   172	                    HStack {
+   173	                        Label("Calendar", systemImage: "calendar")
+   174	                        Spacer()
+   175	                        Text(calendarStatusText)
+   176	                            .foregroundStyle(calendarStatusColor)
+   177	                            .font(.subheadline)
+   178	                    }
+   179
+   180	                    calendarActionRow
+   181
+   182	                    if calendarHasReadAccess {
+   183	                        NavigationLink {
+   184	                            CalendarSourcesSettingsView(selection: $calendarSelection)
+   185	                        } label: {
+   186	                            HStack {
+   187	                                Label("Calendars", systemImage: "calendar.badge.checkmark")
+   188	                                Spacer()
+   189	                                Text(calendarSelection.summary)
+   190	                                    .foregroundStyle(.secondary)
+   191	                            }
+   192	                        }
+   193
+   194	                        Button {
+   195	                            rescanCalendar()
+   196	                        } label: {
+   197	                            HStack {
+   198	                                Label(
+   199	                                    isIngestingCalendar ? "Scanning…" : "Scan Last 2 Years",
+   200	                                    systemImage: isIngestingCalendar ? "arrow.triangle.2.circlepath" : "arrow.clockwise"
+   201	                                )
+   202	                                if isIngestingCalendar {
+   203	                                    Spacer()
+   204	                                    ProgressView()
+   205	                                }
+   206	                            }
+   207	                        }
+   208	                        .disabled(isIngestingCalendar)
+   209	                    }
+   210
+   211	                    HStack {
+   212	                        Label("Data Store", systemImage: "externaldrive")
+   213	                        Spacer()
+   214	                        Text(dataStoreLabel)
+   215	                            .foregroundStyle(dataStoreColor)
+   216	                            .font(.subheadline)
+   217	                    }
+   218	                } header: {
+   219	                    Text("Data Sources")
+   220	                } footer: {
+   221	                    Text("Location and read-only events from your selected calendars help determine which country you were in each day. Verified photo metadata is shown only as non-scoring review context. BorderLog stores this data locally and may use Apple system services such as MapKit geocoding to resolve countries.")
+   222	                }
+   223
+   224
+   225
+   226	                // MARK: – Setup
+   227	                Section {
+   228	                    Button {
+   229	                        hasCompletedOnboarding = false
+   230	                        hasPromptedLocation = false
+   231	                        hasPromptedPhotos = false
+   232	                        hasPromptedCalendar = false
+   233	                    } label: {
+   234	                        Label("Re-Launch Setup", systemImage: "arrow.clockwise")
+   235	                    }
+   236	                } header: {
+   237	                    Text("Setup")
+   238	                }
+   239
+   240	                // MARK: – Data Management
+   241	                Section {
+   242	                    Button("Reset All Data", role: .destructive) {
+   243	                        isConfirmingReset = true
+   244	                    }
+   245	                } header: {
+   246	                    Text("Data Management")
+   247	                } footer: {
+   248	                    Text("Permanently deletes local travel data, profile values, and pending widget samples stored on this device.")
+   249	                }
+   250
+   251	#if DEBUG
+   252	                Section {
+   253	                    Button {
+   254	                        exportDebugDataStore()
+   255	                    } label: {
+   256	                        HStack {
+   257	                            Label(
+   258	                                isPreparingDebugExport ? "Preparing Export…" : "Export Debug Data Store",
+   259	                                systemImage: isPreparingDebugExport ? "arrow.triangle.2.circlepath" : "square.and.arrow.up"
+   260	                            )
+   261	                            if isPreparingDebugExport {
+   262	                                Spacer()
+   263	                                ProgressView()
+   264	                            }
+   265	                        }
+   266	                    }
+   267	                    .disabled(isPreparingDebugExport)
+   268	                } header: {
+   269	                    Text("Debug Export")
+   270	                } footer: {
+   271	                    Text("Exports a full-fidelity JSON snapshot for internal debugging, including raw coordinates, event identifiers, titles, asset hashes, and local user identifiers. Do not share this file externally unless you have reviewed it.")
+   272	                }
+   273	#endif
+   274
+   275	                // MARK: – App Info
+   276	                Section {
+   277	                    HStack {
+   278	                        Text("Version")
+   279	                        Spacer()
+   280	                        Text(appVersionString)
+   281	                            .foregroundStyle(.secondary)
+   282	                    }
+   283	                    HStack {
+   284	                        Text("Storage")
+   285	                        Spacer()
+   286	                        Text("Local (on-device)")
+   287	                            .foregroundStyle(.secondary)
+   288	                    }
+   289
+   290	                    NavigationLink {
+   291	                        PrivacyPolicyView()
+   292	                    } label: {
+   293	                        Label("Privacy Policy", systemImage: "hand.raised")
+   294	                    }
+   295	                } header: {
+   296	                    Text("About BorderLog")
+   297	                }
+   298
+   299	                // MARK: – Customization
+   300	                Section {

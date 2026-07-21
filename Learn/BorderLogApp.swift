@@ -34,6 +34,7 @@ struct BorderLogApp: App {
                 }
             }
         } catch {
+            Self.logger.critical("Failed to initialise the SwiftData container: \(error, privacy: .private)")
             _initializationError = State(initialValue: error)
         }
     }
@@ -41,7 +42,7 @@ struct BorderLogApp: App {
     var body: some Scene {
         WindowGroup {
             Group {
-                if let error = initializationError {
+                if initializationError != nil {
                     VStack(spacing: 16) {
                         Image(systemName: "exclamationmark.triangle.fill")
                             .font(.system(size: 48))
@@ -51,26 +52,22 @@ struct BorderLogApp: App {
                         Text("The application failed to initialize its database. Please restart the application.")
                             .multilineTextAlignment(.center)
                             .foregroundColor(.secondary)
-                        Text(error.localizedDescription)
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                            .multilineTextAlignment(.center)
                     }
                     .padding()
                 } else if let container = sharedModelContainer {
                     MainNavigationView()
                         .environmentObject(authManager)
-                        .overlay {
-                            if requireBiometrics && (!isUnlocked || scenePhase != .active) {
-                                SecurityLockView(
-                                    isUnlocked: $isUnlocked,
-                                    canAuthenticate: scenePhase == .active
-                                )
-                            }
-                        }
                         .modelContainer(container)
                 } else {
                     ProgressView("Initializing...")
+                }
+            }
+            .overlay {
+                if requireBiometrics && (!isUnlocked || scenePhase != .active) {
+                    SecurityLockView(
+                        isUnlocked: $isUnlocked,
+                        canAuthenticate: scenePhase == .active
+                    )
                 }
             }
         }
