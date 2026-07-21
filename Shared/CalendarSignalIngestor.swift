@@ -35,7 +35,7 @@ actor CalendarSignalIngestor {
         let countryName: String
     }
 
-    private struct PrimarySignalSelection {
+    struct PrimarySignalSelection {
         let locationString: String?
         let coordinate: CLLocationCoordinate2D?
         let date: Date
