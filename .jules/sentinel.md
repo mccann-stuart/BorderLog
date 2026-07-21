@@ -1,0 +1,4 @@
+## 2026-07-21 - Fix Unsafe Regex Compilation
+**Vulnerability:** A forced try (`try!`) was used as a fallback when compiling a regular expression in `makeRegex`, posing a Denial of Service (DoS) risk if an invalid pattern bypassed static checks.
+**Learning:** Relying on `try!` for error recovery or fallback compilation is dangerous and can lead to immediate app crashes. The use of `try!` borders on dangerous even for static string literals and should be avoided in security-conscious production environments where regex inputs could become dynamic or accidentally malformed.
+**Prevention:** Avoid `try!` entirely when initializing `NSRegularExpression`. Instead, return an optional (`NSRegularExpression?`), catch the error, return `nil`, and use optional chaining (`?.`) along with nil-coalescing (`??`) to safely handle potential failures gracefully without crashing.

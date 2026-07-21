@@ -42,12 +42,12 @@ enum CalendarEventIngestability: Sendable {
 enum CalendarFlightParsing {
 
     private nonisolated static let logger = Logger(subsystem: "com.MCCANN.Border", category: "Security")
-    private nonisolated static func makeRegex(pattern: String, options: NSRegularExpression.Options = []) -> NSRegularExpression {
+    private nonisolated static func makeRegex(pattern: String, options: NSRegularExpression.Options = []) -> NSRegularExpression? {
         do {
             return try NSRegularExpression(pattern: pattern, options: options)
         } catch {
             logger.error("Failed to compile regex with pattern '\(pattern, privacy: .private)': \(error, privacy: .private)")
-            return try! NSRegularExpression(pattern: "(?!) ", options: [])
+            return nil
         }
     }
 
@@ -129,35 +129,35 @@ enum CalendarFlightParsing {
             let nsString = text as NSString
             let range = NSRange(location: 0, length: nsString.length)
 
-            if let match = patternCodes.firstMatch(in: text, options: [], range: range), match.numberOfRanges >= 3 {
+            if let match = patternCodes?.firstMatch(in: text, options: [], range: range), match.numberOfRanges >= 3 {
                 return (
                     nsString.substring(with: match.range(at: 1)),
                     nsString.substring(with: match.range(at: 2))
                 )
             }
 
-            if let match = patternPlane.firstMatch(in: text, options: [], range: range), match.numberOfRanges >= 3 {
+            if let match = patternPlane?.firstMatch(in: text, options: [], range: range), match.numberOfRanges >= 3 {
                 return (
                     normalizeLocationToken(nsString.substring(with: match.range(at: 1))),
                     normalizeLocationToken(nsString.substring(with: match.range(at: 2)))
                 )
             }
 
-            if let match = patternPlaneEmoji.firstMatch(in: text, options: [], range: range), match.numberOfRanges >= 3 {
+            if let match = patternPlaneEmoji?.firstMatch(in: text, options: [], range: range), match.numberOfRanges >= 3 {
                 return (
                     normalizeLocationToken(nsString.substring(with: match.range(at: 1))),
                     normalizeLocationToken(nsString.substring(with: match.range(at: 2)))
                 )
             }
 
-            if let match = patternFromTo.firstMatch(in: text, options: [], range: range), match.numberOfRanges >= 3 {
+            if let match = patternFromTo?.firstMatch(in: text, options: [], range: range), match.numberOfRanges >= 3 {
                 return (
                     normalizeLocationToken(nsString.substring(with: match.range(at: 1))),
                     normalizeLocationToken(nsString.substring(with: match.range(at: 2)))
                 )
             }
 
-            if let match = patternFlightNumberRoute.firstMatch(in: text, options: [], range: range),
+            if let match = patternFlightNumberRoute?.firstMatch(in: text, options: [], range: range),
                match.numberOfRanges >= 3 {
                 return (
                     normalizeLocationToken(nsString.substring(with: match.range(at: 1))),
@@ -165,7 +165,7 @@ enum CalendarFlightParsing {
                 )
             }
 
-            if let match = patternTo.firstMatch(in: text, options: [], range: range),
+            if let match = patternTo?.firstMatch(in: text, options: [], range: range),
                match.numberOfRanges >= 2 {
                 if bestTo == nil {
                     bestTo = normalizeLocationToken(nsString.substring(with: match.range(at: 1)))
@@ -176,7 +176,7 @@ enum CalendarFlightParsing {
             do {
                 let preprocessedNSString = preprocessedText as NSString
                 let preprocessedRange = NSRange(location: 0, length: preprocessedNSString.length)
-                if let match = patternLineRoute.firstMatch(in: preprocessedText, options: [], range: preprocessedRange),
+                if let match = patternLineRoute?.firstMatch(in: preprocessedText, options: [], range: preprocessedRange),
                    match.numberOfRanges >= 3 {
                     return (
                         normalizeLocationToken(preprocessedNSString.substring(with: match.range(at: 1))),
@@ -186,7 +186,7 @@ enum CalendarFlightParsing {
             }
 
             if bestTo == nil,
-               let match = patternHotel.firstMatch(in: text, options: [], range: range),
+               let match = patternHotel?.firstMatch(in: text, options: [], range: range),
                match.numberOfRanges >= 2 {
                 bestTo = normalizeLocationToken(nsString.substring(with: match.range(at: 1)))
             }
@@ -228,7 +228,7 @@ enum CalendarFlightParsing {
 
     private nonisolated static func collapseWhitespace(_ raw: String) -> String {
         let range = NSRange(location: 0, length: (raw as NSString).length)
-        return patternWhitespace.stringByReplacingMatches(in: raw, options: [], range: range, withTemplate: " ")
+        return (patternWhitespace?.stringByReplacingMatches(in: raw, options: [], range: range, withTemplate: " ") ?? raw)
             .trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
@@ -237,13 +237,13 @@ enum CalendarFlightParsing {
         guard !value.isEmpty else { return nil }
 
         let range1 = NSRange(location: 0, length: (value as NSString).length)
-        value = patternFlightSuffix.stringByReplacingMatches(in: value, options: [], range: range1, withTemplate: "")
+        value = patternFlightSuffix?.stringByReplacingMatches(in: value, options: [], range: range1, withTemplate: "") ?? value
 
         let range2 = NSRange(location: 0, length: (value as NSString).length)
-        value = patternWeekdaySuffix.stringByReplacingMatches(in: value, options: [], range: range2, withTemplate: "")
+        value = patternWeekdaySuffix?.stringByReplacingMatches(in: value, options: [], range: range2, withTemplate: "") ?? value
 
         let range3 = NSRange(location: 0, length: (value as NSString).length)
-        value = patternWhitespace.stringByReplacingMatches(in: value, options: [], range: range3, withTemplate: " ")
+        value = patternWhitespace?.stringByReplacingMatches(in: value, options: [], range: range3, withTemplate: " ") ?? value
         value = value.trimmingCharacters(in: .whitespacesAndNewlines)
 
         var shouldContinue = true
