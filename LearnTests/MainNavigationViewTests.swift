@@ -25,7 +25,6 @@ final class MainNavigationViewTests: XCTestCase {
         mockLocationService = MockLocationSampleService()
 
         UserDefaults.standard.set(true, forKey: "hasCompletedOnboarding")
-
     }
 
     override func tearDownWithError() throws {
@@ -37,11 +36,9 @@ final class MainNavigationViewTests: XCTestCase {
     }
 
     func testPerformCaptureTodayLocationResilientToCaptureError() async throws {
-        // Arrange
         let error = NSError(domain: "TestErrorDomain", code: 1, userInfo: nil)
         mockLocationService.captureAndStoreBurstErrorToThrow = error
 
-        // Ensure no locations exist for today
         let calendar = Calendar.current
         let startOfDay = calendar.startOfDay(for: Date())
         guard let endOfDay = calendar.date(byAdding: .day, value: 1, to: startOfDay) else { return }
@@ -54,14 +51,26 @@ final class MainNavigationViewTests: XCTestCase {
         let existing = try modelContext.fetch(fetch)
         XCTAssertTrue(existing.isEmpty, "Should be no locations before test")
 
-        // Use the internal initializer we added
         let view = MainNavigationView(locationService: mockLocationService)
-
-        // Act - Invoke the explicitly isolated internal method and pass context
         await view.performCaptureTodayLocationIfNeeded(context: modelContext)
 
-        // Assert - The fact that we reach this point means the thrown error was swallowed
-        XCTAssertEqual(mockLocationService.captureAndStoreBurstDidCallCount, 1, "The burst capture should have been attempted")
-        XCTAssertEqual(mockLocationService.captureAndStoreBurstSource, .app, "The source should be .app")
+        XCTAssertEqual(mockLocationService.captureAndStoreBurstDidCallCount, 1)
+        XCTAssertEqual(mockLocationService.captureAndStoreBurstSource, .app)
+    }
+
+    func testPerformCaptureTodayLocationAttemptsCaptureAfterFetchError() async throws {
+        let config = ModelConfiguration(isStoredInMemoryOnly: true)
+        let containerWithoutLocationSamples = try ModelContainer(
+            for: Stay.self,
+            configurations: config
+        )
+        let failingContext = containerWithoutLocationSamples.mainContext
+        let view = MainNavigationView(locationService: mockLocationService)
+
+        await view.performCaptureTodayLocationIfNeeded(context: failingContext)
+
+        XCTAssertEqual(mockLocationService.captureAndStoreBurstDidCallCount, 1)
+        XCTAssertEqual(mockLocationService.captureAndStoreBurstSource, .app)
+        XCTAssertTrue(mockLocationService.captureAndStoreBurstModelContext === failingContext)
     }
 }
