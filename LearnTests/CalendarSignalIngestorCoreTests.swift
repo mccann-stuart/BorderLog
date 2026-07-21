@@ -3,6 +3,164 @@ import SwiftData
 import CoreLocation
 @testable import Learn
 
+
+extension CalendarSignalIngestor {
+    func testUpsertScenario(
+        existingDayKey: String,
+        resolved: ResolvedCalendarSignal
+    ) -> (
+        changed: Bool,
+        touchedDayKeys: [String],
+        finalDayKey: String,
+        finalTimeZoneId: String?,
+        finalBucketingTimeZoneId: String?
+    ) {
+        let existing = CalendarSignal(
+            timestamp: Date(timeIntervalSince1970: 0),
+            dayKey: existingDayKey,
+            latitude: 0,
+            longitude: 0,
+            countryCode: "GB",
+            countryName: "United Kingdom",
+            timeZoneId: "UTC",
+            bucketingTimeZoneId: "UTC",
+            eventIdentifier: "event-1",
+            title: "Old",
+            source: "Calendar"
+        )
+        var map: [String: CalendarSignal] = ["event-1": existing]
+        var touchedDayKeys = Set<String>()
+        let changed = upsertSignal(
+            identifier: "event-1",
+            resolved: resolved,
+            title: "New",
+            existingSignalByIdentifier: &map,
+            touchedDayKeys: &touchedDayKeys
+        )
+        let updated = map["event-1"] ?? existing
+        return (
+            changed: changed,
+            touchedDayKeys: touchedDayKeys.sorted(),
+            finalDayKey: updated.dayKey,
+            finalTimeZoneId: updated.timeZoneId,
+            finalBucketingTimeZoneId: updated.bucketingTimeZoneId
+        )
+    }
+
+    func testDeleteScenario(existingDayKey: String) -> (deleted: Int, touchedDayKeys: [String], remaining: Int) {
+        let existing = CalendarSignal(
+            timestamp: Date(timeIntervalSince1970: 0),
+            dayKey: existingDayKey,
+            latitude: 0,
+            longitude: 0,
+            countryCode: "GB",
+            countryName: "United Kingdom",
+            timeZoneId: "UTC",
+            bucketingTimeZoneId: "UTC",
+            eventIdentifier: "event-2",
+            title: "Old",
+            source: "Calendar"
+        )
+        var map: [String: CalendarSignal] = ["event-2": existing]
+        var touchedDayKeys = Set<String>()
+        let deleted = deleteSignalIfExists(
+            identifier: "event-2",
+            existingSignalByIdentifier: &map,
+            touchedDayKeys: &touchedDayKeys
+        )
+        return (deleted: deleted, touchedDayKeys: touchedDayKeys.sorted(), remaining: map.count)
+    }
+
+    func testOrphanCleanup(
+        existingDayKeys: [String],
+        seenIdentifiers: Set<String>
+    ) -> (deleted: Int, touchedDayKeys: [String], remainingIdentifiers: [String]) {
+        var existingSignalByIdentifier: [String: CalendarSignal] = [:]
+        for (index, dayKey) in existingDayKeys.enumerated() {
+            let identifier = "event-\(index)"
+            existingSignalByIdentifier[identifier] = CalendarSignal(
+                timestamp: Date(timeIntervalSince1970: TimeInterval(index)),
+                dayKey: dayKey,
+                latitude: 0,
+                longitude: 0,
+                countryCode: "GB",
+                countryName: "United Kingdom",
+                timeZoneId: "UTC",
+                bucketingTimeZoneId: "UTC",
+                eventIdentifier: identifier,
+                title: "Event \(index)",
+                source: "Calendar"
+            )
+        }
+
+        var touchedDayKeys = Set<String>()
+        let deleted = deleteOrphanedSignals(
+            existingSignalByIdentifier: &existingSignalByIdentifier,
+            seenIdentifiers: seenIdentifiers,
+            touchedDayKeys: &touchedDayKeys
+        )
+        return (
+            deleted: deleted,
+            touchedDayKeys: touchedDayKeys.sorted(),
+            remainingIdentifiers: existingSignalByIdentifier.keys.sorted()
+        )
+    }
+
+    func testDestinationFirstLegacyEndCleanup(
+        existingDayKey: String,
+        resolved: ResolvedCalendarSignal
+    ) -> (changed: Bool, deletedLegacyEnd: Int, remainingIdentifiers: [String]) {
+        let legacyPrimary = CalendarSignal(
+            timestamp: Date(timeIntervalSince1970: 0),
+            dayKey: existingDayKey,
+            latitude: 0,
+            longitude: 0,
+            countryCode: "GB",
+            countryName: "United Kingdom",
+            timeZoneId: "UTC",
+            bucketingTimeZoneId: "UTC",
+            eventIdentifier: "event-3",
+            title: "Old",
+            source: "Calendar"
+        )
+        let legacyEnd = CalendarSignal(
+            timestamp: Date(timeIntervalSince1970: 0),
+            dayKey: existingDayKey,
+            latitude: 0,
+            longitude: 0,
+            countryCode: "DE",
+            countryName: "Germany",
+            timeZoneId: "UTC",
+            bucketingTimeZoneId: "UTC",
+            eventIdentifier: "event-3#end",
+            title: "Old End",
+            source: "Calendar"
+        )
+        var map: [String: CalendarSignal] = [
+            "event-3": legacyPrimary,
+            "event-3#end": legacyEnd
+        ]
+        var touchedDayKeys = Set<String>()
+        let changed = upsertSignal(
+            identifier: "event-3",
+            resolved: resolved,
+            title: "New",
+            existingSignalByIdentifier: &map,
+            touchedDayKeys: &touchedDayKeys
+        )
+        let deletedLegacyEnd = deleteSignalIfExists(
+            identifier: "event-3#end",
+            existingSignalByIdentifier: &map,
+            touchedDayKeys: &touchedDayKeys
+        )
+        return (
+            changed: changed,
+            deletedLegacyEnd: deletedLegacyEnd,
+            remainingIdentifiers: map.keys.sorted()
+        )
+    }
+}
+
 final class CalendarSignalIngestorCoreTests: XCTestCase {
     private final class StubResolver: CountryResolving {
         func resolveCountry(for location: CLLocation) async -> CountryResolution? {
@@ -64,11 +222,11 @@ final class CalendarSignalIngestorCoreTests: XCTestCase {
         try selectionStore.save(.selected([]), markingRebuild: true)
         let ingestor = try makeIngestor(calendarSelectionStore: selectionStore)
 
-        let pendingMode = await ingestor.testEffectiveIngestMode(requestedMode: .auto)
+        let pendingMode = await ingestor.effectiveIngestMode(for: .auto)
         XCTAssertEqual(pendingMode, .selectionRebuild)
 
         selectionStore.markRebuildCompleted()
-        let completedMode = await ingestor.testEffectiveIngestMode(requestedMode: .auto)
+        let completedMode = await ingestor.effectiveIngestMode(for: .auto)
         XCTAssertEqual(completedMode, .auto)
     }
 
@@ -89,7 +247,7 @@ final class CalendarSignalIngestorCoreTests: XCTestCase {
         let start = Date(timeIntervalSince1970: 1_000)
         let end = Date(timeIntervalSince1970: 2_000)
 
-        let selection = await ingestor.testPrimarySignalSelection(
+        let selection = await ingestor.selectPrimarySignalInput(
             parsedFrom: nil,
             parsedTo: "MUC",
             eventStartDate: start,
@@ -102,14 +260,14 @@ final class CalendarSignalIngestorCoreTests: XCTestCase {
         XCTAssertEqual(selection.locationString, "MUC")
         XCTAssertTrue(selection.usesDestinationRule)
         XCTAssertEqual(selection.date, end)
-        XCTAssertFalse(selection.usesCoordinate)
+        XCTAssertFalse(selection.coordinate != nil)
     }
 
     func testPrimarySignalSelectionFallsBackToStructuredOriginWhenNoDestination() async throws {
         let ingestor = try makeIngestor()
         let start = Date(timeIntervalSince1970: 1_000)
 
-        let selection = await ingestor.testPrimarySignalSelection(
+        let selection = await ingestor.selectPrimarySignalInput(
             parsedFrom: nil,
             parsedTo: nil,
             eventStartDate: start,
@@ -122,7 +280,7 @@ final class CalendarSignalIngestorCoreTests: XCTestCase {
         XCTAssertEqual(selection.locationString, "Manchester Airport")
         XCTAssertFalse(selection.usesDestinationRule)
         XCTAssertEqual(selection.date, start)
-        XCTAssertTrue(selection.usesCoordinate)
+        XCTAssertTrue(selection.coordinate != nil)
     }
 
     func testShouldPersistOriginSignalForOvernightDestinationFlight() async throws {
@@ -130,13 +288,18 @@ final class CalendarSignalIngestorCoreTests: XCTestCase {
         let start = Date(timeIntervalSince1970: 1_000)
         let end = Date(timeIntervalSince1970: 90_000)
 
-        let shouldPersist = await ingestor.testShouldPersistOriginSignal(
-            originDayKey: "2026-03-09",
-            destinationDayKey: "2026-03-10",
-            eventStartDate: start,
-            eventEndDate: end,
-            eventTimeZoneId: "Europe/London"
+        let originResolved = CalendarSignalIngestor.ResolvedCalendarSignal(
+            timestamp: start,
+            dayKey: "2026-03-09",
+            timeZoneId: "UTC",
+            bucketingTimeZoneId: "UTC",
+            latitude: 0,
+            longitude: 0,
+            countryCode: "GB",
+            countryName: "United Kingdom"
         )
+
+        let shouldPersist = await ingestor.shouldPersistOriginSignal(originResolved: originResolved)
 
         XCTAssertTrue(shouldPersist)
     }
@@ -146,13 +309,18 @@ final class CalendarSignalIngestorCoreTests: XCTestCase {
         let start = Date(timeIntervalSince1970: 1_000)
         let end = Date(timeIntervalSince1970: 2_000)
 
-        let shouldPersist = await ingestor.testShouldPersistOriginSignal(
-            originDayKey: "2026-03-09",
-            destinationDayKey: "2026-03-09",
-            eventStartDate: start,
-            eventEndDate: end,
-            eventTimeZoneId: "Europe/London"
+        let originResolved = CalendarSignalIngestor.ResolvedCalendarSignal(
+            timestamp: start,
+            dayKey: "2026-03-09",
+            timeZoneId: "UTC",
+            bucketingTimeZoneId: "UTC",
+            latitude: 0,
+            longitude: 0,
+            countryCode: "GB",
+            countryName: "United Kingdom"
         )
+
+        let shouldPersist = await ingestor.shouldPersistOriginSignal(originResolved: originResolved)
 
         XCTAssertTrue(shouldPersist)
     }
@@ -179,4 +347,5 @@ final class CalendarSignalIngestorCoreTests: XCTestCase {
         XCTAssertEqual(result.deletedLegacyEnd, 1)
         XCTAssertEqual(result.remainingIdentifiers, ["event-3"])
     }
+
 }
