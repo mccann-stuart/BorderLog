@@ -908,4 +908,155 @@ final class CalendarTabDataServiceTests: XCTestCase {
         XCTAssertEqual(march7.countries.map(\.id), ["GB", "DE"])
         XCTAssertTrue(snapshot.countrySummaries.isEmpty)
     }
+
+    func testSnapshotWithEmptyContext() async throws {
+        let container = try makeContainer()
+        let service = CalendarTabDataService(modelContainer: container)
+
+        let visibleMonthStart = makeDate(2026, 3, 1)
+        let now = makeDate(2026, 3, 19)
+        let expectedMonthStart = Calendar.current.startOfDay(for: visibleMonthStart)
+
+        let snapshot = try await service.snapshot(
+            visibleMonthStart: visibleMonthStart,
+            summaryRange: .visibleMonth,
+            now: now
+        )
+
+        XCTAssertEqual(snapshot.visibleMonthStart, expectedMonthStart)
+        XCTAssertEqual(snapshot.daySummaries.count, 31) // March has 31 days
+        XCTAssertTrue(snapshot.countrySummaries.isEmpty)
+        XCTAssertTrue(snapshot.summaryUnknownDayKeys.isEmpty)
+
+        let march1 = try XCTUnwrap(snapshot.daySummaries.first { $0.dayKey == "2026-03-01" })
+        XCTAssertEqual(march1.dayNumber, 1)
+        XCTAssertTrue(march1.countries.isEmpty)
+        XCTAssertFalse(march1.hasFlight)
+        XCTAssertNil(march1.flightOriginCountry)
+        XCTAssertNil(march1.flightDestinationCountry)
+
+        let march19 = try XCTUnwrap(snapshot.daySummaries.first { $0.dayKey == "2026-03-19" })
+        XCTAssertTrue(march19.isToday)
+    }
+
+    func testSnapshotPlaceholder() async throws {
+        let visibleMonthStart = makeDate(2026, 3, 1)
+        let now = makeDate(2026, 3, 19)
+        let latestMonth = makeDate(2026, 3, 1)
+
+        var calendar = Calendar.current
+        calendar.timeZone = TimeZone(secondsFromGMT: 0) ?? .current
+        let expectedMonthStart = calendar.startOfDay(for: visibleMonthStart)
+
+        let snapshot = CalendarTabSnapshot.placeholder(
+            visibleMonthStart: visibleMonthStart,
+            latestAvailableMonth: latestMonth,
+            calendar: calendar,
+            now: now
+        )
+
+        XCTAssertEqual(snapshot.visibleMonthStart, expectedMonthStart)
+        XCTAssertEqual(snapshot.earliestAvailableMonth, expectedMonthStart)
+        XCTAssertEqual(snapshot.latestAvailableMonth, latestMonth)
+        XCTAssertEqual(snapshot.daySummaries.count, 31) // March has 31 days
+        XCTAssertTrue(snapshot.countrySummaries.isEmpty)
+        XCTAssertTrue(snapshot.summaryUnknownDayKeys.isEmpty)
+
+        let march1 = try XCTUnwrap(snapshot.daySummaries.first { $0.dayKey == "2026-03-01" })
+        XCTAssertTrue(march1.countries.isEmpty)
+    }
+
+    func testSnapshotWithMockPresenceData() async throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+
+        // Insert a country config so we can test the summary limits.
+        context.insert(CountryConfig(countryCode: "US", maxAllowedDays: 90))
+
+        let visibleMonthStart = makeDate(2026, 3, 1)
+        let now = makeDate(2026, 3, 19)
+        let timeZoneId = TimeZone.current.identifier
+
+        // Let's insert a couple of mock presence days.
+        context.insert(makePresenceDay(
+            dayKey: "2026-03-05",
+            date: normalizedDate(for: "2026-03-05"),
+            timeZoneId: timeZoneId,
+            countryCode: "US",
+            countryName: localizedCountryName("US"),
+            confidence: 0.9,
+            confidenceLabel: .high,
+            sources: .location,
+            isOverride: false,
+            stayCount: 0,
+            photoCount: 5,
+            locationCount: 10,
+            calendarCount: 0
+        ))
+
+        context.insert(makePresenceDay(
+            dayKey: "2026-03-15",
+            date: normalizedDate(for: "2026-03-15"),
+            timeZoneId: timeZoneId,
+            countryCode: "FR",
+            countryName: localizedCountryName("FR"),
+            confidence: 0.8,
+            confidenceLabel: .high,
+            sources: .photo,
+            isOverride: false,
+            stayCount: 0,
+            photoCount: 20,
+            locationCount: 0,
+            calendarCount: 0
+        ))
+
+        // A day earlier in the year to test `.thisYear` summary range
+        context.insert(makePresenceDay(
+            dayKey: "2026-01-10",
+            date: normalizedDate(for: "2026-01-10"),
+            timeZoneId: timeZoneId,
+            countryCode: "US",
+            countryName: localizedCountryName("US"),
+            confidence: 0.9,
+            confidenceLabel: .high,
+            sources: .location,
+            isOverride: false,
+            stayCount: 0,
+            photoCount: 0,
+            locationCount: 5,
+            calendarCount: 0
+        ))
+
+        try context.save()
+
+        let service = CalendarTabDataService(modelContainer: container)
+
+        let snapshot = try await service.snapshot(
+            visibleMonthStart: visibleMonthStart,
+            summaryRange: .thisYear,
+            now: now
+        )
+
+        // Verify daySummaries has 31 items, and check specific days
+        XCTAssertEqual(snapshot.daySummaries.count, 31)
+
+        let march5 = try XCTUnwrap(snapshot.daySummaries.first { $0.dayKey == "2026-03-05" })
+        XCTAssertEqual(march5.countries.map(\.id), ["US"])
+
+        let march15 = try XCTUnwrap(snapshot.daySummaries.first { $0.dayKey == "2026-03-15" })
+        XCTAssertEqual(march15.countries.map(\.id), ["FR"])
+
+        let march10 = try XCTUnwrap(snapshot.daySummaries.first { $0.dayKey == "2026-03-10" })
+        XCTAssertTrue(march10.countries.isEmpty) // No data for this day
+
+        // Verify countrySummaries logic across the summaryRange (.thisYear)
+        // We inserted US twice (Jan 10, Mar 5) and FR once (Mar 15).
+        let totals = Dictionary(uniqueKeysWithValues: snapshot.countrySummaries.map { ($0.id, $0.totalDays) })
+        XCTAssertEqual(totals["US"], 2)
+        XCTAssertEqual(totals["FR"], 1)
+
+        // Verify max allowed days mapping worked
+        let usSummary = try XCTUnwrap(snapshot.countrySummaries.first { $0.id == "US" })
+        XCTAssertEqual(usSummary.maxAllowedDays, 90)
+    }
 }
