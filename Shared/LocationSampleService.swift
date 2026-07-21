@@ -151,7 +151,7 @@ final class LocationCaptureCoordinator {
 }
 
 @MainActor
-final class LocationSampleService: NSObject, CLLocationManagerDelegate {
+class LocationSampleService: NSObject, CLLocationManagerDelegate {
     private let manager = CLLocationManager()
     private static let logger = Logger(subsystem: "com.MCCANN.Border", category: "LocationSampleService")
     private var previousBatchAccuracy: CLLocationAccuracy?
