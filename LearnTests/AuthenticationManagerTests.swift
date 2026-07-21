@@ -5,8 +5,10 @@ import Security
 // Mock KeychainHelper
 class MockKeychainHelper: KeychainHelperProtocol {
     var storage: [String: Data] = [:]
+    var saveCalls: [(data: Data, service: String, account: String)] = []
 
     func save(_ data: Data, service: String, account: String) {
+        saveCalls.append((data: data, service: service, account: account))
         let key = "\(service)-\(account)"
         storage[key] = data
     }
@@ -39,6 +41,16 @@ final class AuthenticationManagerTests: XCTestCase {
         manager.signIn(userId: userId)
 
         XCTAssertEqual(manager.appleUserId, userId)
+
+        // Verify the save function is called with the correct parameters
+        XCTAssertEqual(mockKeychain.saveCalls.count, 1)
+        if let firstCall = mockKeychain.saveCalls.first {
+            XCTAssertEqual(firstCall.service, "com.MCCANN.Border")
+            XCTAssertEqual(firstCall.account, "appleUserId")
+            XCTAssertEqual(String(data: firstCall.data, encoding: .utf8), userId)
+        } else {
+            XCTFail("Expected mockKeychain.save to be called")
+        }
 
         let storedData = mockKeychain.read(service: "com.MCCANN.Border", account: "appleUserId")
         XCTAssertNotNil(storedData)
