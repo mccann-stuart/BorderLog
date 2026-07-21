@@ -89,9 +89,32 @@ final class DataManagerTests: XCTestCase {
             source: "Calendar"
         )
         let countryConfig = CountryConfig(countryCode: "GB", maxAllowedDays: 180)
+        let presenceDay = PresenceDay(
+            dayKey: calendarDay,
+            date: Date(),
+            timeZoneId: TimeZone.current.identifier,
+            countryCode: "GB",
+            countryName: "United Kingdom",
+            confidence: 1.0,
+            confidenceLabel: .high,
+            sources: .calendar,
+            isOverride: false,
+            stayCount: 0,
+            photoCount: 0,
+            locationCount: 0
+        )
+        let photoIngestState = PhotoIngestState(lastIngestedAt: Date())
+
         context.insert(calendarSignal)
         context.insert(countryConfig)
+        context.insert(presenceDay)
+        context.insert(photoIngestState)
         try context.save()
+
+        XCTAssertTrue(try context.fetchCount(FetchDescriptor<CalendarSignal>()) > 0)
+        XCTAssertTrue(try context.fetchCount(FetchDescriptor<CountryConfig>()) > 0)
+        XCTAssertTrue(try context.fetchCount(FetchDescriptor<PresenceDay>()) > 0)
+        XCTAssertTrue(try context.fetchCount(FetchDescriptor<PhotoIngestState>()) > 0)
 
         let mockKeychain = MockKeychainHelper()
         for account in ["appleUserId", "userPassportNationality", "userHomeCountry"] {
@@ -155,6 +178,36 @@ final class DataManagerTests: XCTestCase {
         XCTAssertTrue(PendingLocationSnapshot.dequeueAll(from: defaults, clearAfter: false, queueDirectoryURL: pendingQueueURL).isEmpty)
         XCTAssertTrue(LedgerRecomputeRecoveryStore(defaults: defaults).dirtyDayKeys().isEmpty)
         XCTAssertNil(defaults.data(forKey: DiagnosticsStore.storageKey))
+    }
+
+    func testResetAllDataWithEmptyContext() async throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+
+        let dataManager = DataManager(modelContext: context)
+
+        // Verify context is empty
+        XCTAssertTrue(try context.fetchCount(FetchDescriptor<Stay>()) == 0)
+
+        let mockKeychain = MockKeychainHelper()
+        let suiteName = "DataManagerTests.EmptyContext.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        let pendingQueueURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("DataManagerTests.PendingQueue.EmptyContext.\(UUID().uuidString)", isDirectory: true)
+        defer {
+            defaults.removePersistentDomain(forName: suiteName)
+            try? FileManager.default.removeItem(at: pendingQueueURL)
+        }
+
+        // Reset
+        try dataManager.resetAllData(
+            keychain: mockKeychain,
+            defaults: defaults,
+            pendingLocationQueueDirectoryURL: pendingQueueURL
+        )
+
+        // Verify still empty and no errors thrown
+        XCTAssertTrue(try context.fetchCount(FetchDescriptor<Stay>()) == 0)
     }
 
     func testDeleteRemovesSpecificModel() async throws {
