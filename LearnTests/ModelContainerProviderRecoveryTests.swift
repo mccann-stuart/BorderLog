@@ -2,6 +2,91 @@ import XCTest
 @testable import Learn
 
 final class ModelContainerProviderRecoveryTests: XCTestCase {
+    func testMakeContainerAppGroupQuarantineRecovery() throws {
+        let fm = FileManager.default
+        let root = fm.temporaryDirectory.appendingPathComponent("AppGroupRecoveryTests-\(UUID().uuidString)")
+        let appGroupRoot = root.appendingPathComponent("group")
+        let appGroupSupport = appGroupRoot.appendingPathComponent("Library/Application Support")
+        try fm.createDirectory(at: appGroupSupport, withIntermediateDirectories: true)
+        defer { try? fm.removeItem(at: root) }
+
+        let storeNames = ["default.store", "Learn.store", "BorderLog.store"]
+        for storeName in storeNames {
+            let storeURL = appGroupSupport.appendingPathComponent(storeName)
+            try Data("corrupted data".utf8).write(to: storeURL)
+        }
+
+        var attempts = 0
+        let containerBuilder: (Schema, ModelConfiguration) throws -> ModelContainer = { schema, config in
+            attempts += 1
+            if attempts == 1 {
+                // Simulate first open failure due to corruption
+                throw StubError(description: "database disk image is malformed")
+            }
+            // For testing purposes, we return a fallback container on retry
+            let memConfig = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
+            return try ModelContainer(for: schema, configurations: [memConfig])
+        }
+
+        let container = ModelContainerProvider.makeContainer(
+            isAppGroupAvailable: true,
+            appGroupId: "test.group",
+            appGroupContainerURL: appGroupRoot,
+            appSupportDirectory: nil,
+            containerBuilder: containerBuilder
+        )
+
+        XCTAssertNotNil(container, "Expected recovery to succeed and return a container")
+        XCTAssertEqual(attempts, 2, "Expected exactly 2 initialization attempts (1st fails, 2nd succeeds after quarantine)")
+
+        for storeName in storeNames {
+            let quarantinedFiles = try fm.contentsOfDirectory(atPath: appGroupSupport.path).filter { $0.starts(with: storeName) && $0.contains(".quarantine-") }
+            XCTAssertFalse(quarantinedFiles.isEmpty, "Expected store file \(storeName) to be quarantined")
+            let originalFile = appGroupSupport.appendingPathComponent(storeName)
+            XCTAssertFalse(fm.fileExists(atPath: originalFile.path), "Expected original store file \(storeName) to be removed/moved")
+        }
+    }
+
+    func testMakeContainerLocalStoreQuarantineRecovery() throws {
+        let fm = FileManager.default
+        let root = fm.temporaryDirectory.appendingPathComponent("LocalRecoveryTests-\(UUID().uuidString)")
+        let appSupport = root.appendingPathComponent("Library/Application Support")
+        try fm.createDirectory(at: appSupport, withIntermediateDirectories: true)
+        defer { try? fm.removeItem(at: root) }
+
+        let storeNames = ["BorderLog.store"]
+        for storeName in storeNames {
+            let storeURL = appSupport.appendingPathComponent(storeName)
+            try Data("corrupted data".utf8).write(to: storeURL)
+        }
+
+        var attempts = 0
+        let containerBuilder: (Schema, ModelConfiguration) throws -> ModelContainer = { schema, config in
+            attempts += 1
+            if attempts == 1 {
+                throw StubError(description: "database disk image is malformed")
+            }
+            let memConfig = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
+            return try ModelContainer(for: schema, configurations: [memConfig])
+        }
+
+        let container = ModelContainerProvider.makeContainer(
+            isAppGroupAvailable: false,
+            appGroupId: nil,
+            appGroupContainerURL: nil,
+            appSupportDirectory: appSupport,
+            containerBuilder: containerBuilder
+        )
+
+        XCTAssertNotNil(container, "Expected recovery to succeed and return a container")
+        XCTAssertEqual(attempts, 2, "Expected exactly 2 initialization attempts (1st fails, 2nd succeeds after quarantine)")
+
+        for storeName in storeNames {
+            let quarantinedFiles = try fm.contentsOfDirectory(atPath: appSupport.path).filter { $0.starts(with: storeName) && $0.contains(".quarantine-") }
+            XCTAssertFalse(quarantinedFiles.isEmpty, "Expected store file \(storeName) to be quarantined")
+        }
+    }
+
     private struct StubError: Error, CustomStringConvertible {
         let description: String
     }
