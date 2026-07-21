@@ -8,3 +8,6 @@
 ## 2024-07-21 - Avoid intermediate array allocations in loops
 **Learning:** Using `.map` directly on a collection within a `for` loop declaration in Swift causes an unnecessary `O(N)` allocation of an intermediate array before iteration begins.
 **Action:** Removed `.map` from the `for` loop declaration and evaluated the mapped expression (`Self.calendarCountry(from: countedCountry)`) directly inside the loop body, achieving `O(1)` memory overhead while maintaining exact functionality.
+## 2026-07-21 - Extract massive View structs into subviews
+**Learning:** Monolithic SwiftUI views with massively nested `@ViewBuilder` logic cause performance issues, make code harder to read, and result in dead code (like orphaned properties when UI elements change).
+**Action:** Used python scripting to refactor `SettingsView` by splitting it into smaller, reusable structs (`SettingsProfileSection`, `SettingsDataSourcesSection`, etc.) and explicitly passing state via `@Binding` and closures, thus improving code health.
