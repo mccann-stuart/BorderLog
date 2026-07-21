@@ -6,7 +6,7 @@ import Foundation
 final class AirportCodeResolverTests: XCTestCase {
 
     func testResolveKnownAirport() async throws {
-        let resolver = AirportCodeResolver.shared
+        let resolver = AirportCodeResolver()
 
         // JFK: 40.639447,-73.779317,US
         let resolved = await resolver.resolve(code: "JFK")
@@ -19,7 +19,7 @@ final class AirportCodeResolverTests: XCTestCase {
     }
 
     func testResolveCaseInsensitive() async throws {
-        let resolver = AirportCodeResolver.shared
+        let resolver = AirportCodeResolver()
 
         // lhr (LHR): 51.4706,-0.461941,GB
         let resolved = await resolver.resolve(code: "lhr")
@@ -32,7 +32,7 @@ final class AirportCodeResolverTests: XCTestCase {
     }
 
     func testResolveNonExistentAirport() async {
-        let resolver = AirportCodeResolver.shared
+        let resolver = AirportCodeResolver()
 
         let location = await resolver.resolve(code: "XYZ999")
 
@@ -40,7 +40,7 @@ final class AirportCodeResolverTests: XCTestCase {
     }
 
     func testResolveAnotherKnownAirport() async throws {
-        let resolver = AirportCodeResolver.shared
+        let resolver = AirportCodeResolver()
 
         // DXB: 25.2527999878,55.3643989563,AE
         let resolved = await resolver.resolve(code: "DXB")
@@ -50,6 +50,33 @@ final class AirportCodeResolverTests: XCTestCase {
         XCTAssertEqual(location.country, "AE")
         XCTAssertEqual(location.lat, 25.2527999878, accuracy: 0.000001)
         XCTAssertEqual(location.lon, 55.3643989563, accuracy: 0.000001)
+    }
+
+    func testResolveEmptyString() async {
+        let resolver = AirportCodeResolver()
+
+        let location = await resolver.resolve(code: "")
+        XCTAssertNil(location)
+    }
+
+    func testConcurrentResolves() async throws {
+        let resolver = AirportCodeResolver()
+
+        let results = await withTaskGroup(of: AirportLocation?.self) { group in
+            group.addTask { await resolver.resolve(code: "JFK") }
+            group.addTask { await resolver.resolve(code: "LHR") }
+            group.addTask { await resolver.resolve(code: "DXB") }
+            group.addTask { await resolver.resolve(code: "XYZ999") }
+
+            var collected: [AirportLocation?] = []
+            for await result in group {
+                collected.append(result)
+            }
+            return collected
+        }
+
+        XCTAssertEqual(results.count, 4)
+        XCTAssertEqual(results.compactMap { $0 }.count, 3)
     }
 }
 #endif
