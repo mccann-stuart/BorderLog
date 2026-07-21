@@ -1,4 +1,5 @@
 import XCTest
+import SwiftData
 @testable import Learn
 
 final class ModelContainerProviderRecoveryTests: XCTestCase {
@@ -28,7 +29,7 @@ final class ModelContainerProviderRecoveryTests: XCTestCase {
             return try ModelContainer(for: schema, configurations: [memConfig])
         }
 
-        let container = ModelContainerProvider.makeContainer(
+        let container = try ModelContainerProvider.makeContainer(
             isAppGroupAvailable: true,
             appGroupId: "test.group",
             appGroupContainerURL: appGroupRoot,
@@ -70,7 +71,7 @@ final class ModelContainerProviderRecoveryTests: XCTestCase {
             return try ModelContainer(for: schema, configurations: [memConfig])
         }
 
-        let container = ModelContainerProvider.makeContainer(
+        let container = try ModelContainerProvider.makeContainer(
             isAppGroupAvailable: false,
             appGroupId: nil,
             appGroupContainerURL: nil,

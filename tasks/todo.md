@@ -20,3 +20,17 @@
 - Repaired conflicts or merge blockers on #262, #263, #269, #270, #271, #278, and #280 on their PR branches before merging.
 - Verified final `main` with the backend test suite and an iOS `build-for-testing` for both simulator architectures; four focused `DataManagerTests` also passed.
 - The full simulator XCTest run could not start because CoreSimulator stalled while booting. The corrected #280 tests compiled successfully, and GitHub's final open-PR list was empty.
+
+## Merge PR #286 — 21 July 2026
+
+- [x] Inspect the live PR metadata, diff, reviews, checks, and mergeability.
+- [x] Verify every changed `ModelContainerProvider.makeContainer()` call site and run the narrowest relevant build/tests.
+- [x] Resolve the merge blocker on the PR branch without disturbing unrelated work.
+- [x] Merge PR #286 using the repository-supported method and confirm the live merged state.
+
+### Review
+
+- Reconciled the PR's throwing container initialisation with `main`'s injectable recovery path and updated the recovery tests for the throwing API.
+- Made every widget show an explicit storage-unavailable state instead of presenting empty or zeroed travel data as real results.
+- Kept the storage error behind the biometric overlay, logged private diagnostics, and removed raw persistence details from the pre-unlock UI.
+- `xcodebuild ... build-for-testing` succeeded for the app, widget, unit tests, and UI tests on both simulator architectures. Runtime tests were unavailable because no simulator destination was installed.

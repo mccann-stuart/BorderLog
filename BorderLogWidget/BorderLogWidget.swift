@@ -53,27 +53,32 @@ struct BorderLogWidgetEntry: TimelineEntry {
     let date: Date
     let country: String
     let timestamp: Date?
+    let isStorageUnavailable: Bool
 }
 
 struct BorderLogWidgetProvider: TimelineProvider {
     func placeholder(in context: Context) -> BorderLogWidgetEntry {
-        BorderLogWidgetEntry(date: Date(), country: "Last known", timestamp: Date())
+        BorderLogWidgetEntry(date: Date(), country: "Last known", timestamp: Date(), isStorageUnavailable: false)
     }
 
     func getSnapshot(in context: Context, completion: @escaping (BorderLogWidgetEntry) -> Void) {
-        completion(BorderLogWidgetEntry(date: Date(), country: "Last known", timestamp: Date()))
+        completion(BorderLogWidgetEntry(date: Date(), country: "Last known", timestamp: Date(), isStorageUnavailable: false))
     }
 
     func getTimeline(in context: Context, completion: @escaping (Timeline<BorderLogWidgetEntry>) -> Void) {
         Task { @MainActor in
-            let container = ModelContainerProvider.makeContainer()
+            guard let container = try? ModelContainerProvider.makeContainer() else {
+                let entry = BorderLogWidgetEntry(date: Date(), country: "Storage unavailable", timestamp: nil, isStorageUnavailable: true)
+                completion(Timeline(entries: [entry], policy: .after(Date().addingTimeInterval(3600))))
+                return
+            }
             let modelContext = ModelContext(container)
 
             await captureWidgetLocationIfAuthorized(modelContext: modelContext)
 
             let latest = Self.latestSample(from: modelContext)
             let country = latest?.countryName ?? latest?.countryCode ?? "Unknown"
-            let entry = BorderLogWidgetEntry(date: Date(), country: country, timestamp: latest?.timestamp)
+            let entry = BorderLogWidgetEntry(date: Date(), country: country, timestamp: latest?.timestamp, isStorageUnavailable: false)
             let nextUpdate = Calendar.current.date(byAdding: .minute, value: 30, to: Date()) ?? Date().addingTimeInterval(1800)
             let timeline = Timeline(entries: [entry], policy: .after(nextUpdate))
             completion(timeline)
@@ -98,7 +103,11 @@ struct BorderLogWidgetEntryView: View {
             Text(entry.country)
                 .font(.system(.title2, design: .rounded).bold())
 
-            if let timestamp = entry.timestamp {
+            if entry.isStorageUnavailable {
+                Text("Open BorderLog to retry")
+                    .font(.system(.caption, design: .rounded))
+                    .foregroundStyle(.secondary)
+            } else if let timestamp = entry.timestamp {
                 Text(timestamp, style: .time)
                     .font(.system(.caption, design: .rounded))
                     .foregroundStyle(.secondary)
@@ -143,6 +152,7 @@ struct WidgetCountryDaysInfo: Identifiable {
 struct TopCountriesEntry: TimelineEntry {
     let date: Date
     let topCountries: [WidgetCountryDaysInfo]
+    let isStorageUnavailable: Bool
 }
 
 struct TopCountriesWidgetProvider: TimelineProvider {
@@ -151,7 +161,7 @@ struct TopCountriesWidgetProvider: TimelineProvider {
             WidgetCountryDaysInfo(countryName: "France", countryCode: "FR", totalDays: 42, region: .schengen),
             WidgetCountryDaysInfo(countryName: "Spain", countryCode: "ES", totalDays: 14, region: .schengen),
             WidgetCountryDaysInfo(countryName: "United Kingdom", countryCode: "GB", totalDays: 7, region: .nonSchengen)
-        ])
+        ], isStorageUnavailable: false)
     }
 
     func getSnapshot(in context: Context, completion: @escaping (TopCountriesEntry) -> Void) {
@@ -160,13 +170,17 @@ struct TopCountriesWidgetProvider: TimelineProvider {
 
     func getTimeline(in context: Context, completion: @escaping (Timeline<TopCountriesEntry>) -> Void) {
         Task { @MainActor in
-            let container = ModelContainerProvider.makeContainer()
+            guard let container = try? ModelContainerProvider.makeContainer() else {
+                let entry = TopCountriesEntry(date: Date(), topCountries: [], isStorageUnavailable: true)
+                completion(Timeline(entries: [entry], policy: .after(Date().addingTimeInterval(3600))))
+                return
+            }
             let modelContext = ModelContext(container)
 
             var descriptor = FetchDescriptor<PresenceDay>()
             let now = Date()
             guard let startOfYear = Calendar.current.dateInterval(of: .year, for: now)?.start else {
-                let timeline = Timeline(entries: [TopCountriesEntry(date: now, topCountries: [])], policy: .after(now.addingTimeInterval(3600)))
+                let timeline = Timeline(entries: [TopCountriesEntry(date: now, topCountries: [], isStorageUnavailable: false)], policy: .after(now.addingTimeInterval(3600)))
                 completion(timeline)
                 return
             }
@@ -219,7 +233,7 @@ struct TopCountriesWidgetProvider: TimelineProvider {
 
             let top3Array = [top1, top2, top3].compactMap { $0 }
 
-            let entry = TopCountriesEntry(date: now, topCountries: top3Array)
+            let entry = TopCountriesEntry(date: now, topCountries: top3Array, isStorageUnavailable: false)
             let nextUpdate = Calendar.current.date(byAdding: .hour, value: 3, to: now) ?? now.addingTimeInterval(10800)
             let timeline = Timeline(entries: [entry], policy: .after(nextUpdate))
             completion(timeline)
@@ -249,7 +263,15 @@ struct TopCountriesWidgetEntryView: View {
             Text("Top Countries")
                 .font(.system(.headline, design: .rounded))
             
-            if entry.topCountries.isEmpty {
+            if entry.isStorageUnavailable {
+                Text("Storage unavailable")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Text("Open BorderLog to retry")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                Spacer()
+            } else if entry.topCountries.isEmpty {
                 Text("No data this year")
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -299,6 +321,7 @@ struct TopCountriesWidget: Widget {
 struct SchengenEntry: TimelineEntry {
     let date: Date
     let summary: SchengenLedgerSummary
+    let isStorageUnavailable: Bool
 }
 
 struct SchengenWidgetProvider: TimelineProvider {
@@ -311,7 +334,7 @@ struct SchengenWidgetProvider: TimelineProvider {
             windowStart: Calendar.current.date(byAdding: .day, value: -180, to: Date()) ?? Date(),
             windowEnd: Date()
         )
-        return SchengenEntry(date: Date(), summary: dummySummary)
+        return SchengenEntry(date: Date(), summary: dummySummary, isStorageUnavailable: false)
     }
 
     func getSnapshot(in context: Context, completion: @escaping (SchengenEntry) -> Void) {
@@ -320,7 +343,19 @@ struct SchengenWidgetProvider: TimelineProvider {
 
     func getTimeline(in context: Context, completion: @escaping (Timeline<SchengenEntry>) -> Void) {
         Task { @MainActor in
-            let container = ModelContainerProvider.makeContainer()
+            guard let container = try? ModelContainerProvider.makeContainer() else {
+                let dummySummary = SchengenLedgerSummary(
+                    usedDays: 0,
+                    remainingDays: 0,
+                    overstayDays: 0,
+                    unknownDays: 0,
+                    windowStart: Date(),
+                    windowEnd: Date()
+                )
+                let entry = SchengenEntry(date: Date(), summary: dummySummary, isStorageUnavailable: true)
+                completion(Timeline(entries: [entry], policy: .after(Date().addingTimeInterval(3600))))
+                return
+            }
             let modelContext = ModelContext(container)
 
             let now = Date()
@@ -338,7 +373,7 @@ struct SchengenWidgetProvider: TimelineProvider {
                 countingMode: CountryDayCountingMode.load()
             )
             
-            let entry = SchengenEntry(date: now, summary: summary)
+            let entry = SchengenEntry(date: now, summary: summary, isStorageUnavailable: false)
             let nextUpdate = Calendar.current.date(byAdding: .hour, value: 3, to: now) ?? now.addingTimeInterval(10800)
             let timeline = Timeline(entries: [entry], policy: .after(nextUpdate))
             completion(timeline)
@@ -361,7 +396,14 @@ struct SchengenWidgetEntryView: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
             
-            if family == .systemSmall {
+            if entry.isStorageUnavailable {
+                Text("Storage unavailable")
+                    .font(.subheadline.bold())
+                    .foregroundStyle(.secondary)
+                Text("Open BorderLog to retry")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            } else if family == .systemSmall {
                 HStack {
                     VStack(alignment: .leading) {
                         Text("\(entry.summary.usedDays)")
