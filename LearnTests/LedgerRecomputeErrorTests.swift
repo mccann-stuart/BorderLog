@@ -40,31 +40,113 @@ final class LedgerRecomputeErrorTests: XCTestCase {
         try await super.tearDown()
     }
 
-    func testFetchFailureAbortsRecompute() async throws {
-        // Given
+    func testFetchStaysFailureAbortsRecompute() async throws {
         struct TestError: Error, Equatable {}
         let expectedError = TestError()
         mockFetcher.fetchStaysError = expectedError
 
         let expectation = XCTestExpectation(description: "Error handler called")
-
         await service.setErrorHandler { error in
-            if let err = error as? TestError, err == expectedError {
-                expectation.fulfill()
-            }
+            if let err = error as? TestError, err == expectedError { expectation.fulfill() }
         }
 
-        // When
         do {
             try await service.recompute(dayKeys: ["2024-01-01"])
-            XCTFail("Expected fetch failure to propagate")
+            XCTFail("Expected fetchStays failure to propagate")
         } catch {
             XCTAssertTrue(error is TestError)
         }
 
-        // Then
         await fulfillment(of: [expectation], timeout: 1.0)
-        XCTAssertFalse(mockFetcher.saveCalled, "Save should not be called if fetch fails")
+        XCTAssertFalse(mockFetcher.saveCalled)
+        XCTAssertEqual(recoveryStore.dirtyDayKeys(), Set(["2024-01-01"]))
+    }
+
+    func testFetchOverridesFailureAbortsRecompute() async throws {
+        struct TestError: Error, Equatable {}
+        let expectedError = TestError()
+        mockFetcher.fetchOverridesError = expectedError
+
+        let expectation = XCTestExpectation(description: "Error handler called")
+        await service.setErrorHandler { error in
+            if let err = error as? TestError, err == expectedError { expectation.fulfill() }
+        }
+
+        do {
+            try await service.recompute(dayKeys: ["2024-01-01"])
+            XCTFail("Expected fetchOverrides failure to propagate")
+        } catch {
+            XCTAssertTrue(error is TestError)
+        }
+
+        await fulfillment(of: [expectation], timeout: 1.0)
+        XCTAssertFalse(mockFetcher.saveCalled)
+        XCTAssertEqual(recoveryStore.dirtyDayKeys(), Set(["2024-01-01"]))
+    }
+
+    func testFetchLocationsFailureAbortsRecompute() async throws {
+        struct TestError: Error, Equatable {}
+        let expectedError = TestError()
+        mockFetcher.fetchLocationsError = expectedError
+
+        let expectation = XCTestExpectation(description: "Error handler called")
+        await service.setErrorHandler { error in
+            if let err = error as? TestError, err == expectedError { expectation.fulfill() }
+        }
+
+        do {
+            try await service.recompute(dayKeys: ["2024-01-01"])
+            XCTFail("Expected fetchLocations failure to propagate")
+        } catch {
+            XCTAssertTrue(error is TestError)
+        }
+
+        await fulfillment(of: [expectation], timeout: 1.0)
+        XCTAssertFalse(mockFetcher.saveCalled)
+        XCTAssertEqual(recoveryStore.dirtyDayKeys(), Set(["2024-01-01"]))
+    }
+
+    func testFetchPhotosFailureAbortsRecompute() async throws {
+        struct TestError: Error, Equatable {}
+        let expectedError = TestError()
+        mockFetcher.fetchPhotosError = expectedError
+
+        let expectation = XCTestExpectation(description: "Error handler called")
+        await service.setErrorHandler { error in
+            if let err = error as? TestError, err == expectedError { expectation.fulfill() }
+        }
+
+        do {
+            try await service.recompute(dayKeys: ["2024-01-01"])
+            XCTFail("Expected fetchPhotos failure to propagate")
+        } catch {
+            XCTAssertTrue(error is TestError)
+        }
+
+        await fulfillment(of: [expectation], timeout: 1.0)
+        XCTAssertFalse(mockFetcher.saveCalled)
+        XCTAssertEqual(recoveryStore.dirtyDayKeys(), Set(["2024-01-01"]))
+    }
+
+    func testFetchCalendarSignalsFailureAbortsRecompute() async throws {
+        struct TestError: Error, Equatable {}
+        let expectedError = TestError()
+        mockFetcher.fetchCalendarSignalsError = expectedError
+
+        let expectation = XCTestExpectation(description: "Error handler called")
+        await service.setErrorHandler { error in
+            if let err = error as? TestError, err == expectedError { expectation.fulfill() }
+        }
+
+        do {
+            try await service.recompute(dayKeys: ["2024-01-01"])
+            XCTFail("Expected fetchCalendarSignals failure to propagate")
+        } catch {
+            XCTAssertTrue(error is TestError)
+        }
+
+        await fulfillment(of: [expectation], timeout: 1.0)
+        XCTAssertFalse(mockFetcher.saveCalled)
         XCTAssertEqual(recoveryStore.dirtyDayKeys(), Set(["2024-01-01"]))
     }
 
