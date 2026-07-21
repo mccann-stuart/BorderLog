@@ -363,6 +363,21 @@ enum ModelContainerProvider {
     internal static var currentStoreEpochForTests: Int { currentStoreEpoch }
 
     static func makeContainer() -> ModelContainer {
+        return makeContainer(
+            isAppGroupAvailable: AppConfig.isAppGroupAvailable,
+            appGroupId: AppConfig.appGroupId,
+            appGroupContainerURL: AppConfig.appGroupContainerURL,
+            appSupportDirectory: FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
+        )
+    }
+
+    internal static func makeContainer(
+        isAppGroupAvailable: Bool,
+        appGroupId: String?,
+        appGroupContainerURL: URL?,
+        appSupportDirectory: URL?,
+        containerBuilder: ((Schema, ModelConfiguration) throws -> ModelContainer)? = nil
+    ) -> ModelContainer {
         _ = enforceStoreEpoch()
         let schema = Schema(versionedSchema: BorderLogSchemaV7.self)
         let cloudKitDatabase: ModelConfiguration.CloudKitDatabase =
@@ -370,20 +385,25 @@ enum ModelContainerProvider {
                 ? .private(AppConfig.cloudKitContainerId)
                 : .none
 
+        let buildContainer: (Schema, ModelConfiguration) throws -> ModelContainer = { s, c in
+            if let builder = containerBuilder { return try builder(s, c) }
+            return try ModelContainer(for: s, migrationPlan: BorderLogMigrationPlan.self, configurations: [c])
+        }
+
         // Tier 1: App Group shared container (needed for widget access)
-        if AppConfig.isAppGroupAvailable, let appGroupId = AppConfig.appGroupId {
+        if isAppGroupAvailable, let appGroupId = appGroupId {
             let appGroupConfig = ModelConfiguration(
                 schema: schema,
                 groupContainer: .identifier(appGroupId),
                 cloudKitDatabase: cloudKitDatabase
             )
             do {
-                let container = try ModelContainer(for: schema, migrationPlan: BorderLogMigrationPlan.self, configurations: [appGroupConfig])
+                let container = try buildContainer(schema, appGroupConfig)
                 logger.info("Using App Group store at group: \(appGroupId, privacy: .private)")
                 return container
             } catch {
                 logger.error("App Group store open failed. Attempting quarantine recovery. Error: \(error, privacy: .private)")
-                if let appGroupRoot = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: appGroupId) {
+                if let appGroupRoot = appGroupContainerURL {
                     let appGroupSupport = appGroupRoot.appendingPathComponent("Library/Application Support")
                     if let recovered = recoverByQuarantiningStore(
                         schema: schema,
@@ -391,7 +411,8 @@ enum ModelContainerProvider {
                         storeDirectory: appGroupSupport,
                         storeNames: ["default.store", "Learn.store", "BorderLog.store"],
                         initialError: error,
-                        contextLabel: "App Group"
+                        contextLabel: "App Group",
+                        containerBuilder: containerBuilder
                     ) {
                         return recovered
                     }
@@ -403,7 +424,7 @@ enum ModelContainerProvider {
         // IMPORTANT: Always specify an explicit URL to prevent SwiftData from defaulting
         // to the App Group container (which happens when no URL is given and the app has
         // an App Group entitlement, even without a groupContainer configuration).
-        guard let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first else {
+        guard let appSupport = appSupportDirectory else {
             logger.critical("Cannot locate Application Support directory — using in-memory store.")
             return makeInMemoryContainer(schema: schema)
         }
@@ -411,7 +432,7 @@ enum ModelContainerProvider {
         let storeURL = appSupport.appendingPathComponent("BorderLog.store")
         let localConfig = ModelConfiguration(schema: schema, url: storeURL, cloudKitDatabase: cloudKitDatabase)
         do {
-            let container = try ModelContainer(for: schema, migrationPlan: BorderLogMigrationPlan.self, configurations: [localConfig])
+            let container = try buildContainer(schema, localConfig)
             logger.info("Using local sandbox store at: \(storeURL.lastPathComponent, privacy: .private)")
             return container
         } catch {
@@ -422,7 +443,8 @@ enum ModelContainerProvider {
                 storeDirectory: appSupport,
                 storeNames: ["BorderLog.store"],
                 initialError: error,
-                contextLabel: "Local"
+                contextLabel: "Local",
+                containerBuilder: containerBuilder
             ) {
                 return recovered
             }
@@ -498,14 +520,19 @@ enum ModelContainerProvider {
         return container
     }
 
-    private static func recoverByQuarantiningStore(
+    internal static func recoverByQuarantiningStore(
         schema: Schema,
         configuration: ModelConfiguration,
         storeDirectory: URL,
         storeNames: [String],
         initialError: Error,
-        contextLabel: String
+        contextLabel: String,
+        containerBuilder: ((Schema, ModelConfiguration) throws -> ModelContainer)? = nil
     ) -> ModelContainer? {
+        let buildContainer: (Schema, ModelConfiguration) throws -> ModelContainer = { s, c in
+            if let builder = containerBuilder { return try builder(s, c) }
+            return try ModelContainer(for: s, migrationPlan: BorderLogMigrationPlan.self, configurations: [c])
+        }
         guard shouldAttemptRecovery(for: initialError) else {
             logger.error("\(contextLabel, privacy: .private) store failure does not match recovery heuristics; skipping destructive paths.")
             return nil
@@ -522,7 +549,7 @@ enum ModelContainerProvider {
         }
 
         do {
-            let container = try ModelContainer(for: schema, migrationPlan: BorderLogMigrationPlan.self, configurations: [configuration])
+            let container = try buildContainer(schema, configuration)
             logger.warning("\(contextLabel, privacy: .private) store recovered by quarantining prior files with tag \(quarantineTag, privacy: .private).")
             return container
         } catch {
@@ -537,7 +564,7 @@ enum ModelContainerProvider {
             }
 
             do {
-                let container = try ModelContainer(for: schema, migrationPlan: BorderLogMigrationPlan.self, configurations: [configuration])
+                let container = try buildContainer(schema, configuration)
                 logger.warning("\(contextLabel, privacy: .private) store recreated after quarantine + corruption-confirmed delete.")
                 return container
             } catch {
